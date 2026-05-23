@@ -9,7 +9,7 @@ require('dotenv').config();
  
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Origin','Accept'] }));
-app.options('*', cors());
+app.options('/{*path}', cors());
 app.use(express.json());
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -667,4 +667,3 @@ setupDB().then(() => {
   console.error('Erro ao configurar banco:', e.message);
   process.exit(1);
 });
- 
