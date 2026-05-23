@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Punch and Roll Fight Team — São José, SC</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--red:#d4111c;--black:#080808;--dark:#0f0f0f;--panel:#161616;--border:#222;--white:#f2f2f2;--muted:#666}
+html,body{height:100%;background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(212,17,28,.2) 0%,transparent 70%)}
+.hero-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:120px;background:linear-gradient(to bottom,var(--red),transparent)}
+
+.logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:40px;position:relative;z-index:1;animation:fadeDown .7s ease both}
+.logo-ring{width:90px;height:90px;border-radius:50%;background:var(--panel);border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:16px;box-shadow:0 0 60px rgba(212,17,28,.3)}
+.brand{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,10vw,64px);letter-spacing:3px;line-height:.95;text-align:center}
+.brand span{color:var(--red)}
+.sub{font-size:12px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:8px}
+
+/* CARDS DE ACESSO */
+.access-cards{display:flex;flex-direction:column;gap:14px;width:100%;max-width:380px;position:relative;z-index:1;animation:fadeUp .7s .2s ease both}
+
+.access-card{border-radius:12px;padding:20px 24px;cursor:pointer;transition:all .2s;text-decoration:none;display:flex;align-items:center;gap:16px;border:1px solid}
+.access-card:hover{transform:translateY(-2px)}
+
+.card-matricula{background:var(--red);border-color:var(--red);box-shadow:0 8px 32px rgba(212,17,28,.35)}
+.card-matricula:hover{background:#e8151f;box-shadow:0 12px 40px rgba(212,17,28,.5)}
+
+.card-portal{background:var(--panel);border-color:#2a2a2a}
+.card-portal:hover{border-color:#444;background:#1c1c1c}
+
+.card-admin{background:transparent;border-color:#1a1a1a}
+.card-admin:hover{border-color:#333;background:rgba(255,255,255,.03)}
+
+.card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.card-matricula .card-icon{background:rgba(255,255,255,.15)}
+.card-portal .card-icon{background:rgba(212,17,28,.15)}
+.card-admin .card-icon{background:rgba(255,255,255,.05)}
+
+.card-text{flex:1}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;line-height:1;margin-bottom:3px}
+.card-desc{font-size:12px;opacity:.7;line-height:1.4}
+.card-arrow{font-size:18px;opacity:.5;flex-shrink:0}
+
+/* STATS */
+.stats{display:flex;gap:28px;margin-bottom:40px;position:relative;z-index:1;animation:fadeUp .7s .1s ease both}
+.stat{text-align:center}
+.stat-n{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--red);line-height:1}
+.stat-l{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+
+/* FOOTER */
+footer{text-align:center;padding:24px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);position:relative;z-index:1}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--white)}
+
+/* MODAL LOGIN ADMIN */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:24px;width:100%;max-width:400px}
+.modal-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 16px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:20px;text-align:center}
+.fg{margin-bottom:14px}
+.fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
+.fi{width:100%;background:#1c1c1c;border:1px solid var(--border);border-radius:6px;padding:11px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--red)}
+.btn-login{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;margin-top:6px;transition:background .2s}
+.btn-login:hover{background:#e8151f}
+.btn-cancel{width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;transition:all .2s}
+.btn-cancel:hover{border-color:#444;color:var(--white)}
+.erro{color:#f87171;font-size:12px;text-align:center;margin-top:8px;display:none}
+
+@keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+@media(min-width:600px){
+  .access-cards{gap:16px}
+  .overlay{align-items:center}
+  .modal{border-radius:14px;max-height:85vh}
+  .modal-handle{display:none}
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-line"></div>
+
+  <div class="logo-wrap">
+    <div class="logo-ring">🥊</div>
+    <div class="brand">PUNCH AND<br><span>ROLL</span></div>
+    <div class="sub">Fight Team · São José, SC</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n">+120</div><div class="stat-l">Alunos</div></div>
+    <div class="stat"><div class="stat-n">2</div><div class="stat-l">Modalidades</div></div>
+    <div class="stat"><div class="stat-n">5★</div><div class="stat-l">Avaliação</div></div>
+  </div>
+
+  <div class="access-cards">
+    <!-- MATRICULA -->
+    <a href="/punch-and-roll-matricula.html" class="access-card card-matricula">
+      <div class="card-icon">🥊</div>
+      <div class="card-text">
+        <div class="card-title">Quero me matricular</div>
+        <div class="card-desc">Boxe · Jiu-Jitsu · São José, SC</div>
+      </div>
+      <div class="card-arrow">→</div>
+    </a>
+
+    <!-- PORTAL ALUNO -->
+    <a href="/punch-and-roll-portal.html" class="access-card card-portal">
+      <div class="card-icon">👤</div>
+      <div class="card-text">
+        <div class="card-title">Sou Aluno</div>
+        <div class="card-desc">Acesse seu portal, agenda e check-in</div>
+      </div>
+      <div class="card-arrow">→</div>
+    </a>
+
+    <!-- ADMIN -->
+    <a href="#" class="access-card card-admin" onclick="abrirAdmin(event)">
+      <div class="card-icon">⚙️</div>
+      <div class="card-text">
+        <div class="card-title">Administração</div>
+        <div class="card-desc">Acesso restrito à equipe</div>
+      </div>
+      <div class="card-arrow">→</div>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p>© 2026 Punch and Roll Fight Team · São José, SC</p>
+  <p style="margin-top:6px"><a href="https://wa.me/554898463-9257">💬 (48) 98463-9257</a></p>
+</footer>
+
+<!-- MODAL ADMIN -->
+<div class="overlay" id="modal-admin">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🥊 Acesso Admin</div>
+    <div class="fg">
+      <label class="fl">E-mail</label>
+      <input class="fi" id="admin-email" type="email" placeholder="admin@punchandroll.com.br" onkeydown="if(event.key==='Enter')fazerLogin()">
+    </div>
+    <div class="fg">
+      <label class="fl">Senha</label>
+      <input class="fi" id="admin-senha" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')fazerLogin()">
+    </div>
+    <button class="btn-login" onclick="fazerLogin()">ENTRAR</button>
+    <button class="btn-cancel" onclick="fecharAdmin()">Cancelar</button>
+    <div class="erro" id="admin-erro">E-mail ou senha incorretos</div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
+
+function abrirAdmin(e) {
+  e.preventDefault();
+  document.getElementById('modal-admin').classList.add('open');
+  setTimeout(()=>document.getElementById('admin-email').focus(), 100);
+}
+
+function fecharAdmin() {
+  document.getElementById('modal-admin').classList.remove('open');
+  document.getElementById('admin-erro').style.display='none';
+  document.getElementById('admin-email').value='';
+  document.getElementById('admin-senha').value='';
+}
+
+document.getElementById('modal-admin').addEventListener('click', function(e) {
+  if(e.target === this) fecharAdmin();
+});
+
+async function fazerLogin() {
+  const email = document.getElementById('admin-email').value.trim();
+  const senha = document.getElementById('admin-senha').value;
+  if(!email||!senha) return;
+  try {
+    const res = await fetch(API_URL+'/api/auth/admin', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email, senha})
+    });
+    if(!res.ok) { document.getElementById('admin-erro').style.display='block'; return; }
+    const data = await res.json();
+    localStorage.setItem('pr_admin_token', data.token);
+    window.location.href = '/punch-and-roll-admin.html';
+  } catch(e) {
+    document.getElementById('admin-erro').style.display='block';
+  }
+}
+</script>
+</body>
+</html>
