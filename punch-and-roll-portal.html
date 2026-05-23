@@ -119,8 +119,8 @@ body{font-family:'DM Sans',sans-serif;color:var(--white)}
     <div class="login-sub">Fight Team · Portal</div>
     <div class="login-card">
       <div class="fg">
-        <label class="fl">Seu nome (login)</label>
-        <input class="fi" id="l-user" placeholder="Ex: carlos" onkeydown="if(event.key==='Enter')doLogin()">
+        <label class="fl">E-mail ou nome</label>
+        <input class="fi" id="l-user" placeholder="Ex: carlos@email.com" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div class="fg">
         <label class="fl">Senha</label>
@@ -129,8 +129,8 @@ body{font-family:'DM Sans',sans-serif;color:var(--white)}
       <button class="btn btn-r btn-full" onclick="doLogin()">Entrar</button>
       <div id="l-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">Login ou senha incorretos</div>
       <div class="login-hint">
-        Demo: <strong>carlos</strong> / <strong>123</strong><br>
-        <span style="color:var(--muted2)">Sua senha é enviada por WhatsApp no cadastro</span>
+        Use seu e-mail ou primeiro nome<br>
+        <span style="color:var(--muted2)">Senha padrão: 123 (enviada por WhatsApp)</span>
       </div>
     </div>
   </div>
@@ -268,17 +268,26 @@ async function doLogin() {
   const user = (document.getElementById('l-user').value||'').trim().toLowerCase();
   const pass = document.getElementById('l-pass').value;
   if(!user||!pass){document.getElementById('l-erro').style.display='block';return;}
+  
+  const btnEl = document.querySelector('.btn.btn-r.btn-full');
+  if(btnEl){btnEl.textContent='Entrando...';btnEl.disabled=true;}
+  
   try {
     const res = await fetch(API_URL+'/api/auth/aluno',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({login:user,senha:pass})
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({login:user, senha:pass})
     });
-    if(!res.ok){document.getElementById('l-erro').style.display='block';return;}
     const data = await res.json();
+    if(!res.ok){
+      document.getElementById('l-erro').textContent = data.error||'Login ou senha incorretos';
+      document.getElementById('l-erro').style.display='block';
+      if(btnEl){btnEl.textContent='Entrar';btnEl.disabled=false;}
+      return;
+    }
     localStorage.setItem('pr_token', data.token);
     usuarioAtual = user;
     alunoAtual = data.aluno;
-    // Carregar dados reais
     await carregarDadosAPI(data.token);
     document.getElementById('login-screen').style.display='none';
     const main = document.getElementById('main-app');
@@ -286,7 +295,11 @@ async function doLogin() {
     document.getElementById('top-avatar').textContent = alunoAtual.nome[0];
     document.getElementById('top-name').textContent = alunoAtual.nome.split(' ')[0];
     navTo('inicio');
-  } catch(e){document.getElementById('l-erro').style.display='block';}
+  } catch(e){
+    document.getElementById('l-erro').textContent = 'Erro de conexão. Tente novamente.';
+    document.getElementById('l-erro').style.display='block';
+    if(btnEl){btnEl.textContent='Entrar';btnEl.disabled=false;}
+  }
 }
 
 async function carregarDadosAPI(token) {
