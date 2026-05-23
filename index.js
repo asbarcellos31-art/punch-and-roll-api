@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 require('dotenv').config();
- 
+
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Origin','Accept'] }));
 app.options('/{*path}', cors());
@@ -17,7 +17,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   next();
 });
- 
+
 // ══════════════════════════════════════
 // BANCO DE DADOS
 // ══════════════════════════════════════
@@ -26,12 +26,12 @@ const db = mysql2.createPool({
   waitForConnections: true,
   connectionLimit: 10,
 });
- 
+
 // ══════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════
 const JWT_SECRET = process.env.JWT_SECRET || 'punchandroll2026secret';
- 
+
 function auth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token necessário' });
@@ -42,12 +42,12 @@ function auth(req, res, next) {
     res.status(401).json({ error: 'Token inválido' });
   }
 }
- 
+
 function adminOnly(req, res, next) {
   if (req.user.tipo !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
   next();
 }
- 
+
 // ══════════════════════════════════════
 // SETUP — criar tabelas se não existirem
 // ══════════════════════════════════════
@@ -88,7 +88,7 @@ async function setupDB() {
         atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS checkins (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -100,7 +100,7 @@ async function setupDB() {
         FOREIGN KEY (aluno_id) REFERENCES alunos(id)
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS aulas (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -113,7 +113,7 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS recados (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -125,7 +125,7 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS documentos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -141,7 +141,7 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS pagamentos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -156,7 +156,7 @@ async function setupDB() {
         FOREIGN KEY (aluno_id) REFERENCES alunos(id)
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -166,7 +166,7 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
- 
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS marketing_msgs (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -179,7 +179,7 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
- 
+
     // Seed aulas padrão
     const [aulaCount] = await conn.query('SELECT COUNT(*) as n FROM aulas');
     if (aulaCount[0].n === 0) {
@@ -208,7 +208,7 @@ async function setupDB() {
         await conn.query('INSERT INTO aulas (nome,hora,dia,vagas,modalidade) VALUES (?,?,?,?,?)',[nome,hora,dia,vagas,modalidade]);
       }
     }
- 
+
     // Seed admin padrão
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
@@ -216,17 +216,17 @@ async function setupDB() {
       await conn.query('INSERT INTO admin_users (nome,email,senha) VALUES (?,?,?)',['Admin PR','admin@punchandroll.com.br',senha]);
       console.log('Admin criado: admin@punchandroll.com.br / admin123');
     }
- 
+
     console.log('✅ Banco configurado com sucesso!');
   } finally {
     conn.release();
   }
 }
- 
+
 // ══════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════
- 
+
 // Login admin
 app.post('/api/auth/admin', async (req, res) => {
   try {
@@ -241,16 +241,20 @@ app.post('/api/auth/admin', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
- 
+
 // Login aluno
 app.post('/api/auth/aluno', async (req, res) => {
   try {
     const { login, senha } = req.body;
+    const loginLower = (login||'').toLowerCase().trim();
     const [rows] = await db.query(
-      'SELECT * FROM alunos WHERE LOWER(SUBSTRING_INDEX(nome," ",1)) = ? OR email = ?',
-      [login.toLowerCase(), login.toLowerCase()]
+      `SELECT * FROM alunos WHERE 
+        LOWER(email) = ? OR 
+        LOWER(SUBSTRING_INDEX(nome,' ',1)) = ? OR
+        LOWER(nome) LIKE ?`,
+      [loginLower, loginLower, loginLower+'%']
     );
-    if (!rows.length) return res.status(401).json({ error: 'Aluno não encontrado' });
+    if (!rows.length) return res.status(401).json({ error: 'Aluno não encontrado. Use seu e-mail ou primeiro nome.' });
     const aluno = rows[0];
     if (!aluno.senha) return res.status(401).json({ error: 'Senha não configurada. Contate a academia.' });
     const ok = await bcrypt.compare(senha, aluno.senha);
@@ -258,13 +262,17 @@ app.post('/api/auth/aluno', async (req, res) => {
     const token = jwt.sign({ id: aluno.id, tipo: 'aluno', nome: aluno.nome }, JWT_SECRET, { expiresIn: '30d' });
     res.json({
       token, tipo: 'aluno',
-      aluno: { id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade, status: aluno.status, plano: aluno.plano, valor: aluno.valor, vencimento: aluno.vencimento, tel: aluno.tel }
+      aluno: { 
+        id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade, 
+        status: aluno.status, plano: aluno.plano, valor: aluno.valor, 
+        vencimento: aluno.vencimento, tel: aluno.tel, email: aluno.email
+      }
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
- 
+
 // ══════════════════════════════════════
 // ALUNOS
 // ══════════════════════════════════════
@@ -274,7 +282,7 @@ app.get('/api/alunos', auth, adminOnly, async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.get('/api/alunos/:id', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
@@ -282,7 +290,7 @@ app.get('/api/alunos/:id', auth, async (req, res) => {
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/alunos', auth, adminOnly, async (req, res) => {
   try {
     const d = req.body;
@@ -303,7 +311,7 @@ app.post('/api/alunos', auth, adminOnly, async (req, res) => {
     res.json({ id: result.insertId, message: 'Aluno cadastrado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     const d = req.body;
@@ -316,14 +324,14 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
     res.json({ message: 'Aluno atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('DELETE FROM alunos WHERE id = ?', [req.params.id]);
     res.json({ message: 'Aluno removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // Auto-cadastro público (página de matrícula)
 app.post('/api/alunos/publico', async (req, res) => {
   try {
@@ -333,7 +341,7 @@ app.post('/api/alunos/publico', async (req, res) => {
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,obs,status,senha,origem)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.payMethod,d.obs,'aguardando_pagamento',senhaHash,'auto-cadastro']);
- 
+
     // WA admin
     await notificarWA(process.env.WA_ADMIN_NUM || '554898463-9257',
       `🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Modalidade:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}\n*E-mail:* ${d.email}`);
@@ -341,18 +349,18 @@ app.post('/api/alunos/publico', async (req, res) => {
     // WA aluno
     await notificarWA(d.tel,
       `Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*\nAcesse: https://asbarcellos31-art.github.io/maciel-team/portal-aluno.html`);
- 
+
     // Email admin
     await enviarEmailAdmin('🥊 Nova Matrícula Online', `<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p><p>Email: ${d.email}</p>`);
- 
+
     // Email aluno
     await enviarEmailAluno(d.email, d.nome, 'Matrícula recebida — Punch and Roll',
       `<h2>Olá, ${d.nome.split(' ')[0]}!</h2><p>Sua matrícula foi recebida. Entraremos em contato em breve.</p><p>Plano: <strong>${d.plano}</strong></p>`);
- 
+
     res.json({ id: result.insertId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // AULAS
 // ══════════════════════════════════════
@@ -362,7 +370,7 @@ app.get('/api/aulas', async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/aulas', auth, adminOnly, async (req, res) => {
   try {
     const { nome, hora, dia, vagas, modalidade } = req.body;
@@ -370,7 +378,7 @@ app.post('/api/aulas', auth, adminOnly, async (req, res) => {
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.put('/api/aulas/:id', auth, adminOnly, async (req, res) => {
   try {
     const { nome, hora, dia, vagas, modalidade, status } = req.body;
@@ -378,7 +386,7 @@ app.put('/api/aulas/:id', auth, adminOnly, async (req, res) => {
     res.json({ message: 'Aula atualizada!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // CHECK-INS
 // ══════════════════════════════════════
@@ -398,39 +406,39 @@ app.get('/api/checkins', auth, async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/checkins', auth, async (req, res) => {
   try {
     const { aula_id } = req.body;
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hoje = new Date().toISOString().slice(0,10);
     const hora = new Date().toTimeString().slice(0,5);
- 
+
     // Verificar se já fez checkin hoje nessa aula
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,hoje]);
     if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
- 
+
     // Verificar status do aluno
     const [aluno] = await db.query('SELECT status FROM alunos WHERE id=?',[aluno_id]);
     if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso. Regularize para fazer check-in.' });
- 
+
     // Verificar vagas
     const [aula] = await db.query('SELECT vagas FROM aulas WHERE id=?',[aula_id]);
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,hoje]);
     if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
- 
+
     await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,hoje,hora]);
     res.json({ message: 'Check-in confirmado! 🥊' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.delete('/api/checkins/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('DELETE FROM checkins WHERE id=?',[req.params.id]);
     res.json({ message: 'Check-in removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // RECADOS
 // ══════════════════════════════════════
@@ -440,7 +448,7 @@ app.get('/api/recados', async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/recados', auth, adminOnly, async (req, res) => {
   try {
     const { titulo, body, tipo, pin } = req.body;
@@ -448,7 +456,7 @@ app.post('/api/recados', auth, adminOnly, async (req, res) => {
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.put('/api/recados/:id', auth, adminOnly, async (req, res) => {
   try {
     const { titulo, body, tipo, pin, ativo } = req.body;
@@ -456,14 +464,14 @@ app.put('/api/recados/:id', auth, adminOnly, async (req, res) => {
     res.json({ message: 'Recado atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.delete('/api/recados/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('UPDATE recados SET ativo=0 WHERE id=?',[req.params.id]);
     res.json({ message: 'Recado removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // PAGAMENTOS
 // ══════════════════════════════════════
@@ -478,7 +486,7 @@ app.get('/api/pagamentos', auth, async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
   try {
     const { aluno_id, descricao, valor, data_pagamento, status, metodo } = req.body;
@@ -489,7 +497,7 @@ app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // DOCUMENTOS
 // ══════════════════════════════════════
@@ -504,7 +512,7 @@ app.get('/api/documentos', auth, async (req, res) => {
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/documentos', auth, adminOnly, async (req, res) => {
   try {
     const { nome, descricao, tipo, extensao, tamanho, url, visivel, disponivel_para } = req.body;
@@ -512,7 +520,7 @@ app.post('/api/documentos', auth, adminOnly, async (req, res) => {
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.put('/api/documentos/:id', auth, adminOnly, async (req, res) => {
   try {
     const { nome, descricao, tipo, visivel, disponivel_para } = req.body;
@@ -520,7 +528,7 @@ app.put('/api/documentos/:id', auth, adminOnly, async (req, res) => {
     res.json({ message: 'Documento atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.post('/api/documentos/:id/download', auth, async (req, res) => {
   try {
     await db.query('UPDATE documentos SET downloads=downloads+1 WHERE id=?',[req.params.id]);
@@ -528,14 +536,14 @@ app.post('/api/documentos/:id/download', auth, async (req, res) => {
     res.json({ url: rows[0]?.url });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 app.delete('/api/documentos/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('DELETE FROM documentos WHERE id=?',[req.params.id]);
     res.json({ message: 'Documento removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // DASHBOARD / STATS
 // ══════════════════════════════════════
@@ -553,7 +561,7 @@ app.get('/api/dashboard', auth, adminOnly, async (req, res) => {
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // MARKETING
 // ══════════════════════════════════════
@@ -566,7 +574,7 @@ app.post('/api/marketing/enviar', auth, adminOnly, async (req, res) => {
     else if (segmento === 'vencendo') { q += " AND status='vencendo'"; }
     else if (segmento === 'ativos') { q += " AND status='ativo'"; }
     const [alvos] = await db.query(q, params);
- 
+
     let enviados = 0;
     for (const alvo of alvos) {
       const msg = texto
@@ -577,12 +585,12 @@ app.post('/api/marketing/enviar', auth, adminOnly, async (req, res) => {
       if (tipo === 'email') await enviarEmailAluno(alvo.email, alvo.nome, titulo, '<p>'+msg+'</p>');
       enviados++;
     }
- 
+
     await db.query('INSERT INTO marketing_msgs (tipo,titulo,texto,segmento,status,qtd_enviados) VALUES (?,?,?,?,?,?)',[tipo,titulo,texto,segmento,'enviado',enviados]);
     res.json({ enviados, message: `Enviado para ${enviados} aluno(s)!` });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
- 
+
 // ══════════════════════════════════════
 // WEBHOOK MERCADO PAGO
 // ══════════════════════════════════════
@@ -614,7 +622,7 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
     res.sendStatus(500);
   }
 });
- 
+
 // ══════════════════════════════════════
 // NOTIFICAÇÕES
 // ══════════════════════════════════════
@@ -627,7 +635,7 @@ async function notificarWA(tel, msg) {
     });
   } catch (e) { console.log('WA error:', e.message); }
 }
- 
+
 async function enviarEmailAdmin(assunto, html) {
   if (!process.env.SENDGRID_API_KEY) return;
   try {
@@ -639,7 +647,7 @@ async function enviarEmailAdmin(assunto, html) {
     }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('Email admin error:', e.message); }
 }
- 
+
 async function enviarEmailAluno(email, nome, assunto, html) {
   if (!process.env.SENDGRID_API_KEY || !email) return;
   try {
@@ -651,12 +659,12 @@ async function enviarEmailAluno(email, nome, assunto, html) {
     }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('Email aluno error:', e.message); }
 }
- 
+
 // ══════════════════════════════════════
 // HEALTH CHECK
 // ══════════════════════════════════════
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0' }));
- 
+
 // ══════════════════════════════════════
 // START
 // ══════════════════════════════════════
