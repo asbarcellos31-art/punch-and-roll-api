@@ -1174,7 +1174,7 @@ function abrirCadastroAluno(id) {
   openModal('modal-aluno');
 }
 
-function salvarAluno() {
+async function salvarAluno() {
   const nome = document.getElementById('a-nome').value.trim();
   const tel = document.getElementById('a-tel').value.trim();
   const modalidade = document.getElementById('a-modalidade').value;
@@ -1224,17 +1224,34 @@ function salvarAluno() {
     mat: editandoAlunoId ? (alunos.find(a=>a.id===editandoAlunoId)?.mat||todayStr) : todayStr,
   };
 
-  if(editandoAlunoId) {
-    const idx = alunos.findIndex(a=>a.id===editandoAlunoId);
-    if(idx>=0) alunos[idx] = {...alunos[idx], ...dados};
-  } else {
-    alunos.push(dados);
+  // Salvar na API
+  try {
+    let res;
+    if(editandoAlunoId) {
+      res = await fetch(API_URL+'/api/alunos/'+editandoAlunoId, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},
+        body:JSON.stringify(dados)
+      });
+    } else {
+      res = await fetch(API_URL+'/api/alunos', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},
+        body:JSON.stringify(dados)
+      });
+    }
+    const result = await res.json();
+    if(!res.ok) { alert('Erro: '+(result.error||'Tente novamente')); return; }
+    
+    // Recarregar alunos do banco
+    await carregarDadosReais();
+    fecharModalAluno();
+    if(currentPage==='alunos') renderAlunos();
+    if(currentPage==='dashboard') renderDashboard();
+    alert(editandoAlunoId?'✅ Aluno atualizado!':'✅ Aluno cadastrado com sucesso!');
+  } catch(e) {
+    alert('Erro de conexão: '+e.message);
   }
-
-  fecharModalAluno();
-  if(currentPage==='alunos') renderAlunos();
-  if(currentPage==='dashboard') renderDashboard();
-  alert((editandoAlunoId?'✅ Aluno atualizado!':'✅ Aluno cadastrado com sucesso!'));
 }
 
 // ══════════════════════════════════════
