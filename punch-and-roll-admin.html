@@ -330,39 +330,7 @@ textarea.fi{resize:none}
 </div>
 </div>
 
-<!-- MODAL AULA -->
-<div class="modal-overlay" id="modal-aula">
-<div class="modal-box">
-  <div class="modal-handle"></div>
-  <div class="modal-hdr">
-    <div class="modal-title" id="modal-aula-title">Nova Aula</div>
-    <button class="modal-x" onclick="fecharModalAula()">✕</button>
-  </div>
-  <div class="frow">
-    <div class="fg"><label class="fl">Nome da Aula *</label><input class="fi" id="au-nome" placeholder="Ex: Boxe Iniciante"></div>
-    <div class="fg"><label class="fl">Horário *</label><input class="fi" type="time" id="au-hora" value="07:00"></div>
-  </div>
-  <div class="frow">
-    <div class="fg"><label class="fl">Dia *</label>
-      <select class="fi" id="au-dia">
-        <option>Segunda</option><option>Terça</option><option>Quarta</option>
-        <option>Quinta</option><option>Sexta</option><option>Sábado</option>
-      </select>
-    </div>
-    <div class="fg"><label class="fl">Vagas</label><input class="fi" type="number" id="au-vagas" value="15" min="1" max="60"></div>
-  </div>
-  <div class="fg"><label class="fl">Modalidade</label>
-    <select class="fi" id="au-modalidade">
-      <option value="boxe">🥊 Boxe</option>
-      <option value="jiujitsu">🟦 Jiu-Jitsu</option>
-    </select>
-  </div>
-  <div class="modal-foot">
-    <button class="btn btn-ghost" onclick="fecharModalAula()">Cancelar</button>
-    <button class="btn btn-r" id="btn-salvar-aula" onclick="salvarAula()">💾 Salvar</button>
-  </div>
-</div>
-</div>
+<!-- modal-aula replaced by dynamic criarModal -->
 
 <!-- MODAL RECADO -->
 <div class="modal-overlay" id="modal-recado">
@@ -853,16 +821,34 @@ function selecionarDia(dia) { selectedDay=dia; renderAgenda(); }
 function abrirModalAula(id) {
   editingAulaId = id||null;
   const a = id ? cache.aulas.find(x=>x.id===id) : null;
-  document.getElementById('modal-aula-title').textContent = a ? 'Editar Aula' : 'Nova Aula';
-  document.getElementById('au-nome').value = a?.nome||'';
-  document.getElementById('au-hora').value = a?.hora||'07:00';
-  document.getElementById('au-dia').value = a?.dia||selectedDay;
-  document.getElementById('au-vagas').value = a?.vagas||15;
-  document.getElementById('au-modalidade').value = a?.modalidade||'boxe';
-  document.getElementById('modal-aula').classList.add('open');
+  const box = criarModal('modal-aula-dyn', a?'✏️ Editar Aula':'+ Nova Aula');
+  box.innerHTML += `
+    <div class="frow">
+      <div class="fg"><label class="fl">Nome da Aula *</label><input class="fi" id="au-nome" value="${a?.nome||''}" placeholder="Ex: Boxe Iniciante"></div>
+      <div class="fg"><label class="fl">Horário *</label><input class="fi" type="time" id="au-hora" value="${a?.hora||'07:00'}"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Dia *</label>
+        <select class="fi" id="au-dia">
+          ${['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'].map(d=>`<option${(a?.dia||selectedDay)===d?' selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Vagas</label><input class="fi" type="number" id="au-vagas" value="${a?.vagas||15}" min="1" max="60"></div>
+    </div>
+    <div class="fg"><label class="fl">Modalidade</label>
+      <select class="fi" id="au-modalidade">
+        <option value="boxe"${a?.modalidade==='boxe'?' selected':''}>🥊 Boxe</option>
+        <option value="jiujitsu"${a?.modalidade==='jiujitsu'?' selected':''}>🟦 Jiu-Jitsu</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-aula-dyn').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" id="btn-salvar-aula" onclick="salvarAula()">💾 Salvar</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
 }
 
-function fecharModalAula() { document.getElementById('modal-aula').classList.remove('open'); editingAulaId=null; }
+function fecharModalAula() { const m=document.getElementById('modal-aula-dyn'); if(m)m.remove(); editingAulaId=null; }
 
 async function salvarAula() {
   const nome = document.getElementById('au-nome').value.trim();
@@ -878,10 +864,11 @@ async function salvarAula() {
   try {
     if(editingAulaId) await PUT('/api/aulas/'+editingAulaId, dados);
     else await POST('/api/aulas', dados);
-    fecharModalAula();
+    const m=document.getElementById('modal-aula-dyn'); if(m)m.remove();
+    editingAulaId=null;
     await carregarTudo();
     renderAgenda();
-    alert(editingAulaId?'✅ Aula atualizada!':'✅ Aula criada!');
+    alert(editingAulaId!==null?'✅ Aula atualizada!':'✅ Aula criada!');
   } catch(e) { alert('Erro: '+e.message); }
   finally { btn.textContent='💾 Salvar'; btn.disabled=false; }
 }
