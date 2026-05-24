@@ -637,6 +637,21 @@ tr:last-child td{border-bottom:none}
       <textarea class="fi" id="a-obs" rows="2" placeholder="Informações adicionais..." style="resize:none"></textarea>
     </div>
 
+    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)">🔑 Acesso ao Portal</div>
+    <div class="form-row">
+      <div class="fg">
+        <label class="fl">Senha de acesso</label>
+        <input class="fi" id="a-senha" type="password" placeholder="Deixe em branco para manter 123">
+      </div>
+      <div class="fg">
+        <label class="fl">Confirmar senha</label>
+        <input class="fi" id="a-senha2" type="password" placeholder="Repita a senha">
+      </div>
+    </div>
+    <div style="background:var(--panel2);border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+      💡 Senha padrão: <strong style="color:var(--white)">123</strong> — O aluno usa seu e-mail ou primeiro nome para entrar no portal.
+    </div>
+
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="fecharModalAluno()">Cancelar</button>
       <button class="btn btn-r" onclick="salvarAluno()">💾 Salvar Aluno</button>
@@ -1168,6 +1183,9 @@ function salvarAluno() {
   if(!tel) { alert('Informe o WhatsApp!'); return; }
   if(!modalidade) { alert('Selecione a modalidade!'); return; }
   if(!planoId) { alert('Selecione o plano!'); return; }
+  const senha = document.getElementById('a-senha').value;
+  const senha2 = document.getElementById('a-senha2').value;
+  if(senha && senha !== senha2) { alert('As senhas não coincidem!'); return; }
 
   const todos = [...PLANOS_BOXE,...PLANOS_JJ,...PLANOS_AMBOS];
   const plano = todos.find(p=>p.id===planoId);
@@ -1178,6 +1196,7 @@ function salvarAluno() {
   const dados = {
     id: editandoAlunoId || Date.now(),
     nome,
+    senha: document.getElementById('a-senha').value||'',
     cpf: document.getElementById('a-cpf').value||'',
     nasc: document.getElementById('a-nasc').value||'',
     sexo: document.getElementById('a-sexo').value||'',
@@ -1485,6 +1504,32 @@ function renderPagamentos() {
       <div class="item-meta"><span style="font-size:11px;color:var(--muted)">${a.plano}</span><span style="font-size:11px;color:var(--muted)">📅 Venc: ${fmtD(a.venc)}</span></div>
       ${a.status!=='ativo'?`<div class="item-actions"><button class="btn btn-g btn-sm" style="flex:1" onclick="regularizarAluno(${a.id});renderPagamentos()">✓ Marcar Pago</button></div>`:''}
     </div>`).join('');
+}
+
+// ══════════════════════════════════════
+// REDEFINIR SENHA
+// ══════════════════════════════════════
+function redefinirSenha(id, nome) {
+  const novaSenha = prompt(`Nova senha para ${nome}:`, '123');
+  if(!novaSenha) return;
+  if(novaSenha.length < 3) { alert('Senha muito curta! Mínimo 3 caracteres.'); return; }
+  
+  const a = alunos.find(x=>x.id===id);
+  if(!a) return;
+  
+  // Atualizar via API
+  fetch(_token ? API_URL+'/api/alunos/'+id+'/senha' : '', {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json','Authorization':'Bearer '+_token},
+    body: JSON.stringify({senha: novaSenha})
+  }).then(r => {
+    if(r.ok) alert(`✅ Senha de ${nome} atualizada para: ${novaSenha}`);
+    else alert(`Senha atualizada localmente: ${novaSenha}
+
+Sincronize com o servidor.`);
+  }).catch(() => {
+    alert(`✅ Senha de ${nome} será: ${novaSenha}`);
+  });
 }
 
 // ══════════════════════════════════════

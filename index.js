@@ -332,6 +332,32 @@ app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Redefinir senha do aluno
+app.put('/api/alunos/:id/senha', auth, adminOnly, async (req, res) => {
+  try {
+    const { senha } = req.body;
+    if(!senha || senha.length < 3) return res.status(400).json({ error: 'Senha muito curta!' });
+    const hash = await bcrypt.hash(senha, 10);
+    await db.query('UPDATE alunos SET senha=? WHERE id=?', [hash, req.params.id]);
+    res.json({ message: 'Senha atualizada!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Aluno alterar própria senha
+app.put('/api/auth/aluno/senha', auth, async (req, res) => {
+  try {
+    const { senha_atual, nova_senha } = req.body;
+    if(req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const [rows] = await db.query('SELECT senha FROM alunos WHERE id=?', [req.user.id]);
+    if(!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
+    const ok = await bcrypt.compare(senha_atual, rows[0].senha);
+    if(!ok) return res.status(401).json({ error: 'Senha atual incorreta' });
+    const hash = await bcrypt.hash(nova_senha, 10);
+    await db.query('UPDATE alunos SET senha=? WHERE id=?', [hash, req.user.id]);
+    res.json({ message: 'Senha alterada com sucesso!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Auto-cadastro público (página de matrícula)
 app.post('/api/alunos/publico', async (req, res) => {
   try {
