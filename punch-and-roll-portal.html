@@ -305,18 +305,49 @@ async function doLogin() {
 async function carregarDadosAPI(token) {
   try {
     const h = {'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-    const [aulasRes, recadosRes, pagRes, ckRes] = await Promise.all([
-      fetch(API_URL+'/api/aulas').then(r=>r.json()),
-      fetch(API_URL+'/api/recados').then(r=>r.json()),
-      fetch(API_URL+'/api/pagamentos',{headers:h}).then(r=>r.json()),
-      fetch(API_URL+'/api/checkins?aluno_id='+alunoAtual.id,{headers:h}).then(r=>r.json()),
-    ]);
-    // Atualizar dados locais com dados reais
-    if(Array.isArray(aulasRes)) AULAS.splice(0,AULAS.length,...aulasRes);
-    if(Array.isArray(recadosRes)) RECADOS.splice(0,RECADOS.length,...recadosRes);
-    if(Array.isArray(pagRes)) PAGAMENTOS[alunoAtual.id] = pagRes.map(p=>({desc:p.descricao,valor:p.valor,data:p.data_pagamento,status:p.status}));
-    if(Array.isArray(ckRes)) ckRes.forEach(ck=>{if(!CHECKINS[ck.aula_id])CHECKINS[ck.aula_id]=[];if(!CHECKINS[ck.aula_id].find(c=>c.alunoId===alunoAtual.id))CHECKINS[ck.aula_id].push({alunoId:alunoAtual.id,nome:alunoAtual.nome,hora:ck.hora});});
-  } catch(e){console.log('Usando dados locais',e.message);}
+
+    // Carregar aulas reais
+    const aulasRes = await fetch(API_URL+'/api/aulas').then(r=>r.json());
+    if(Array.isArray(aulasRes) && aulasRes.length > 0) {
+      AULAS.length = 0;
+      aulasRes.forEach(a => AULAS.push(a));
+      // Inicializar checkins para cada aula
+      AULAS.forEach(a => { if(!CHECKINS[a.id]) CHECKINS[a.id] = []; });
+      console.log('✅ Aulas carregadas:', AULAS.length);
+    }
+
+    // Carregar recados reais
+    const recadosRes = await fetch(API_URL+'/api/recados').then(r=>r.json());
+    if(Array.isArray(recadosRes)) {
+      RECADOS.length = 0;
+      recadosRes.forEach(r => RECADOS.push(r));
+      console.log('✅ Recados carregados:', RECADOS.length);
+    }
+
+    // Carregar pagamentos do aluno
+    const pagRes = await fetch(API_URL+'/api/pagamentos', {headers:h}).then(r=>r.json());
+    if(Array.isArray(pagRes)) {
+      PAGAMENTOS[alunoAtual.id] = pagRes.map(p=>({
+        desc: p.descricao, valor: p.valor,
+        data: p.data_pagamento, status: p.status
+      }));
+    }
+
+    // Carregar checkins do aluno
+    const ckRes = await fetch(API_URL+'/api/checkins?aluno_id='+alunoAtual.id, {headers:h}).then(r=>r.json());
+    if(Array.isArray(ckRes)) {
+      ckRes.forEach(ck => {
+        if(!CHECKINS[ck.aula_id]) CHECKINS[ck.aula_id] = [];
+        if(!CHECKINS[ck.aula_id].find(c=>c.alunoId===alunoAtual.id)) {
+          CHECKINS[ck.aula_id].push({alunoId:alunoAtual.id, nome:alunoAtual.nome, hora:ck.hora});
+        }
+      });
+    }
+
+    console.log('✅ Dados carregados com sucesso!');
+  } catch(e) {
+    console.error('Erro ao carregar dados da API:', e.message);
+  }
 }
 
 function logout() {
