@@ -191,11 +191,14 @@ textarea.fi{resize:none}
     <div class="sb-sec">Financeiro</div>
     <div class="sb-item" id="sb-financeiro" onclick="navTo('financeiro')"><span class="ico">💰</span>Financeiro</div>
     <div class="sb-item" id="sb-pagamentos" onclick="navTo('pagamentos')"><span class="ico">💳</span>Pagamentos</div>
-    <div class="sb-sec">Portal</div>
+    <div class="sb-sec">Portal do Aluno</div>
     <div class="sb-item" id="sb-recados" onclick="navTo('recados')"><span class="ico">📢</span>Recados</div>
     <div class="sb-item" id="sb-documentos" onclick="navTo('documentos')"><span class="ico">📁</span>Documentos</div>
+    <div class="sb-item" id="sb-portal-config" onclick="navTo('portal-config')"><span class="ico">⚙️</span>Config. Portal</div>
     <div class="sb-sec">Marketing</div>
-    <div class="sb-item" id="sb-marketing" onclick="navTo('marketing')"><span class="ico">📣</span>Marketing</div>
+    <div class="sb-item" id="sb-mkt-wa" onclick="navTo('mkt-wa')"><span class="ico">💬</span>WhatsApp</div>
+    <div class="sb-item" id="sb-mkt-email" onclick="navTo('mkt-email')"><span class="ico">📧</span>E-mail</div>
+    <div class="sb-item" id="sb-mkt-campanhas" onclick="navTo('mkt-campanhas')"><span class="ico">📣</span>Campanhas</div>
   </nav>
   <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
     <div style="font-size:12px;color:var(--muted)" id="sb-user-name">Admin</div>
@@ -219,6 +222,10 @@ textarea.fi{resize:none}
   <div class="page" id="page-recados"></div>
   <div class="page" id="page-documentos"></div>
   <div class="page" id="page-marketing"></div>
+  <div class="page" id="page-portal-config"></div>
+  <div class="page" id="page-mkt-wa"></div>
+  <div class="page" id="page-mkt-email"></div>
+  <div class="page" id="page-mkt-campanhas"></div>
 </div>
 
 <nav class="bottom-nav">
@@ -498,9 +505,12 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',pagamentos:'Pagamentos',recados:'Recados',documentos:'Documentos',marketing:'Marketing'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',pagamentos:'Pagamentos',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
+    'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\"wa\")">+ Mensagem</button>',
+    'mkt-email': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\"email\")">+ E-mail</button>',
+    'mkt-campanhas': '<button class="btn btn-r btn-sm" onclick="mktNovaCampanha()">+ Campanha</button>',
     alunos:'<button class="btn btn-r btn-sm" onclick="abrirModalAluno()">+ Aluno</button>',
     agenda:'<button class="btn btn-r btn-sm" onclick="abrirModalAula()">+ Aula</button>',
     recados:'<button class="btn btn-r btn-sm" onclick="abrirModalRecado()">+ Recado</button>',
@@ -516,6 +526,10 @@ function navTo(page) {
   if(page==='recados') renderRecados();
   if(page==='documentos') renderDocumentos();
   if(page==='marketing') renderMarketing();
+  if(page==='portal-config') renderPortalConfig();
+  if(page==='mkt-wa') renderMktWA();
+  if(page==='mkt-email') renderMktEmail();
+  if(page==='mkt-campanhas') renderMktCampanhas();
 }
 
 function toggleSB() {
@@ -1138,6 +1152,506 @@ function maskCEP(el){let v=el.value.replace(/\D/g,'').slice(0,8);if(v.length>5)v
 
 // Fechar modais clicando fora
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+// ══════════════════════════════════════
+// FINANCEIRO COMPLETO
+// ══════════════════════════════════════
+let contas = [];
+let receitas = [];
+let finTab = 'dashboard';
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function renderFinanceiro() {
+  const pg = document.getElementById('page-financeiro');
+  pg.innerHTML = `
+    <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
+      ${[['dashboard','📊 Dashboard'],['contas','📋 Contas'],['receitas','💵 Receitas'],['dre','📑 DRE']].map(([id,label])=>
+        `<button onclick="finNavTo('${id}')" id="fin-tab-${id}" style="flex:1;padding:7px 10px;border-radius:5px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;white-space:nowrap;background:${finTab===id?'var(--red)':'transparent'};color:${finTab===id?'#fff':'var(--muted)'};transition:all .15s">${label}</button>`
+      ).join('')}
+    </div>
+    <div id="fin-content"></div>
+  `;
+  renderFinTab();
+}
+
+function finNavTo(tab) { finTab=tab; renderFinanceiro(); }
+
+function renderFinTab() {
+  if(finTab==='dashboard') renderFinDash();
+  if(finTab==='contas') renderContas();
+  if(finTab==='receitas') renderReceitas();
+  if(finTab==='dre') renderDRE();
+}
+
+function renderFinDash() {
+  const atrasados = cache.alunos.filter(a=>a.status==='atrasado');
+  const vencendo = cache.alunos.filter(a=>a.status==='vencendo');
+  const recMes = receitas.filter(r=>r.status==='recebido').reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  const despMes = contas.filter(c=>c.status==='pago').reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const saldo = recMes - despMes;
+  const inadimTotal = atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+
+  document.getElementById('fin-content').innerHTML = `
+    <div class="grid4">
+      <div class="kpi kg"><div class="kpi-label">Receitas</div><div class="kpi-val">${fmtR(recMes)}</div><div class="kpi-sub">Recebido</div></div>
+      <div class="kpi kr"><div class="kpi-label">Despesas</div><div class="kpi-val">${fmtR(despMes)}</div><div class="kpi-sub">Pago</div></div>
+      <div class="kpi ${saldo>=0?'kb':'kr'}"><div class="kpi-label">Saldo</div><div class="kpi-val" style="color:${saldo>=0?'var(--blue)':'#f87171'}">${fmtR(saldo)}</div></div>
+      <div class="kpi ky"><div class="kpi-label">Inadimplência</div><div class="kpi-val">${fmtR(inadimTotal)}</div><div class="kpi-sub">${atrasados.length} aluno(s)</div></div>
+    </div>
+    ${atrasados.length>0?`<div class="alert alert-r">🔴 ${atrasados.length} aluno(s) em atraso — ${fmtR(inadimTotal)}</div>`:''}
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-r btn-sm" onclick="abrirModalConta()">+ Lançar Conta</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalReceita()">+ Receita</button>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 Últimos Lançamentos</div>
+      ${contas.length===0&&receitas.length===0
+        ?'<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhum lançamento ainda</div>'
+        :[...contas.slice(0,3),...receitas.slice(0,3)].map(item=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1e1e1e">
+          <div><div style="font-size:13px;font-weight:500">${item.desc||item.descricao||'—'}</div>
+          <div style="font-size:11px;color:var(--muted)">${item.cat||item.tipo||'—'} · ${fmtD(item.venc||item.data)}</div></div>
+          <div style="text-align:right">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:${item.status==='pago'||item.status==='recebido'?'var(--green)':item.status==='vencido'?'#f87171':'var(--yellow)'}">${fmtR(item.valor)}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+// Modal Conta
+function abrirModalConta(id) {
+  const c = id ? contas.find(x=>x.id===id) : null;
+  const m = criarModal('modal-conta-dyn', (c?'✏️ Editar':'+ Nova') +' Conta');
+  m.innerHTML += `
+    <div class="frow"><div class="fg"><label class="fl">Descrição *</label><input class="fi" id="mc-desc" value="${c?.desc||''}" placeholder="Ex: Aluguel"></div>
+    <div class="fg"><label class="fl">Categoria</label><select class="fi" id="mc-cat">${['Aluguel','Energia','Internet','Salários','Equipamentos','Marketing','Contador','Outros'].map(ct=>`<option${c?.cat===ct?' selected':''}>${ct}</option>`).join('')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" id="mc-valor" value="${c?.valor||''}" placeholder="0,00"></div>
+    <div class="fg"><label class="fl">Vencimento</label><input class="fi" type="date" id="mc-venc" value="${c?.venc||''}"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">Recorrência</label><select class="fi" id="mc-rec"><option value="unica"${c?.rec==='unica'?' selected':''}>Única</option><option value="mensal"${c?.rec==='mensal'?' selected':''}>Mensal</option></select></div>
+    <div class="fg"><label class="fl">Status</label><select class="fi" id="mc-status"><option value="pendente"${c?.status==='pendente'?' selected':''}>Pendente</option><option value="pago"${c?.status==='pago'?' selected':''}>Pago</option></select></div></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-conta-dyn').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="salvarConta('${id||''}')">💾 Salvar</button>
+    </div>`;
+  document.body.appendChild(m.parentElement||m);
+}
+
+function salvarConta(id) {
+  const desc = document.getElementById('mc-desc').value.trim();
+  if(!desc){alert('Informe a descrição!');return;}
+  const dados = {id:id||Date.now(),desc,cat:document.getElementById('mc-cat').value,valor:parseFloat(document.getElementById('mc-valor').value)||0,venc:document.getElementById('mc-venc').value,rec:document.getElementById('mc-rec').value,status:document.getElementById('mc-status').value};
+  if(id){const i=contas.findIndex(x=>x.id==id);if(i>=0)contas[i]=dados;}
+  else contas.unshift(dados);
+  document.getElementById('modal-conta-dyn').remove();
+  renderFinanceiro();
+}
+
+// Modal Receita
+function abrirModalReceita(id) {
+  const r = id ? receitas.find(x=>x.id===id) : null;
+  const m = criarModal('modal-receita-dyn', (r?'✏️ Editar':'+ Nova') +' Receita');
+  m.innerHTML += `
+    <div class="frow"><div class="fg"><label class="fl">Descrição *</label><input class="fi" id="mr-desc" value="${r?.desc||''}" placeholder="Ex: Mensalidades"></div>
+    <div class="fg"><label class="fl">Tipo</label><select class="fi" id="mr-tipo">${['Mensalidades','Matrículas','Aulas Avulsas','Eventos','Outros'].map(t=>`<option${r?.tipo===t?' selected':''}>${t}</option>`).join('')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" id="mr-valor" value="${r?.valor||''}" placeholder="0,00"></div>
+    <div class="fg"><label class="fl">Data</label><input class="fi" type="date" id="mr-data" value="${r?.data||new Date().toISOString().slice(0,10)}"></div></div>
+    <div class="fg"><label class="fl">Status</label><select class="fi" id="mr-status"><option value="pendente"${r?.status==='pendente'?' selected':''}>A Receber</option><option value="recebido"${r?.status==='recebido'?' selected':''}>Recebido</option></select></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-receita-dyn').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="salvarReceita('${id||''}')">💾 Salvar</button>
+    </div>`;
+  document.body.appendChild(m.parentElement||m);
+}
+
+function salvarReceita(id) {
+  const desc = document.getElementById('mr-desc').value.trim();
+  if(!desc){alert('Informe a descrição!');return;}
+  const dados = {id:id||Date.now(),desc,tipo:document.getElementById('mr-tipo').value,valor:parseFloat(document.getElementById('mr-valor').value)||0,data:document.getElementById('mr-data').value,status:document.getElementById('mr-status').value};
+  if(id){const i=receitas.findIndex(x=>x.id==id);if(i>=0)receitas[i]=dados;}
+  else receitas.unshift(dados);
+  document.getElementById('modal-receita-dyn').remove();
+  renderFinanceiro();
+}
+
+function renderContas() {
+  document.getElementById('fin-content').innerHTML = `
+    <button class="btn btn-r btn-sm" onclick="abrirModalConta()" style="margin-bottom:12px">+ Nova Conta</button>
+    ${contas.length===0?'<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhuma conta lançada</div>':
+      contas.map(c=>{
+        const isVenc = c.status!=='pago'&&c.venc&&c.venc<todayStr;
+        const st = isVenc?'vencido':c.status;
+        return `<div class="item">
+          <div class="item-top">
+            <div><div class="item-name">${c.desc}</div><div class="item-meta">${c.cat} · ${fmtD(c.venc)}</div></div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${st==='pago'?'var(--green)':st==='vencido'?'#f87171':'var(--yellow)'}">${fmtR(c.valor)}</div>
+          </div>
+          <div style="margin-bottom:8px"><span class="badge ${st==='pago'?'bg':st==='vencido'?'br':'by'}">${st==='pago'?'Pago':st==='vencido'?'Vencido':'Pendente'}</span></div>
+          <div class="item-acts">
+            ${c.status!=='pago'?`<button class="btn btn-g btn-sm" style="flex:1" onclick="marcarPago('${c.id}')">✓ Pago</button>`:`<button class="btn btn-ghost btn-sm" style="flex:1" onclick="estornarConta('${c.id}')">↩ Estornar</button>`}
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="abrirModalConta('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirConta('${c.id}')">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}
+  `;
+}
+
+function marcarPago(id){const c=contas.find(x=>x.id==id);if(c){c.status='pago';renderFinanceiro();}}
+function estornarConta(id){const c=contas.find(x=>x.id==id);if(c){c.status='pendente';renderFinanceiro();}}
+function excluirConta(id){if(confirm('Excluir conta?')){contas=contas.filter(x=>x.id!=id);renderFinanceiro();}}
+
+function renderReceitas() {
+  document.getElementById('fin-content').innerHTML = `
+    <button class="btn btn-r btn-sm" onclick="abrirModalReceita()" style="margin-bottom:12px">+ Nova Receita</button>
+    ${receitas.length===0?'<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhuma receita lançada</div>':
+      receitas.map(r=>`
+        <div class="item">
+          <div class="item-top">
+            <div><div class="item-name">${r.desc}</div><div class="item-meta">${r.tipo} · ${fmtD(r.data)}</div></div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${r.status==='recebido'?'var(--green)':'var(--yellow)'}">${fmtR(r.valor)}</div>
+          </div>
+          <div style="margin-bottom:8px"><span class="badge ${r.status==='recebido'?'bg':'by'}">${r.status==='recebido'?'Recebido':'A Receber'}</span></div>
+          <div class="item-acts">
+            ${r.status!=='recebido'?`<button class="btn btn-g btn-sm" style="flex:1" onclick="marcarRecebido('${r.id}')">✓ Recebido</button>`:''}
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="abrirModalReceita('${r.id}')">✏️ Editar</button>
+            <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirReceita('${r.id}')">🗑</button>
+          </div>
+        </div>`).join('')}
+  `;
+}
+
+function marcarRecebido(id){const r=receitas.find(x=>x.id==id);if(r){r.status='recebido';renderFinanceiro();}}
+function excluirReceita(id){if(confirm('Excluir receita?')){receitas=receitas.filter(x=>x.id!=id);renderFinanceiro();}}
+
+function renderDRE() {
+  const totRec = receitas.reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  const totDesp = contas.reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const resultado = totRec - totDesp;
+  const marg = totRec>0?((resultado/totRec)*100).toFixed(1):0;
+  const catR={}, catD={};
+  receitas.forEach(r=>{catR[r.tipo]=(catR[r.tipo]||0)+parseFloat(r.valor||0)});
+  contas.forEach(c=>{catD[c.cat]=(catD[c.cat]||0)+parseFloat(c.valor||0)});
+
+  document.getElementById('fin-content').innerHTML = `
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title" style="color:var(--green)">📥 Receitas</div>
+        ${Object.entries(catR).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:12px"><span>${k}</span><span style="font-weight:500">${fmtR(v)}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">Nenhuma</div>'}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:600"><span>Total</span><span style="color:var(--green)">${fmtR(totRec)}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:#f87171">📤 Despesas</div>
+        ${Object.entries(catD).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:12px"><span>${k}</span><span style="font-weight:500">${fmtR(v)}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">Nenhuma</div>'}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:600"><span>Total</span><span style="color:#f87171">${fmtR(totDesp)}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">💡 Resultado</div>
+      <div class="grid2">
+        <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="color:${resultado>=0?'var(--green)':'#f87171'}">${fmtR(resultado)}</div></div>
+        <div class="kpi kb"><div class="kpi-label">Margem</div><div class="kpi-val">${marg}%</div></div>
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════
+// PORTAL CONFIG
+// ══════════════════════════════════════
+let portalCfg = {antecedencia:120, blockInadim:true, encerrar:15};
+
+function renderPortalConfig() {
+  document.getElementById('page-portal-config').innerHTML = `
+    <div class="card">
+      <div class="card-title">⏰ Regras de Check-in</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e1e1e">
+        <div><div style="font-size:13px;font-weight:500">Antecedência máxima</div><div style="font-size:11px;color:var(--muted)">Quanto antes o aluno pode fazer check-in</div></div>
+        <select class="fsel" onchange="portalCfg.antecedencia=parseInt(this.value)">
+          <option value="60">1 hora</option><option value="120" selected>2 horas</option>
+          <option value="180">3 horas</option><option value="360">6 horas</option><option value="1440">1 dia</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e1e1e">
+        <div><div style="font-size:13px;font-weight:500">Bloquear inadimplente</div><div style="font-size:11px;color:var(--muted)">Impedir check-in se mensalidade vencida</div></div>
+        <label style="position:relative;width:40px;height:22px;flex-shrink:0;cursor:pointer" onclick="portalCfg.blockInadim=!portalCfg.blockInadim;renderPortalConfig()">
+          <div style="position:absolute;inset:0;background:${portalCfg.blockInadim?'var(--green)':'var(--muted2)'};border-radius:22px;transition:.3s">
+            <div style="position:absolute;height:16px;width:16px;left:${portalCfg.blockInadim?'21':'3'}px;bottom:3px;background:white;border-radius:50%;transition:.3s"></div>
+          </div>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+        <div><div style="font-size:13px;font-weight:500">Encerrar check-in após</div><div style="font-size:11px;color:var(--muted)">Minutos após início da aula</div></div>
+        <select class="fsel" onchange="portalCfg.encerrar=parseInt(this.value)">
+          <option value="0">Imediato</option><option value="15" selected>15 min</option><option value="30">30 min</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 Vagas por Turma</div>
+      ${cache.aulas.map(au=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e1e1e;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${au.hora} — ${au.nome}</div>
+            <div style="font-size:11px;color:var(--muted)">${au.dia} · <span class="badge ${au.status==='ativo'?'bg':'br'}">${au.status==='ativo'?'Ativa':'Cancelada'}</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <input type="number" value="${au.vagas}" min="1" max="60" onchange="atualizarVagasAula(${au.id},parseInt(this.value))" style="width:54px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;text-align:center;outline:none">
+            <span style="font-size:11px;color:var(--muted)">vagas</span>
+          </div>
+        </div>`).join('')||'<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhuma aula cadastrada</div>'}
+    </div>
+
+    <div class="card">
+      <div class="card-title">👥 Alunos com Acesso</div>
+      ${cache.alunos.map(a=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1e1e1e">
+          <div><div style="font-size:13px;font-weight:500">${a.nome}</div><div style="font-size:11px;color:var(--muted)">${a.email||a.tel||'—'}</div></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge ${a.status==='ativo'?'bg':a.status==='atrasado'?'br':'by'}">${a.status==='ativo'?'Ativo':a.status==='atrasado'?'Atrasado':'Vencendo'}</span>
+            <button onclick="redefinirSenha(${a.id},'${a.nome.split(' ')[0]}')" style="padding:3px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--muted)">🔑 Senha</button>
+          </div>
+        </div>`).join('')||'<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhum aluno</div>'}
+    </div>
+  `;
+}
+
+async function atualizarVagasAula(id, vagas) {
+  const au = cache.aulas.find(x=>x.id===id);
+  if(!au) return;
+  try { await PUT('/api/aulas/'+id, {...au, vagas}); await carregarTudo(); }
+  catch(e) { alert('Erro: '+e.message); }
+}
+
+async function redefinirSenha(id, nome) {
+  const nova = prompt('Nova senha para '+nome+' (mín. 3 caracteres):','123');
+  if(!nova||nova.length<3){if(nova!==null)alert('Senha muito curta!');return;}
+  try {
+    await PUT('/api/alunos/'+id+'/senha', {senha:nova});
+    alert('✅ Senha de '+nome+' atualizada!');
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+// ══════════════════════════════════════
+// MARKETING
+// ══════════════════════════════════════
+let mktMsgs = [];
+let mktTipo = 'wa';
+const SEGS = [
+  {id:'todos',label:'Todos',icon:'👥',n:()=>cache.alunos.length},
+  {id:'ativos',label:'Ativos',icon:'✅',n:()=>cache.alunos.filter(a=>a.status==='ativo').length},
+  {id:'atrasados',label:'Em atraso',icon:'🔴',n:()=>cache.alunos.filter(a=>a.status==='atrasado').length},
+  {id:'vencendo',label:'Vencendo',icon:'⚠️',n:()=>cache.alunos.filter(a=>a.status==='vencendo').length},
+];
+const TPLS_WA = [
+  {id:'cobranca',nome:'Cobrança',txt:'Olá {nome}! 🥊 Sua mensalidade da *Punch and Roll* está em atraso. Regularize para manter seu acesso!'},
+  {id:'vencendo',nome:'Vencimento',txt:'Olá {nome}! 🥊 Sua mensalidade vence em breve. Renove para continuar treinando na *Punch and Roll*!'},
+  {id:'boas_vindas',nome:'Boas-vindas',txt:'Bem-vindo(a) à *Punch and Roll Fight Team*, {nome}! 🥊 Qualquer dúvida pode nos chamar!'},
+  {id:'livre',nome:'Livre',txt:''},
+];
+const TPLS_EMAIL = [
+  {id:'newsletter',nome:'Newsletter',assunto:'Novidades da Punch and Roll',txt:'Olá {nome},\n\nAqui estão as novidades do mês na Punch and Roll Fight Team...'},
+  {id:'cobranca',nome:'Cobrança',assunto:'Mensalidade — Punch and Roll',txt:'Olá {nome},\n\nSua mensalidade está em atraso. Regularize para continuar treinando.'},
+  {id:'livre',nome:'Livre',assunto:'',txt:''},
+];
+
+function renderMktWA() {
+  const inadim = cache.alunos.filter(a=>a.status==='atrasado').length;
+  const vencendo = cache.alunos.filter(a=>a.status==='vencendo').length;
+  document.getElementById('page-mkt-wa').innerHTML = `
+    <div class="grid4" style="margin-bottom:14px">
+      <div class="kpi kg"><div class="kpi-label">Enviadas</div><div class="kpi-val">${mktMsgs.filter(m=>m.tipo==='wa').length}</div></div>
+      <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${inadim}</div></div>
+      <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo}</div></div>
+      <div class="kpi kb"><div class="kpi-label">Total</div><div class="kpi-val">${cache.alunos.length}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">⚡ Disparos Rápidos</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${[
+          {seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'🔴',label:'Cobrar inadimplentes',n:inadim},
+          {seg:'vencendo',color:'var(--yellow)',bg:'rgba(245,158,11,.08)',border:'rgba(245,158,11,.25)',icon:'⚠️',label:'Avisar vencimentos',n:vencendo},
+          {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📣',label:'Comunicado geral',n:cache.alunos.length},
+          {seg:'livre',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✏️',label:'Mensagem livre',n:null},
+        ].map(item=>`<button onclick="mktNovaMsg('wa','${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
+          <div style="font-size:18px;margin-bottom:4px">${item.icon}</div>
+          <div style="font-size:12px;font-weight:600;color:${item.color}">${item.label}</div>
+          ${item.n!==null?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>`:''}
+        </button>`).join('')}
+      </div>
+    </div>
+    ${mktMsgs.filter(m=>m.tipo==='wa').length>0?`<div class="card"><div class="card-title">📋 Histórico</div>${mktMsgs.filter(m=>m.tipo==='wa').map(m=>`<div style="padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px"><div style="font-size:13px;font-weight:500;margin-bottom:4px">${m.titulo}</div><div style="font-size:11px;color:var(--muted);line-height:1.4">${m.texto.slice(0,80)}...</div><div style="font-size:10px;color:var(--green);margin-top:6px">✓ ${m.qtd} enviado(s)</div></div>`).join('')}</div>`:''}
+  `;
+}
+
+function renderMktEmail() {
+  document.getElementById('page-mkt-email').innerHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">⚡ Disparos Rápidos</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${[
+          {seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'📧',label:'Cobrança',n:cache.alunos.filter(a=>a.status==='atrasado').length},
+          {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📰',label:'Newsletter',n:cache.alunos.length},
+          {seg:'livre',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✏️',label:'E-mail livre',n:null},
+        ].map(item=>`<button onclick="mktNovaMsg('email','${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
+          <div style="font-size:18px;margin-bottom:4px">${item.icon}</div>
+          <div style="font-size:12px;font-weight:600;color:${item.color}">${item.label}</div>
+          ${item.n!==null?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>`:''}
+        </button>`).join('')}
+      </div>
+    </div>
+    ${mktMsgs.filter(m=>m.tipo==='email').length>0?`<div class="card"><div class="card-title">📋 Histórico</div>${mktMsgs.filter(m=>m.tipo==='email').map(m=>`<div style="padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px"><div style="font-size:13px;font-weight:500">${m.titulo}</div><div style="font-size:11px;color:var(--muted)">${m.texto.slice(0,80)}...</div></div>`).join('')}</div>`:''}
+  `;
+}
+
+let campanhas = [];
+function renderMktCampanhas() {
+  document.getElementById('page-mkt-campanhas').innerHTML = `
+    ${campanhas.length===0?'<div class="alert alert-y">Nenhuma campanha criada ainda.</div>':''}
+    ${campanhas.map(camp=>`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${camp.nome}</div>
+          <div style="font-size:11px;color:var(--muted)">${camp.objetivo}</div></div>
+          <span class="badge ${camp.status==='ativo'?'bg':camp.status==='concluido'?'bb':'by'}">${camp.status==='ativo'?'Ativo':camp.status==='concluido'?'Concluído':'Rascunho'}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          ${camp.canais.map(c=>`<span style="font-size:10px;color:var(--muted);background:var(--panel2);padding:3px 8px;border-radius:4px">${c==='wa'?'💬 WhatsApp':'📧 E-mail'}</span>`).join('')}
+          <span style="font-size:10px;color:var(--muted);background:var(--panel2);padding:3px 8px;border-radius:4px">👥 ${SEGS.find(s=>s.id===camp.seg)?.label||camp.seg}</span>
+        </div>
+        ${camp.status==='ativo'?`<div style="display:flex;gap:8px">
+          <button onclick="dispararCampanha('${camp.id}')" class="btn btn-r btn-sm" style="flex:1">🚀 Disparar</button>
+          <button onclick="encerrarCampanha('${camp.id}')" class="btn btn-ghost btn-sm">Encerrar</button>
+        </div>`:''}
+      </div>`).join('')}
+  `;
+}
+
+function mktNovaMsg(tipo, segPre) {
+  mktTipo = tipo;
+  const tpls = tipo==='wa' ? TPLS_WA : TPLS_EMAIL;
+  const isWA = tipo==='wa';
+  const m = criarModal('mkt-msg-modal', isWA?'💬 Nova Mensagem WhatsApp':'📧 Novo E-mail');
+
+  let html = `
+    <div class="fg"><label class="fl">Template</label>
+      <select class="fi" id="mkt-tpl" onchange="mktAplicarTpl()">
+        ${tpls.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg"><label class="fl">Destinatários</label>
+      <select class="fi" id="mkt-seg">
+        ${SEGS.map(s=>`<option value="${s.id}"${segPre===s.id?' selected':''}>${s.icon} ${s.label} (${s.n()})</option>`).join('')}
+      </select>
+    </div>
+    ${!isWA?`<div class="fg"><label class="fl">Assunto</label><input class="fi" id="mkt-assunto" placeholder="Assunto do e-mail"></div>`:''}
+    <div class="fg"><label class="fl">Mensagem</label><textarea class="fi" id="mkt-texto" rows="5" placeholder="Digite a mensagem..." style="resize:vertical"></textarea></div>
+    <div style="background:var(--panel2);border-radius:8px;padding:10px;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Variáveis</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${['{nome}','{vencimento}','{plano}'].map(v=>`<button onclick="inserirVar('${v}')" style="padding:2px 8px;background:var(--panel);border:1px solid var(--border);border-radius:4px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--blue);cursor:pointer">${v}</button>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('mkt-msg-modal').remove()">Cancelar</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="mktSalvar(false)">💾 Salvar</button>
+      <button class="btn btn-r" style="flex:1" onclick="mktSalvar(true)">🚀 Enviar</button>
+    </div>`;
+  m.innerHTML += html;
+  document.body.appendChild(m.parentElement||m);
+  setTimeout(()=>mktAplicarTpl(),50);
+}
+
+function mktAplicarTpl() {
+  const tpls = mktTipo==='wa'?TPLS_WA:TPLS_EMAIL;
+  const tid = document.getElementById('mkt-tpl')?.value;
+  const t = tpls.find(x=>x.id===tid);
+  if(!t) return;
+  const ta=document.getElementById('mkt-texto'); if(ta) ta.value=t.txt||'';
+  const as=document.getElementById('mkt-assunto'); if(as&&t.assunto) as.value=t.assunto||'';
+}
+
+function inserirVar(v) {
+  const ta=document.getElementById('mkt-texto'); if(!ta) return;
+  const p=ta.selectionStart; ta.value=ta.value.slice(0,p)+v+ta.value.slice(ta.selectionEnd); ta.focus();
+}
+
+function mktSalvar(enviar) {
+  const texto=document.getElementById('mkt-texto')?.value?.trim();
+  if(!texto){alert('Escreva a mensagem!');return;}
+  const seg=document.getElementById('mkt-seg')?.value;
+  const tpls=mktTipo==='wa'?TPLS_WA:TPLS_EMAIL;
+  const tpl=tpls.find(x=>x.id===document.getElementById('mkt-tpl')?.value);
+  const map={todos:cache.alunos,ativos:cache.alunos.filter(a=>a.status==='ativo'),atrasados:cache.alunos.filter(a=>a.status==='atrasado'),vencendo:cache.alunos.filter(a=>a.status==='vencendo')};
+  const alvos=map[seg]||cache.alunos;
+  if(enviar&&mktTipo==='wa'&&alvos.length>0){
+    const al=alvos[0];
+    const msg=texto.replace(/{nome}/g,al.nome.split(' ')[0]).replace(/{vencimento}/g,al.vencimento||al.venc||'').replace(/{plano}/g,al.plano||'');
+    const tel=(al.tel||'').replace(/\D/g,'');
+    window.open('https://wa.me/55'+tel+'?text='+encodeURIComponent(msg),'_blank');
+  }
+  mktMsgs.unshift({id:Date.now(),tipo:mktTipo,titulo:tpl?.nome||'Mensagem',texto,seg,qtd:enviar?alvos.length:0,data:todayStr});
+  document.getElementById('mkt-msg-modal').remove();
+  alert(enviar?`✅ Enviado para ${alvos.length} aluno(s)!`:'💾 Salvo como rascunho!');
+  if(currentPage==='mkt-wa') renderMktWA();
+  if(currentPage==='mkt-email') renderMktEmail();
+}
+
+function mktNovaCampanha() {
+  const m = criarModal('mkt-camp-modal','📣 Nova Campanha');
+  m.innerHTML += `
+    <div class="fg"><label class="fl">Nome *</label><input class="fi" id="nc-nome" placeholder="Ex: Retenção Maio 2026"></div>
+    <div class="fg"><label class="fl">Objetivo</label><input class="fi" id="nc-obj" placeholder="Ex: Reduzir inadimplência"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Início</label><input class="fi" type="date" id="nc-ini" value="${todayStr}"></div>
+      <div class="fg"><label class="fl">Fim</label><input class="fi" type="date" id="nc-fim"></div>
+    </div>
+    <div class="fg"><label class="fl">Segmento</label><select class="fi" id="nc-seg">${SEGS.map(s=>`<option value="${s.id}">${s.icon} ${s.label} (${s.n()})</option>`).join('')}</select></div>
+    <div class="fg"><label class="fl">Canais</label>
+      <div style="display:flex;gap:14px;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="nc-wa" checked style="accent-color:var(--red)"> 💬 WhatsApp</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="nc-email" style="accent-color:var(--red)"> 📧 E-mail</label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('mkt-camp-modal').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="salvarCampanha()">✅ Criar</button>
+    </div>`;
+  document.body.appendChild(m.parentElement||m);
+}
+
+function salvarCampanha() {
+  const nome=document.getElementById('nc-nome').value.trim();
+  if(!nome){alert('Informe o nome!');return;}
+  const canais=[];
+  if(document.getElementById('nc-wa').checked) canais.push('wa');
+  if(document.getElementById('nc-email').checked) canais.push('email');
+  if(!canais.length){alert('Selecione um canal!');return;}
+  campanhas.unshift({id:Date.now(),nome,objetivo:document.getElementById('nc-obj').value,ini:document.getElementById('nc-ini').value,fim:document.getElementById('nc-fim').value,seg:document.getElementById('nc-seg').value,canais,status:'ativo',env:0});
+  document.getElementById('mkt-camp-modal').remove();
+  renderMktCampanhas();
+}
+
+function dispararCampanha(id){const c=campanhas.find(x=>x.id==id);if(!c)return;const n=SEGS.find(s=>s.id===c.seg)?.n()||0;c.env=n;alert('🚀 Campanha disparada para '+n+' aluno(s)!');renderMktCampanhas();}
+function encerrarCampanha(id){if(!confirm('Encerrar campanha?'))return;const c=campanhas.find(x=>x.id==id);if(c){c.status='concluido';renderMktCampanhas();}}
+
+// ══════════════════════════════════════
+// HELPER CRIAR MODAL
+// ══════════════════════════════════════
+function criarModal(id, title) {
+  const existing = document.getElementById(id);
+  if(existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = id;
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+  const box = document.createElement('div');
+  box.style.cssText='background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px;width:100%;max-height:90vh;overflow-y:auto';
+  box.innerHTML=`<div style="width:36px;height:4px;background:var(--muted2);border-radius:2px;margin:0 auto 14px"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">${title}</div><button onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button></div>`;
+  overlay.appendChild(box);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
+  return box;
+}
+
 </script>
 </body>
 </html>
