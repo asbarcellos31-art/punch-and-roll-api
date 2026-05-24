@@ -190,7 +190,7 @@ textarea.fi{resize:none}
     <div class="sb-item" id="sb-checkins" onclick="navTo('checkins')"><span class="ico">✅</span>Check-ins</div>
     <div class="sb-sec">Financeiro</div>
     <div class="sb-item" id="sb-financeiro" onclick="navTo('financeiro')"><span class="ico">💰</span>Financeiro</div>
-    <div class="sb-item" id="sb-pagamentos" onclick="navTo('pagamentos')"><span class="ico">💳</span>Pagamentos</div>
+    <div class="sb-item" id="sb-pagamentos" onclick="navTo('pagamentos')"><span class="ico">💳</span>Mensalidades</div>
     <div class="sb-sec">Portal do Aluno</div>
     <div class="sb-item" id="sb-recados" onclick="navTo('recados')"><span class="ico">📢</span>Recados</div>
     <div class="sb-item" id="sb-documentos" onclick="navTo('documentos')"><span class="ico">📁</span>Documentos</div>
@@ -233,7 +233,7 @@ textarea.fi{resize:none}
   <button class="bn" id="bn-alunos" onclick="navTo('alunos')"><span class="bn-icon">👥</span>Alunos</button>
   <button class="bn" id="bn-agenda" onclick="navTo('agenda')"><span class="bn-icon">📅</span>Agenda</button>
   <button class="bn" id="bn-financeiro" onclick="navTo('financeiro')"><span class="bn-icon">💰</span>Financeiro</button>
-  <button class="bn" id="bn-pagamentos" onclick="navTo('pagamentos')"><span class="bn-icon">💳</span>Pagtos</button>
+  <button class="bn" id="bn-pagamentos" onclick="navTo('pagamentos')"><span class="bn-icon">💳</span>Mensalidades</button>
 </nav>
 
 <button class="fab" id="fab" onclick="fabAction()">+</button>
@@ -473,7 +473,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',pagamentos:'Pagamentos',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\"wa\")">+ Mensagem</button>',
@@ -958,29 +958,309 @@ async function regularizar(id) {
 }
 
 // ══════════════════════════════════════
-// PAGAMENTOS
+// MENSALIDADES
 // ══════════════════════════════════════
+let mensTab = 'overview';
+let mensHistorico = []; // pagamentos registrados
+
 function renderPagamentos() {
   const pg = document.getElementById('page-pagamentos');
   const atrasados = cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo = cache.alunos.filter(a=>a.status==='vencendo');
+  const vencendo  = cache.alunos.filter(a=>a.status==='vencendo');
+  const ativos    = cache.alunos.filter(a=>a.status==='ativo');
+  const receitaTotal = cache.alunos.filter(a=>a.status==='ativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const inadimTotal  = atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+
   pg.innerHTML = `
+    <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
+      ${[['overview','📊 Visão Geral'],['cobranca','🔴 Cobranças'],['historico','📋 Histórico'],['renovacao','🔄 Renovação']].map(([id,label])=>
+        `<button onclick="mensNavTo('${id}')" id="mens-tab-${id}" style="flex:1;padding:7px 8px;border-radius:5px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;white-space:nowrap;background:${mensTab===id?'var(--red)':'transparent'};color:${mensTab===id?'#fff':'var(--muted)'};transition:all .15s">${label}</button>`
+      ).join('')}
+    </div>
+    <div id="mens-content"></div>
+  `;
+  renderMensTab();
+}
+
+function mensNavTo(tab) { mensTab=tab; renderPagamentos(); }
+
+function renderMensTab() {
+  if(mensTab==='overview')  renderMensOverview();
+  if(mensTab==='cobranca')  renderMensCobranca();
+  if(mensTab==='historico') renderMensHistorico();
+  if(mensTab==='renovacao') renderMensRenovacao();
+}
+
+function renderMensOverview() {
+  const atrasados = cache.alunos.filter(a=>a.status==='atrasado');
+  const vencendo  = cache.alunos.filter(a=>a.status==='vencendo');
+  const ativos    = cache.alunos.filter(a=>a.status==='ativo');
+  const recMes    = ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const inadim    = atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const taxaAdim  = cache.alunos.length>0?Math.round(ativos.length/cache.alunos.length*100):0;
+
+  document.getElementById('mens-content').innerHTML = `
+    <div class="grid4">
+      <div class="kpi kg"><div class="kpi-label">Adimplentes</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">${taxaAdim}% do total</div></div>
+      <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados.length}</div><div class="kpi-sub">${fmtR(inadim)} em aberto</div></div>
+      <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo.length}</div><div class="kpi-sub">Próximos dias</div></div>
+      <div class="kpi kb"><div class="kpi-label">Receita/mês</div><div class="kpi-val">${fmtR(recMes)}</div><div class="kpi-sub">Alunos ativos</div></div>
+    </div>
+
+    ${atrasados.length>0?`<div class="alert alert-r">🔴 ${atrasados.length} aluno(s) inadimplente(s) — ${fmtR(inadim)} em aberto</div>`:''}
+    ${vencendo.length>0?`<div class="alert alert-y">⚠️ ${vencendo.length} aluno(s) com mensalidade vencendo em breve</div>`:''}
+    ${atrasados.length===0&&vencendo.length===0?`<div class="alert alert-g">✅ Todos os alunos estão em dia!</div>`:''}
+
     <div class="card">
-      <div class="card-title">💳 Mensalidades</div>
-      ${cache.alunos.length===0?'<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhum aluno</div>':
-        cache.alunos.map(a=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1e1e1e;gap:8px">
+      <div class="card-title">👥 Situação de Todos os Alunos</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button onclick="mensFiltroPor='todos';renderMensOverview()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${typeof mensFiltroPor==='undefined'||mensFiltroPor==='todos'?'var(--red)':'var(--panel2)'};color:${typeof mensFiltroPor==='undefined'||mensFiltroPor==='todos'?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Todos (${cache.alunos.length})</button>
+        <button onclick="mensFiltroPor='atrasado';renderMensOverview()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${mensFiltroPor==='atrasado'?'var(--red)':'var(--panel2)'};color:${mensFiltroPor==='atrasado'?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Atrasados (${atrasados.length})</button>
+        <button onclick="mensFiltroPor='vencendo';renderMensOverview()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${mensFiltroPor==='vencendo'?'var(--red)':'var(--panel2)'};color:${mensFiltroPor==='vencendo'?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Vencendo (${vencendo.length})</button>
+        <button onclick="mensFiltroPor='ativo';renderMensOverview()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${mensFiltroPor==='ativo'?'var(--red)':'var(--panel2)'};color:${mensFiltroPor==='ativo'?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Em dia (${ativos.length})</button>
+      </div>
+      ${(mensFiltroPor&&mensFiltroPor!=='todos'?cache.alunos.filter(a=>a.status===mensFiltroPor):cache.alunos).map(a=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e1e1e;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nome}</div>
-            <div style="font-size:11px;color:var(--muted)">${a.plano||'—'} · Venc: ${fmtD(a.venc)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${a.plano||'—'} · Venc: <span style="color:${a.status==='atrasado'?'#f87171':a.status==='vencendo'?'var(--yellow)':'var(--muted)'}">${fmtD(a.venc)}</span></div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:${a.status==='ativo'?'var(--green)':'#f87171'}">${fmtR(a.valor)}</div>
             ${badgeStatus(a.status)}
-            ${a.status!=='ativo'?`<button class="btn btn-g btn-sm" onclick="regularizar(${a.id})">✓ OK</button>`:''}
           </div>
-        </div>`).join('')}
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            ${a.status!=='ativo'?`<button class="btn btn-g btn-sm" onclick="registrarPagamento(${a.id})">✓ Pago</button>`:''}
+            <button class="btn btn-ghost btn-sm" onclick="verHistoricoAluno(${a.id},'${a.nome.split(' ')[0]}')">📋</button>
+          </div>
+        </div>`).join('')||'<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhum aluno</div>'}
     </div>
   `;
+}
+
+let mensFiltroPor = 'todos';
+
+function renderMensCobranca() {
+  const atrasados = cache.alunos.filter(a=>a.status==='atrasado');
+  const vencendo  = cache.alunos.filter(a=>a.status==='vencendo');
+  document.getElementById('mens-content').innerHTML = `
+    ${atrasados.length===0&&vencendo.length===0?'<div class="alert alert-g">✅ Nenhuma cobrança pendente!</div>':''}
+
+    ${atrasados.length>0?`<div class="card">
+      <div class="card-title" style="color:#f87171">🔴 Em Atraso (${atrasados.length})</div>
+      ${atrasados.map(a=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(212,17,28,.06);border-radius:8px;margin-bottom:6px;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${a.nome}</div>
+            <div style="font-size:11px;color:var(--muted)">Venceu: ${fmtD(a.venc)} · ${a.plano||'—'}</div>
+            <div style="font-size:11px;color:var(--muted)">📱 ${a.tel||'—'}</div>
+          </div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:#f87171;flex-shrink:0">${fmtR(a.valor)}</div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn btn-g btn-sm" onclick="registrarPagamento(${a.id})">✓ Pago</button>
+            <button onclick="cobrarWA(${a.id})" style="padding:5px 10px;background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.25);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">💬 Cobrar</button>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+
+    ${vencendo.length>0?`<div class="card">
+      <div class="card-title" style="color:var(--yellow)">⚠️ Vencendo em Breve (${vencendo.length})</div>
+      ${vencendo.map(a=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(245,158,11,.06);border-radius:8px;margin-bottom:6px;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${a.nome}</div>
+            <div style="font-size:11px;color:var(--muted)">Vence: ${fmtD(a.venc)} · ${a.plano||'—'}</div>
+            <div style="font-size:11px;color:var(--muted)">📱 ${a.tel||'—'}</div>
+          </div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--yellow);flex-shrink:0">${fmtR(a.valor)}</div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn btn-g btn-sm" onclick="registrarPagamento(${a.id})">✓ Pago</button>
+            <button onclick="avisarWA(${a.id})" style="padding:5px 10px;background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.25);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">💬 Avisar</button>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+  `;
+}
+
+function renderMensHistorico() {
+  document.getElementById('mens-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--muted)">${mensHistorico.length} registro(s)</div>
+      <button class="btn btn-r btn-sm" onclick="abrirModalRegistrarPag()">+ Registrar Pagamento</button>
+    </div>
+    ${mensHistorico.length===0
+      ?'<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px">Nenhum pagamento registrado ainda</div>'
+      :mensHistorico.map(p=>`
+        <div class="item">
+          <div class="item-top">
+            <div>
+              <div class="item-name">${p.alunoNome}</div>
+              <div class="item-meta">📅 ${fmtD(p.data)} · ${p.metodo||'PIX'} · ${p.referencia||'—'}</div>
+            </div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${fmtR(p.valor)}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="badge bg">✓ Confirmado</span>
+            <button onclick="excluirHistorico('${p.id}')" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">🗑 Remover</button>
+          </div>
+        </div>`).join('')}
+  `;
+}
+
+function renderMensRenovacao() {
+  const hoje = new Date();
+  document.getElementById('mens-content').innerHTML = `
+    <div class="card">
+      <div class="card-title">🔄 Renovação em Massa</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5">Renove a mensalidade de múltiplos alunos de uma vez. O vencimento será calculado automaticamente com base no plano de cada um.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px" id="renovacao-lista">
+        ${cache.alunos.filter(a=>a.status!=='ativo').map(a=>`
+          <label style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--panel2);border-radius:8px;cursor:pointer">
+            <input type="checkbox" value="${a.id}" class="ren-check" style="accent-color:var(--red);width:16px;height:16px;flex-shrink:0">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">${a.nome}</div>
+              <div style="font-size:11px;color:var(--muted)">${a.plano||'—'} · ${fmtR(a.valor)}/mês · Venc: ${fmtD(a.venc)}</div>
+            </div>
+            ${badgeStatus(a.status)}
+          </label>`).join('')||'<div style="text-align:center;color:var(--green);font-size:13px;padding:20px">✅ Todos os alunos estão em dia!</div>'}
+      </div>
+      ${cache.alunos.filter(a=>a.status!=='ativo').length>0?`
+      <div class="frow" style="margin-bottom:12px">
+        <div class="fg"><label class="fl">Forma de Pagamento</label>
+          <select class="fi" id="ren-metodo"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option></select>
+        </div>
+        <div class="fg"><label class="fl">Data do Pagamento</label>
+          <input class="fi" type="date" id="ren-data" value="${todayStr}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="selecionarTodos()">Selecionar todos</button>
+        <button class="btn btn-r" style="flex:1" onclick="renovarSelecionados()">🔄 Renovar Selecionados</button>
+      </div>`:''}
+    </div>
+  `;
+}
+
+function selecionarTodos() {
+  document.querySelectorAll('.ren-check').forEach(c=>c.checked=true);
+}
+
+async function renovarSelecionados() {
+  const selecionados = [...document.querySelectorAll('.ren-check:checked')].map(c=>parseInt(c.value));
+  if(selecionados.length===0){alert('Selecione ao menos um aluno!');return;}
+  if(!confirm(`Renovar mensalidade de ${selecionados.length} aluno(s)?`)) return;
+  const metodo = document.getElementById('ren-metodo')?.value||'pix';
+  const data = document.getElementById('ren-data')?.value||todayStr;
+  let ok=0;
+  for(const id of selecionados) {
+    const a = cache.alunos.find(x=>x.id===id);
+    if(!a) continue;
+    try {
+      // Calcular novo vencimento
+      const todos = [...PLANOS.boxe,...PLANOS.jiujitsu,...PLANOS.ambos];
+      const plano = todos.find(p=>p.id===(a.planoId||a.plano_id));
+      const meses = plano?.meses||1;
+      const novoVenc = new Date(a.venc&&a.venc>todayStr?a.venc:todayStr);
+      novoVenc.setMonth(novoVenc.getMonth()+meses);
+      const novoVencStr = novoVenc.toISOString().slice(0,10);
+      await PUT('/api/alunos/'+id, {...a, status:'ativo', venc:novoVencStr});
+      // Registrar no histórico
+      mensHistorico.unshift({id:Date.now()+id,alunoId:id,alunoNome:a.nome,valor:a.valor,data,metodo,referencia:'Renovação '+new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'})});
+      ok++;
+    } catch(e) { console.error('Erro renovando '+a.nome,e); }
+  }
+  await carregarTudo();
+  alert(`✅ ${ok} mensalidade(s) renovada(s)!`);
+  renderPagamentos();
+}
+
+function abrirModalRegistrarPag(alunoId) {
+  const box = criarModal('modal-reg-pag', '💳 Registrar Pagamento');
+  box.innerHTML += `
+    <div class="fg"><label class="fl">Aluno *</label>
+      <select class="fi" id="rp-aluno">
+        ${cache.alunos.map(a=>`<option value="${a.id}"${a.id===alunoId?' selected':''}>${a.nome}</option>`).join('')}
+      </select>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" id="rp-valor" placeholder="0,00"></div>
+      <div class="fg"><label class="fl">Data</label><input class="fi" type="date" id="rp-data" value="${todayStr}"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Método</label>
+        <select class="fi" id="rp-metodo"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option><option value="transferencia">Transferência</option></select>
+      </div>
+      <div class="fg"><label class="fl">Referência</label><input class="fi" id="rp-ref" placeholder="Ex: Maio/2026"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-reg-pag').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="confirmarPagamento()">✅ Confirmar</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
+  if(alunoId) {
+    const a = cache.alunos.find(x=>x.id===alunoId);
+    if(a) { document.getElementById('rp-valor').value=a.valor||''; document.getElementById('rp-ref').value='Mensalidade '+new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); }
+  }
+}
+
+async function confirmarPagamento() {
+  const alunoId = parseInt(document.getElementById('rp-aluno').value);
+  const valor = parseFloat(document.getElementById('rp-valor').value)||0;
+  const data = document.getElementById('rp-data').value||todayStr;
+  const metodo = document.getElementById('rp-metodo').value;
+  const ref = document.getElementById('rp-ref').value||'Mensalidade';
+  if(!valor){alert('Informe o valor!');return;}
+  const a = cache.alunos.find(x=>x.id===alunoId);
+  if(!a) return;
+  try {
+    // Calcular novo vencimento
+    const todos = [...PLANOS.boxe,...PLANOS.jiujitsu,...PLANOS.ambos];
+    const plano = todos.find(p=>p.id===(a.planoId||a.plano_id));
+    const meses = plano?.meses||1;
+    const base = a.venc&&a.venc>todayStr?a.venc:todayStr;
+    const novoVenc = new Date(base); novoVenc.setMonth(novoVenc.getMonth()+meses);
+    await PUT('/api/alunos/'+alunoId, {...a, status:'ativo', venc:novoVenc.toISOString().slice(0,10)});
+    mensHistorico.unshift({id:Date.now(),alunoId,alunoNome:a.nome,valor,data,metodo,referencia:ref});
+    document.getElementById('modal-reg-pag').remove();
+    await carregarTudo();
+    alert('✅ Pagamento registrado e aluno regularizado!');
+    renderPagamentos();
+  } catch(e){alert('Erro: '+e.message);}
+}
+
+async function registrarPagamento(alunoId) { abrirModalRegistrarPag(alunoId); }
+
+function excluirHistorico(id) {
+  if(!confirm('Remover este registro?')) return;
+  mensHistorico = mensHistorico.filter(x=>x.id!=id);
+  renderMensHistorico();
+}
+
+function verHistoricoAluno(id, nome) {
+  const hist = mensHistorico.filter(h=>h.alunoId===id);
+  const box = criarModal('modal-hist-aluno','📋 Histórico — '+nome);
+  box.innerHTML += hist.length===0
+    ?'<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">Nenhum pagamento registrado</div>'
+    :hist.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
+        <div><div style="font-size:13px;font-weight:500">${p.referencia||'—'}</div><div style="font-size:11px;color:var(--muted)">📅 ${fmtD(p.data)} · ${p.metodo||'—'}</div></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}</div>
+      </div>`).join('');
+  box.innerHTML += `<button class="btn btn-ghost btn-full" style="margin-top:12px" onclick="document.getElementById('modal-hist-aluno').remove()">Fechar</button>`;
+  document.body.appendChild(box.parentElement||box);
+}
+
+function cobrarWA(id) {
+  const a = cache.alunos.find(x=>x.id===id); if(!a) return;
+  const msg = `Olá ${a.nome.split(' ')[0]}! 🥊 Sua mensalidade da *Punch and Roll Fight Team* está em atraso desde ${fmtD(a.venc)}. Regularize para manter seu acesso. Qualquer dúvida estamos aqui!`;
+  const tel = (a.tel||'').replace(/\D/g,'');
+  window.open('https://wa.me/55'+tel+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function avisarWA(id) {
+  const a = cache.alunos.find(x=>x.id===id); if(!a) return;
+  const msg = `Olá ${a.nome.split(' ')[0]}! 🥊 Sua mensalidade da *Punch and Roll Fight Team* vence no dia ${fmtD(a.venc)}. Renove para continuar treinando!`;
+  const tel = (a.tel||'').replace(/\D/g,'');
+  window.open('https://wa.me/55'+tel+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 // ══════════════════════════════════════
