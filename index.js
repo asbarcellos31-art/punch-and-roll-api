@@ -180,8 +180,9 @@ async function setupDB() {
       )
     `);
 
-    // Seed aulas padrão
+    // Seed aulas padrão — sempre verifica e insere se vazio
     const [aulaCount] = await conn.query('SELECT COUNT(*) as n FROM aulas');
+    console.log('Aulas no banco:', aulaCount[0].n);
     if (aulaCount[0].n === 0) {
       const aulasDefault = [
         ['Boxe Iniciante','07:00','Segunda',15,'boxe'],
@@ -408,8 +409,16 @@ app.post('/api/aulas', auth, adminOnly, async (req, res) => {
 app.put('/api/aulas/:id', auth, adminOnly, async (req, res) => {
   try {
     const { nome, hora, dia, vagas, modalidade, status } = req.body;
-    await db.query('UPDATE aulas SET nome=?,hora=?,dia=?,vagas=?,modalidade=?,status=? WHERE id=?',[nome,hora,dia,vagas,modalidade,status,req.params.id]);
+    await db.query('UPDATE aulas SET nome=?,hora=?,dia=?,vagas=?,modalidade=?,status=? WHERE id=?',[nome,hora,dia,vagas,modalidade,status||'ativo',req.params.id]);
     res.json({ message: 'Aula atualizada!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/aulas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM checkins WHERE aula_id=?',[req.params.id]);
+    await db.query('DELETE FROM aulas WHERE id=?',[req.params.id]);
+    res.json({ message: 'Aula removida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -689,7 +698,15 @@ async function enviarEmailAluno(email, nome, assunto, html) {
 // ══════════════════════════════════════
 // HEALTH CHECK
 // ══════════════════════════════════════
-app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0' }));
+app.get('/api/health', async (req, res) => {
+  try {
+    const [aulas] = await db.query('SELECT COUNT(*) as n FROM aulas');
+    const [alunos] = await db.query('SELECT COUNT(*) as n FROM alunos');
+    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0', aulas: aulas[0].n, alunos: alunos[0].n });
+  } catch(e) {
+    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0' });
+  }
+});
 
 // ══════════════════════════════════════
 // START
