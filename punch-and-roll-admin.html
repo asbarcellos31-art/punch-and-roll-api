@@ -236,7 +236,31 @@ tr:last-child td{border-bottom:none}
 </style>
 </head>
 <body>
-<div id="app">
+
+<!-- LOGIN ADMIN -->
+<div id="login-admin-screen" style="position:fixed;inset:0;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:500;font-family:'DM Sans',sans-serif">
+  <div style="width:64px;height:64px;background:#181818;border-radius:50%;border:3px solid #d4111c;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:14px">🥊</div>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:#f0f0f0;margin-bottom:4px">PUNCH AND ROLL</div>
+  <div style="font-size:11px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:28px">Administração</div>
+  <div style="background:#181818;border:1px solid #2a2a2a;border-radius:14px;padding:24px;width:100%;max-width:340px">
+    <div style="margin-bottom:12px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#666;margin-bottom:5px;display:block">E-mail</label>
+      <input id="adm-login-email" type="email" placeholder="admin@punchandroll.com.br" 
+        style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:10px 12px;color:#f0f0f0;font-family:'DM Sans',sans-serif;font-size:14px;outline:none"
+        onkeydown="if(event.key==='Enter')admLogin()">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#666;margin-bottom:5px;display:block">Senha</label>
+      <input id="adm-login-senha" type="password" placeholder="••••••••"
+        style="width:100%;background:#1f1f1f;border:1px solid #2a2a2a;border-radius:6px;padding:10px 12px;color:#f0f0f0;font-family:'DM Sans',sans-serif;font-size:14px;outline:none"
+        onkeydown="if(event.key==='Enter')admLogin()">
+    </div>
+    <button onclick="admLogin()" style="width:100%;padding:12px;background:#d4111c;color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">ENTRAR</button>
+    <div id="adm-login-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">E-mail ou senha incorretos</div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
 
 <!-- SIDEBAR OVERLAY -->
 <div class="sidebar-overlay" id="sb-overlay" onclick="closeSB()"></div>
@@ -1567,7 +1591,57 @@ Sincronize com o servidor.`);
 // ══════════════════════════════════════
 // INIT
 // ══════════════════════════════════════
-carregarDadosReais().then(function(){navTo('dashboard');});
+async function admLogin() {
+  const email = document.getElementById('adm-login-email').value.trim();
+  const senha = document.getElementById('adm-login-senha').value;
+  if(!email||!senha) return;
+  const btn = document.querySelector('#login-admin-screen button');
+  btn.textContent='Entrando...'; btn.disabled=true;
+  try {
+    const res = await fetch(API_URL+'/api/auth/admin',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,senha})
+    });
+    const data = await res.json();
+    if(!res.ok){ 
+      document.getElementById('adm-login-erro').style.display='block';
+      btn.textContent='ENTRAR'; btn.disabled=false;
+      return; 
+    }
+    _token = data.token;
+    localStorage.setItem('pr_admin_token', _token);
+    document.getElementById('login-admin-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    await carregarDadosReais();
+    navTo('dashboard');
+  } catch(e){
+    document.getElementById('adm-login-erro').style.display='block';
+    btn.textContent='ENTRAR'; btn.disabled=false;
+  }
+}
+
+// Verificar token salvo
+(async function(){
+  const saved = localStorage.getItem('pr_admin_token');
+  if(saved) {
+    _token = saved;
+    // Verificar se token ainda é válido
+    try {
+      const res = await fetch(API_URL+'/api/dashboard',{headers:{'Authorization':'Bearer '+_token}});
+      if(res.ok) {
+        document.getElementById('login-admin-screen').style.display='none';
+        document.getElementById('app').style.display='flex';
+        await carregarDadosReais();
+        navTo('dashboard');
+        return;
+      }
+    } catch(e){}
+    // Token inválido - limpar
+    localStorage.removeItem('pr_admin_token');
+    _token = '';
+  }
+})();
 
 // ════════════════════════════════════════
 // PORTAL DO ALUNO — DADOS COMPARTILHADOS
