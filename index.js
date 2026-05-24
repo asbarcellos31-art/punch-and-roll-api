@@ -284,6 +284,18 @@ app.get('/api/alunos', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// Dados do aluno logado
+app.get('/api/alunos/me', auth, async (req, res) => {
+  try {
+    if(req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.user.id]);
+    if(!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
+    const a = rows[0];
+    res.json({...a, venc: a.vencimento, aulasLiberadas: (() => { try { return JSON.parse(a.aulas_liberadas||'[]'); } catch(e){ return []; } })()});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/alunos/:id', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);

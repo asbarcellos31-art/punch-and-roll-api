@@ -7,388 +7,183 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{
-  --black:#0a0a0a;--dark:#111;--panel:#181818;--panel2:#1f1f1f;
-  --border:#2a2a2a;--red:#d4111c;--white:#f0f0f0;--muted:#666;--muted2:#444;
-  --green:#22c55e;--yellow:#f59e0b;--blue:#3b82f6;
-}
-html,body{height:100%;overflow:hidden;background:var(--black)}
-body{font-family:'DM Sans',sans-serif;color:var(--white)}
+:root{--bg:#0a0a0a;--dark:#111;--panel:#181818;--panel2:#1f1f1f;--border:#2a2a2a;--red:#d4111c;--white:#f0f0f0;--muted:#666;--green:#22c55e;--yellow:#f59e0b;--blue:#3b82f6}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--white)}
 #app{position:fixed;inset:0;display:flex;flex-direction:column}
-
-/* LOGIN */
-.login-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:var(--black)}
-.login-logo{width:72px;height:72px;background:var(--panel);border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:14px;box-shadow:0 0 40px rgba(192,21,31,.2)}
-.login-brand{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;margin-bottom:4px}
-.login-sub{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px}
-.login-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:340px}
-.login-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5}
-
-/* TOPBAR */
 .topbar{height:52px;background:var(--dark);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0}
-.topbar-logo{width:30px;height:30px;background:var(--black);border-radius:50%;border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.topbar-logo{width:30px;height:30px;background:var(--bg);border-radius:50%;border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .topbar-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;flex:1}
 .user-chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:4px 10px 4px 4px;cursor:pointer}
 .user-avatar{width:24px;height:24px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
-
-/* PAGES */
 .pages{flex:1;overflow:hidden;position:relative}
 .page{position:absolute;inset:0;overflow-y:auto;padding:14px;display:none;-webkit-overflow-scrolling:touch}
 .page.active{display:block}
-.page::-webkit-scrollbar{width:3px}
-.page::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-
-/* BOTTOM NAV */
 .bottom-nav{height:56px;background:var(--dark);border-top:1px solid var(--border);display:flex;flex-shrink:0}
-.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--muted);font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;border:none;background:none;font-family:'DM Sans',sans-serif;transition:color .15s}
-.bn-item.active{color:var(--red)}
+.bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:var(--muted);font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .15s}
+.bn.active{color:var(--red)}
 .bn-icon{font-size:20px;line-height:1}
-
-/* CARDS */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
 .card-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;color:var(--muted);margin-bottom:12px}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-
-/* KPI */
 .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;overflow:hidden}
 .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}
-.kpi.b::before{background:var(--blue)}.kpi.y::before{background:var(--yellow)}
+.kg::before{background:var(--green)}.kr::before{background:var(--red)}.kb::before{background:var(--blue)}.ky::before{background:var(--yellow)}
 .kpi-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.kpi-val{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;line-height:1}
+.kpi-val{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;line-height:1}
 .kpi-sub{font-size:10px;color:var(--muted);margin-top:4px}
-
-/* BADGE */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-.bg{background:rgba(34,197,94,.15);color:var(--green)}.br{background:rgba(192,21,31,.15);color:#f87171}
-.by{background:rgba(245,158,11,.15);color:var(--yellow)}.bb{background:rgba(59,130,246,.15);color:var(--blue)}
-
-/* ALERT */
-.alert{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.4}
-.alert.r{background:rgba(192,21,31,.12);border:1px solid rgba(192,21,31,.3);color:#f87171}
-.alert.y{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--yellow)}
-.alert.g{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green)}
-
-/* FORM */
-.fg{margin-bottom:12px}
-.fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
-.fi{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;transition:border-color .15s}
-.fi:focus{outline:none;border-color:var(--red)}
-
-/* BTN */
-.btn{padding:8px 14px;border-radius:6px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s}
-.btn-r{background:var(--red);color:#fff}
-.btn-g{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
-.btn-full{width:100%;padding:12px;font-size:14px;text-align:center}
-.btn-sm{padding:6px 12px;font-size:12px}
-
-/* AULA CARD */
+.bg{background:rgba(34,197,94,.15);color:var(--green)}.br{background:rgba(212,17,28,.15);color:#f87171}.by{background:rgba(245,158,11,.15);color:var(--yellow)}.bb{background:rgba(59,130,246,.15);color:var(--blue)}
+.alert-r{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;background:rgba(212,17,28,.12);border:1px solid rgba(212,17,28,.3);color:#f87171;line-height:1.4}
+.alert-y{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-size:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--yellow);line-height:1.4}
 .aula-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
 .aula-hora{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--red);width:52px;flex-shrink:0}
-.aula-info{flex:1;min-width:0}
+.aula-info{flex:1}
 .aula-nome{font-size:13px;font-weight:500}
 .aula-meta{font-size:11px;color:var(--muted);margin-top:2px}
-
-/* DAY TABS */
-.day-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
-.day-tabs::-webkit-scrollbar{display:none}
+.day-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;scrollbar-width:none}
 .day-tab{padding:6px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:11px;font-weight:500;color:var(--muted);background:var(--panel);white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif;transition:all .15s}
 .day-tab.active{background:var(--red);border-color:var(--red);color:#fff}
-
-/* RECADO */
-.recado-item{background:var(--panel2);border-radius:10px;padding:14px;margin-bottom:10px}
-
-/* FIN ITEM */
-.fin-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e1e1e}
-.fin-item:last-child{border-bottom:none}
-
-@media(min-width:600px){
-  .page{padding:20px}
-  .login-screen{padding:40px}
-}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="app">
 
-  <!-- LOGIN -->
-  <div class="login-screen" id="login-screen">
-    <div class="login-logo">🥊</div>
-    <div class="login-brand">Punch and Roll</div>
-    <div class="login-sub">Fight Team · Portal</div>
-    <div class="login-card">
-      <div class="fg">
-        <label class="fl">E-mail ou nome</label>
-        <input class="fi" id="l-user" placeholder="Ex: carlos@email.com" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <div class="fg">
-        <label class="fl">Senha</label>
-        <input class="fi" type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="btn btn-r btn-full" onclick="doLogin()">Entrar</button>
-      <div id="l-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">Login ou senha incorretos</div>
-      <div class="login-hint">
-        Use seu e-mail ou primeiro nome<br>
-        <span style="color:var(--muted2)">Senha padrão: 123 (enviada por WhatsApp)</span>
-      </div>
+<!-- LOGIN -->
+<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:500">
+  <div style="width:72px;height:72px;background:var(--panel);border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:14px;box-shadow:0 0 40px rgba(212,17,28,.2)">🥊</div>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;margin-bottom:4px">PUNCH AND ROLL</div>
+  <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px">Portal do Aluno</div>
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:340px">
+    <div style="margin-bottom:12px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block">E-mail ou nome</label>
+      <input id="l-login" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="seu@email.com ou nome" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-  </div>
-
-  <!-- APP (após login) -->
-  <div id="main-app" style="display:none;flex:1;flex-direction:column;height:100%">
-
-    <!-- TOPBAR -->
-    <div class="topbar">
-      <div class="topbar-logo">PR</div>
-      <div class="topbar-title" id="page-title">Início</div>
-      <div class="user-chip" onclick="logout()">
-        <div class="user-avatar" id="top-avatar">?</div>
-        <span style="font-size:11px" id="top-name">—</span>
-      </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block">Senha</label>
+      <input id="l-senha" type="password" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-
-    <!-- PAGES -->
-    <div class="pages">
-      <div class="page active" id="page-inicio"></div>
-      <div class="page" id="page-financeiro"></div>
-      <div class="page" id="page-agenda"></div>
-      <div class="page" id="page-recados"></div>
-    </div>
-
-    <!-- BOTTOM NAV -->
-    <nav class="bottom-nav">
-      <button class="bn-item active" id="bn-inicio" onclick="navTo('inicio')"><span class="bn-icon">🏠</span>Início</button>
-      <button class="bn-item" id="bn-financeiro" onclick="navTo('financeiro')"><span class="bn-icon">💳</span>Financeiro</button>
-      <button class="bn-item" id="bn-agenda" onclick="navTo('agenda')"><span class="bn-icon">📅</span>Agenda</button>
-      <button class="bn-item" id="bn-recados" onclick="navTo('recados')"><span class="bn-icon">📢</span>Recados</button>
-    </nav>
-
+    <button id="l-btn" onclick="doLogin()" style="width:100%;padding:12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">ENTRAR</button>
+    <div id="l-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">Login ou senha incorretos</div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px">Senha padrão: <strong style="color:var(--white)">123</strong></div>
   </div>
 </div>
 
-<script>
-const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
-// ══════════════════════════════════════
-// DADOS — em produção virão do backend
-// ══════════════════════════════════════
-// Carregar aulas e recados ao abrir a página (sem precisar de login)
-async function carregarAulasPublicas() {
-  try {
-    const [aulasRes, recadosRes] = await Promise.all([
-      fetch(API_URL+'/api/aulas').then(r=>r.json()),
-      fetch(API_URL+'/api/recados').then(r=>r.json()),
-    ]);
-    if(Array.isArray(aulasRes) && aulasRes.length > 0) {
-      AULAS.length = 0;
-      aulasRes.forEach(a => { AULAS.push(a); if(!CHECKINS[a.id]) CHECKINS[a.id]=[]; });
-      console.log('✅ Aulas:', AULAS.length);
-    }
-    if(Array.isArray(recadosRes) && recadosRes.length > 0) {
-      RECADOS.length = 0;
-      recadosRes.forEach(r => RECADOS.push(r));
-    }
-  } catch(e) { console.error('Erro aulas:', e.message); }
-}
-carregarAulasPublicas();
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-logo">🥊</div>
+    <div class="topbar-title" id="page-title">Início</div>
+    <div class="user-chip" onclick="doLogout()">
+      <div class="user-avatar" id="top-avatar">?</div>
+      <span style="font-size:11px" id="top-name">—</span>
+    </div>
+  </div>
+  <div class="pages">
+    <div class="page active" id="page-inicio"></div>
+    <div class="page" id="page-financeiro"></div>
+    <div class="page" id="page-agenda"></div>
+    <div class="page" id="page-recados"></div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="bn active" id="bn-inicio" onclick="navTo('inicio')"><span class="bn-icon">🏠</span>Início</button>
+    <button class="bn" id="bn-financeiro" onclick="navTo('financeiro')"><span class="bn-icon">💳</span>Financeiro</button>
+    <button class="bn" id="bn-agenda" onclick="navTo('agenda')"><span class="bn-icon">📅</span>Agenda</button>
+    <button class="bn" id="bn-recados" onclick="navTo('recados')"><span class="bn-icon">📢</span>Recados</button>
+  </nav>
+</div>
 
-const fmt = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
-const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return dd+'/'+m+'/'+y; };
-const now = new Date();
-const todayStr = now.toISOString().slice(0,10);
+<script>
+const API = 'https://punch-and-roll-api-production.up.railway.app';
+const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
+const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return `${dd}/${m}/${y}`; };
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS_IDX = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
-const diaAtual = DIAS_IDX[now.getDay()] || 'Segunda';
+const diaHoje = DIAS_IDX[new Date().getDay()]||'Segunda';
+const nowMin = new Date().getHours()*60+new Date().getMinutes();
 
-// Credenciais dos alunos (login:senha)
-const CREDENCIAIS = {
-  'carlos':{senha:'123',alunoId:1},
-  'ana':{senha:'123',alunoId:2},
-  'rafael':{senha:'123',alunoId:3},
-  'fernanda':{senha:'123',alunoId:4},
-  'bruno':{senha:'123',alunoId:5},
-  'juliana':{senha:'123',alunoId:6},
-  'diego':{senha:'123',alunoId:7},
-  'patricia':{senha:'123',alunoId:8},
-  'lucas':{senha:'123',alunoId:9},
-  'mariana':{senha:'123',alunoId:10},
-  'thiago':{senha:'123',alunoId:11},
-  'camila':{senha:'123',alunoId:12},
-};
+let _token = localStorage.getItem('pr_aluno_token')||'';
+let aluno = null;
+let cache = { aulas:[], recados:[], pagamentos:[], checkins:[] };
+let diaSelecionado = diaHoje;
 
-const ALUNOS = [
-  {id:1,nome:'Carlos Mendes',tel:'(47) 98765-4321',email:'carlos@boxe.com',modalidade:'boxe',plano:'Mensal — Boxe',valor:200,venc:'2026-04-28',status:'ativo'},
-  {id:2,nome:'Ana Paula Souza',tel:'(47) 91234-5678',email:'ana@boxe.com',modalidade:'jiujitsu',plano:'Semestral — Jiu-Jitsu',valor:190,venc:'2026-05-15',status:'ativo'},
-  {id:3,nome:'Rafael Lima',tel:'(47) 99887-6543',email:'rafael@boxe.com',modalidade:'ambos',plano:'Mensal — Boxe + Jiu-Jitsu',valor:350,venc:'2026-04-25',status:'vencendo'},
-  {id:4,nome:'Fernanda Costa',tel:'(47) 93344-5566',email:'fernanda@boxe.com',modalidade:'jiujitsu',plano:'Semestral — Jiu-Jitsu',valor:190,venc:'2026-06-01',status:'ativo'},
-  {id:5,nome:'Bruno Alves',tel:'(47) 97788-9900',email:'bruno@boxe.com',modalidade:'boxe',plano:'Anual — Boxe',valor:180,venc:'2026-04-20',status:'atrasado'},
-  {id:6,nome:'Juliana Rocha',tel:'(47) 95566-7788',email:'juliana@boxe.com',modalidade:'boxe',plano:'Mensal — Boxe',valor:200,venc:'2026-05-05',status:'ativo'},
-  {id:7,nome:'Diego Santos',tel:'(47) 99001-2233',email:'diego@boxe.com',modalidade:'boxe',plano:'Mensal — Boxe',valor:200,venc:'2026-05-01',status:'ativo'},
-  {id:8,nome:'Patricia Ferreira',tel:'(47) 94455-6677',email:'patricia@boxe.com',modalidade:'jiujitsu',plano:'Mensal — Jiu-Jitsu',valor:200,venc:'2026-04-27',status:'vencendo'},
-  {id:9,nome:'Lucas Martins',tel:'(47) 92233-4455',email:'lucas@boxe.com',modalidade:'ambos',plano:'Trimestral — Boxe + Jiu-Jitsu',valor:330,venc:'2026-05-10',status:'ativo'},
-  {id:10,nome:'Mariana Oliveira',tel:'(47) 98899-0011',email:'mariana@boxe.com',modalidade:'boxe',plano:'Mensal — Boxe',valor:200,venc:'2026-04-30',status:'ativo'},
-  {id:11,nome:'Thiago Nunes',tel:'(47) 96677-8899',email:'thiago@boxe.com',modalidade:'jiujitsu',plano:'Mensal — Jiu-Jitsu',valor:200,venc:'2026-04-26',status:'atrasado'},
-  {id:12,nome:'Camila Torres',tel:'(47) 93322-1100',email:'camila@boxe.com',modalidade:'boxe',plano:'Semestral — Boxe',valor:190,venc:'2026-07-15',status:'ativo'},
-];
+async function api(method, path, body) {
+  const opts = {method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token}};
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(API+path, opts);
+  const data = await r.json();
+  if(!r.ok) throw new Error(data.error||'Erro');
+  return data;
+}
 
-const PAGAMENTOS = {
-  1:[{desc:'Mensalidade Abr/26',valor:200,data:'2026-04-01',status:'pago'},{desc:'Mensalidade Mar/26',valor:200,data:'2026-03-01',status:'pago'},{desc:'Mensalidade Fev/26',valor:200,data:'2026-02-01',status:'pago'}],
-  2:[{desc:'Semestral Fev-Jul/26',valor:1140,data:'2026-02-01',status:'pago'}],
-  3:[{desc:'Mensalidade Abr/26',valor:350,data:'2026-04-25',status:'pendente'},{desc:'Mensalidade Mar/26',valor:350,data:'2026-03-01',status:'pago'}],
-  5:[{desc:'Mensalidade Abr/26',valor:180,data:'2026-04-20',status:'pendente'},{desc:'Mensalidade Mar/26',valor:180,data:'2026-03-01',status:'pago'}],
-};
-
-const AULAS = [
-  {id:1,nome:'Boxe Iniciante',hora:'07:00',dia:'Segunda',vagas:15,mod:'boxe'},
-  {id:2,nome:'Sparring',hora:'09:00',dia:'Segunda',vagas:8,mod:'boxe'},
-  {id:3,nome:'Condicionamento',hora:'19:00',dia:'Segunda',vagas:20,mod:'boxe'},
-  {id:4,nome:'Boxe Intermediário',hora:'07:00',dia:'Terça',vagas:12,mod:'boxe'},
-  {id:5,nome:'Jiu-Jitsu',hora:'08:00',dia:'Terça',vagas:12,mod:'jiujitsu'},
-  {id:6,nome:'Técnica',hora:'19:30',dia:'Terça',vagas:10,mod:'boxe'},
-  {id:7,nome:'Boxe Iniciante',hora:'07:00',dia:'Quarta',vagas:15,mod:'boxe'},
-  {id:8,nome:'Jiu-Jitsu',hora:'09:00',dia:'Quarta',vagas:12,mod:'jiujitsu'},
-  {id:9,nome:'Feminino',hora:'10:00',dia:'Quarta',vagas:10,mod:'boxe'},
-  {id:10,nome:'Sparring',hora:'19:00',dia:'Quarta',vagas:8,mod:'boxe'},
-  {id:11,nome:'Boxe Intermediário',hora:'07:00',dia:'Quinta',vagas:12,mod:'boxe'},
-  {id:12,nome:'Jiu-Jitsu',hora:'08:00',dia:'Quinta',vagas:12,mod:'jiujitsu'},
-  {id:13,nome:'Condicionamento',hora:'19:30',dia:'Quinta',vagas:20,mod:'boxe'},
-  {id:14,nome:'Boxe Iniciante',hora:'07:00',dia:'Sexta',vagas:15,mod:'boxe'},
-  {id:15,nome:'Técnica',hora:'09:00',dia:'Sexta',vagas:10,mod:'boxe'},
-  {id:16,nome:'Jiu-Jitsu',hora:'19:00',dia:'Sexta',vagas:12,mod:'jiujitsu'},
-  {id:17,nome:'All Levels',hora:'09:00',dia:'Sábado',vagas:20,mod:'boxe'},
-  {id:18,nome:'Jiu-Jitsu Open Mat',hora:'10:30',dia:'Sábado',vagas:15,mod:'jiujitsu'},
-  {id:19,nome:'Kids Boxe',hora:'10:30',dia:'Sábado',vagas:12,mod:'boxe'},
-];
-
-let RECADOS = [
-  {id:1,titulo:'Vagas abertas no Sparring!',body:'Inscrições abertas para a turma de Sparring de terças-feiras. Venha treinar com a equipe!',tipo:'evento',pin:true,data:'2026-04-24'},
-  {id:2,titulo:'Manutenção dos equipamentos',body:'Os sacos de pancada serão substituídos na próxima semana. As aulas seguem normalmente.',tipo:'info',pin:false,data:'2026-04-22'},
-  {id:3,titulo:'⚠️ Aula de Sexta Cancelada',body:'A aula de Técnica das 09h de sexta-feira 26/04 está cancelada. Retomamos semana que vem.',tipo:'urgente',pin:true,data:'2026-04-25'},
-];
-
-let CHECKINS = {};
-AULAS.forEach(a=>{ CHECKINS[a.id]=[]; });
-CHECKINS[1]=[{alunoId:2,nome:'Ana Paula',hora:'06:48'},{alunoId:3,nome:'Rafael',hora:'06:52'}];
-CHECKINS[17]=[{alunoId:1,nome:'Carlos',hora:'08:50'},{alunoId:4,nome:'Fernanda',hora:'08:55'}];
-
-const CFG = {antecedencia:120, blockInadim:true};
-
-// ══════════════════════════════════════
-// ESTADO
-// ══════════════════════════════════════
-let usuarioAtual = null;
-let alunoAtual = null;
-let diaSelecionado = diaAtual;
-let meuCheckin = {};
-
-// ══════════════════════════════════════
 // LOGIN
-// ══════════════════════════════════════
 async function doLogin() {
-  const user = (document.getElementById('l-user').value||'').trim().toLowerCase();
-  const pass = document.getElementById('l-pass').value;
-  if(!user||!pass){document.getElementById('l-erro').style.display='block';return;}
-  
-  const btnEl = document.querySelector('.btn.btn-r.btn-full');
-  if(btnEl){btnEl.textContent='Entrando...';btnEl.disabled=true;}
-  
-  try {
-    const res = await fetch(API_URL+'/api/auth/aluno',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({login:user, senha:pass})
-    });
-    const data = await res.json();
-    if(!res.ok){
-      document.getElementById('l-erro').textContent = data.error||'Login ou senha incorretos';
-      document.getElementById('l-erro').style.display='block';
-      if(btnEl){btnEl.textContent='Entrar';btnEl.disabled=false;}
-      return;
-    }
-    localStorage.setItem('pr_token', data.token);
-    usuarioAtual = user;
-    alunoAtual = data.aluno;
-    await carregarDadosAPI(data.token);
-    document.getElementById('login-screen').style.display='none';
-    const main = document.getElementById('main-app');
-    main.style.display='flex'; main.style.flexDirection='column'; main.style.height='100%';
-    document.getElementById('top-avatar').textContent = alunoAtual.nome[0];
-    document.getElementById('top-name').textContent = alunoAtual.nome.split(' ')[0];
-    navTo('inicio');
-  } catch(e){
-    document.getElementById('l-erro').textContent = 'Erro de conexão. Tente novamente.';
-    document.getElementById('l-erro').style.display='block';
-    if(btnEl){btnEl.textContent='Entrar';btnEl.disabled=false;}
-  }
-}
-
-async function carregarDadosAPI(token) {
-  try {
-    const h = {'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-
-    // Carregar aulas reais
-    const aulasRes = await fetch(API_URL+'/api/aulas').then(r=>r.json());
-    if(Array.isArray(aulasRes) && aulasRes.length > 0) {
-      AULAS.length = 0;
-      aulasRes.forEach(a => AULAS.push(a));
-      // Inicializar checkins para cada aula
-      AULAS.forEach(a => { if(!CHECKINS[a.id]) CHECKINS[a.id] = []; });
-      console.log('✅ Aulas carregadas:', AULAS.length);
-    }
-
-    // Carregar recados reais
-    const recadosRes = await fetch(API_URL+'/api/recados').then(r=>r.json());
-    if(Array.isArray(recadosRes)) {
-      RECADOS.length = 0;
-      recadosRes.forEach(r => RECADOS.push(r));
-      console.log('✅ Recados carregados:', RECADOS.length);
-    }
-
-    // Carregar pagamentos do aluno
-    const pagRes = await fetch(API_URL+'/api/pagamentos', {headers:h}).then(r=>r.json());
-    if(Array.isArray(pagRes)) {
-      PAGAMENTOS[alunoAtual.id] = pagRes.map(p=>({
-        desc: p.descricao, valor: p.valor,
-        data: p.data_pagamento, status: p.status
-      }));
-    }
-
-    // Carregar checkins do aluno
-    const ckRes = await fetch(API_URL+'/api/checkins?aluno_id='+alunoAtual.id, {headers:h}).then(r=>r.json());
-    if(Array.isArray(ckRes)) {
-      ckRes.forEach(ck => {
-        if(!CHECKINS[ck.aula_id]) CHECKINS[ck.aula_id] = [];
-        if(!CHECKINS[ck.aula_id].find(c=>c.alunoId===alunoAtual.id)) {
-          CHECKINS[ck.aula_id].push({alunoId:alunoAtual.id, nome:alunoAtual.nome, hora:ck.hora});
-        }
-      });
-    }
-
-    console.log('✅ Dados carregados com sucesso!');
-  } catch(e) {
-    console.error('Erro ao carregar dados da API:', e.message);
-  }
-}
-
-function logout() {
-  if(!confirm('Sair do portal?')) return;
-  usuarioAtual = null; alunoAtual = null;
-  document.getElementById('main-app').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('l-user').value='';
-  document.getElementById('l-pass').value='';
+  const login = document.getElementById('l-login').value.trim();
+  const senha = document.getElementById('l-senha').value;
+  const btn = document.getElementById('l-btn');
+  if(!login||!senha) return;
+  btn.innerHTML='<span class="spinner"></span>Entrando...'; btn.disabled=true;
   document.getElementById('l-erro').style.display='none';
+  try {
+    const data = await api('POST','/api/auth/aluno',{login,senha});
+    _token = data.token;
+    localStorage.setItem('pr_aluno_token',_token);
+    aluno = data.aluno;
+    iniciarApp();
+  } catch(e) {
+    document.getElementById('l-erro').style.display='block';
+    btn.textContent='ENTRAR'; btn.disabled=false;
+  }
 }
 
-// ══════════════════════════════════════
+function doLogout() {
+  if(!confirm('Sair do portal?')) return;
+  _token=''; aluno=null; localStorage.removeItem('pr_aluno_token');
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-login').value='';
+  document.getElementById('l-senha').value='';
+}
+
+async function iniciarApp() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('top-avatar').textContent = aluno.nome[0];
+  document.getElementById('top-name').textContent = aluno.nome.split(' ')[0];
+  await carregarTudo();
+  navTo('inicio');
+}
+
+async function carregarTudo() {
+  try {
+    const [aulas, recados, pags] = await Promise.all([
+      api('GET','/api/aulas'),
+      api('GET','/api/recados'),
+      api('GET','/api/pagamentos'),
+    ]);
+    cache.aulas = Array.isArray(aulas) ? aulas : [];
+    cache.recados = Array.isArray(recados) ? recados : [];
+    cache.pagamentos = Array.isArray(pags) ? pags : [];
+    // Checkins do aluno
+    try {
+      const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
+      cache.checkins = Array.isArray(cks) ? cks : [];
+    } catch(e) { cache.checkins=[]; }
+    // Atualizar dados do aluno
+    try {
+      const a = await api('GET','/api/alunos/'+aluno.id);
+      if(a&&a.id) aluno = {...a, venc:a.vencimento||a.venc||''};
+    } catch(e){}
+  } catch(e) { console.error('Erro ao carregar:', e.message); }
+}
+
 // NAVEGAÇÃO
-// ══════════════════════════════════════
 function navTo(pg) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+pg).classList.add('active');
-  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   document.getElementById('bn-'+pg).classList.add('active');
-  const titles={inicio:'Meu Portal',financeiro:'Situação Financeira',agenda:'Agenda & Check-in',recados:'Recados'};
+  const titles={inicio:'Início',financeiro:'Situação Financeira',agenda:'Agenda & Check-in',recados:'Recados'};
   document.getElementById('page-title').textContent=titles[pg]||pg;
   if(pg==='inicio') renderInicio();
   if(pg==='financeiro') renderFinanceiro();
@@ -396,47 +191,32 @@ function navTo(pg) {
   if(pg==='recados') renderRecados();
 }
 
-// ══════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════
-function modLabel(m){return{boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Boxe + Jiu-Jitsu'}[m]||m}
-function aulaPermitida(au){
-  const m=alunoAtual.modalidade;
-  if(m==='ambos') return true;
-  return au.mod===m;
-}
-
-// ══════════════════════════════════════
 // INÍCIO
-// ══════════════════════════════════════
 function renderInicio() {
-  const a = alunoAtual;
-  const sCls = a.status==='ativo'?'g':a.status==='atrasado'?'r':'y';
-  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️'}[a.status];
-  const pinned = RECADOS.filter(r=>r.pin).slice(0,2);
-  const aulasHoje = AULAS.filter(au=>au.dia===diaAtual&&aulaPermitida(au));
-  const bloqueado = CFG.blockInadim && a.status==='atrasado';
-  const nowMin = now.getHours()*60+now.getMinutes();
+  const a = aluno;
+  const sCls = a.status==='ativo'?'kg':a.status==='atrasado'?'kr':'ky';
+  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️'}[a.status]||a.status;
+  const pinned = cache.recados.filter(r=>r.pin).slice(0,2);
+  const aulasHoje = cache.aulas.filter(au=>au.dia===diaHoje&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const bloqueado = a.status==='atrasado';
+  const modLabel = {boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'}[a.modalidade]||a.modalidade||'—';
 
   let html = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:48px;height:48px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${a.nome[0]}</div>
-      <div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Olá, ${a.nome.split(' ')[0]}!</div>
-        <div style="font-size:11px;color:var(--muted)">${modLabel(a.modalidade)}</div>
-      </div>
+      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Olá, ${a.nome.split(' ')[0]}!</div>
+      <div style="font-size:11px;color:var(--muted)">${modLabel}</div></div>
     </div>
-    <div class="grid-2">
-      <div class="kpi ${sCls}"><div class="kpi-label">Mensalidade</div><div class="kpi-val" style="font-size:16px">${sTxt}</div><div class="kpi-sub">Venc: ${fmtD(a.venc)}</div></div>
-      <div class="kpi b"><div class="kpi-label">Plano</div><div class="kpi-val" style="font-size:14px;line-height:1.2">${a.plano.split('—')[0].trim()}</div><div class="kpi-sub">${fmt(a.valor)}/mês</div></div>
+    <div class="grid2">
+      <div class="kpi ${sCls}"><div class="kpi-label">Mensalidade</div><div class="kpi-val" style="font-size:14px">${sTxt}</div><div class="kpi-sub">Venc: ${fmtD(a.venc)}</div></div>
+      <div class="kpi kb"><div class="kpi-label">Plano</div><div class="kpi-val" style="font-size:13px;line-height:1.2">${(a.plano||'—').split('—')[0].trim()}</div><div class="kpi-sub">${fmtR(a.valor)}/mês</div></div>
     </div>
-    ${a.status==='atrasado'?'<div class="alert r">🔴 Mensalidade em atraso. Check-in bloqueado até regularização.</div>':''}
-    ${a.status==='vencendo'?'<div class="alert y">⚠️ Sua mensalidade vence em breve. Renove para manter o acesso!</div>':''}
+    ${bloqueado?'<div class="alert-r">🔴 Mensalidade em atraso. Check-in bloqueado.</div>':''}
+    ${a.status==='vencendo'?'<div class="alert-y">⚠️ Mensalidade vencendo em breve!</div>':''}
   `;
 
-  // Recados fixados
   if(pinned.length) {
-    html += '<div class="card"><div class="card-title">📌 Avisos</div>';
+    html+='<div class="card"><div class="card-title">📌 Avisos</div>';
     pinned.forEach(r=>{
       const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted2)';
       html+=`<div style="padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${cor}">
@@ -444,25 +224,23 @@ function renderInicio() {
         <div style="font-size:11px;color:var(--muted);line-height:1.4">${r.body.slice(0,100)}${r.body.length>100?'...':''}</div>
       </div>`;
     });
-    html+=`<button onclick="navTo('recados')" style="width:100%;padding:7px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;margin-top:6px">Ver todos os recados →</button></div>`;
+    html+=`<button onclick="navTo('recados')" style="width:100%;padding:7px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;margin-top:6px">Ver todos →</button></div>`;
   }
 
-  // Aulas de hoje
   if(aulasHoje.length) {
-    html+='<div class="card"><div class="card-title">📅 Aulas de Hoje — '+diaAtual+'</div>';
+    html+='<div class="card"><div class="card-title">📅 Aulas de Hoje — '+diaHoje+'</div>';
     aulasHoje.forEach(au=>{
-      const cks=CHECKINS[au.id]||[];
-      const ck=cks.find(c=>c.alunoId===a.id);
+      const ckFeito = cache.checkins.some(c=>c.aula_id===au.id);
       const [h,mi]=au.hora.split(':').map(Number);
-      const diff=h*60+mi-nowMin;
-      const podeCheckin=!bloqueado&&!ck&&diff<=CFG.antecedencia&&diff>=-15&&cks.length<au.vagas;
+      const diff=(h*60+mi)-nowMin;
+      const podeCheckin = !bloqueado&&!ckFeito&&diff<=120&&diff>=-15;
       html+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1e1e1e">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--red);width:44px">${au.hora}</div>
-        <div style="flex:1"><div style="font-size:13px;font-weight:500">${au.nome}</div><div style="font-size:11px;color:var(--muted)">${cks.length}/${au.vagas} confirmados</div></div>
-        ${ck?'<span class="badge bg">✓ OK</span>':
-          podeCheckin?`<button onclick="fazerCheckin(${au.id},'inicio')" style="padding:6px 10px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Check-in</button>`:
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${au.nome}</div><div style="font-size:11px;color:var(--muted)">${au.vagas} vagas</div></div>
+        ${ckFeito?'<span class="badge bg">✓ OK</span>':
+          podeCheckin?`<button onclick="fazerCheckin(${au.id})" style="padding:6px 10px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Check-in</button>`:
           bloqueado?'<span style="font-size:10px;color:#f87171">⛔ Bloq.</span>':
-          diff>CFG.antecedencia?'<span style="font-size:10px;color:var(--muted)">Ainda não</span>':
+          diff>120?'<span style="font-size:10px;color:var(--muted)">Ainda não</span>':
           '<span style="font-size:10px;color:var(--muted)">Encerrado</span>'}
       </div>`;
     });
@@ -472,162 +250,127 @@ function renderInicio() {
   document.getElementById('page-inicio').innerHTML = html;
 }
 
-// ══════════════════════════════════════
 // FINANCEIRO
-// ══════════════════════════════════════
 function renderFinanceiro() {
-  const a = alunoAtual;
-  const hist = PAGAMENTOS[a.id]||[];
-  const sCls = a.status==='ativo'?'g':a.status==='atrasado'?'r':'y';
-  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️'}[a.status];
-
+  const a = aluno;
+  const sCls = a.status==='ativo'?'kg':a.status==='atrasado'?'kr':'ky';
+  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️'}[a.status]||a.status;
   document.getElementById('page-financeiro').innerHTML = `
     <div class="card">
       <div class="card-title">💳 Minha Situação</div>
-      <div class="grid-2" style="margin-bottom:10px">
-        <div class="kpi ${sCls}"><div class="kpi-label">Status</div><div class="kpi-val" style="font-size:14px">${sTxt}</div></div>
-        <div class="kpi b"><div class="kpi-label">Próx. Venc.</div><div class="kpi-val" style="font-size:18px">${fmtD(a.venc)}</div></div>
+      <div class="grid2" style="margin-bottom:10px">
+        <div class="kpi ${sCls}"><div class="kpi-label">Status</div><div class="kpi-val" style="font-size:13px">${sTxt}</div></div>
+        <div class="kpi kb"><div class="kpi-label">Vencimento</div><div class="kpi-val" style="font-size:16px">${fmtD(a.venc)}</div></div>
       </div>
       <div style="background:var(--panel2);border-radius:8px;padding:12px">
-        <div class="fin-item"><span style="font-size:12px;color:var(--muted)">Modalidade</span><span style="font-size:12px;font-weight:500">${modLabel(a.modalidade)}</span></div>
-        <div class="fin-item"><span style="font-size:12px;color:var(--muted)">Plano</span><span style="font-size:12px;font-weight:500">${a.plano}</span></div>
-        <div class="fin-item"><span style="font-size:12px;color:var(--muted)">Mensalidade</span><span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmt(a.valor)}</span></div>
-        <div class="fin-item"><span style="font-size:12px;color:var(--muted)">WhatsApp</span><span style="font-size:12px;font-weight:500">${a.tel}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a2a2a"><span style="font-size:12px;color:var(--muted)">Plano</span><span style="font-size:12px;font-weight:500">${a.plano||'—'}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a2a2a"><span style="font-size:12px;color:var(--muted)">Valor</span><span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(a.valor)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="font-size:12px;color:var(--muted)">WhatsApp</span><span style="font-size:12px;font-weight:500">${a.tel||'—'}</span></div>
       </div>
     </div>
-    ${a.status!=='ativo'?`<div class="alert ${a.status==='atrasado'?'r':'y'}">${a.status==='atrasado'?'🔴 Mensalidade em atraso. Entre em contato para regularizar.':'⚠️ Sua mensalidade vence em breve. Renove para não perder o acesso!'}</div>`:''}
     <div class="card">
-      <div class="card-title">📋 Histórico de Pagamentos</div>
-      ${hist.length===0?'<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Nenhum registro</p>':
-        hist.map(p=>`
-          <div class="fin-item">
-            <div><div style="font-size:13px;font-weight:500">${p.desc}</div><div style="font-size:11px;color:var(--muted)">📅 ${fmtD(p.data)}</div></div>
-            <div style="text-align:right">
-              <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${p.status==='pago'?'var(--green)':'var(--yellow)'}">${fmt(p.valor)}</div>
-              <span class="badge ${p.status==='pago'?'bg':'by'}">${p.status==='pago'?'Pago':'Pendente'}</span>
-            </div>
-          </div>`).join('')}
+      <div class="card-title">📋 Histórico</div>
+      ${cache.pagamentos.length===0?'<div style="font-size:13px;color:var(--muted);text-align:center;padding:16px">Nenhum registro</div>':
+        cache.pagamentos.map(p=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e1e1e">
+          <div><div style="font-size:13px;font-weight:500">${p.descricao||'—'}</div><div style="font-size:11px;color:var(--muted)">📅 ${fmtD(p.data_pagamento)}</div></div>
+          <div style="text-align:right">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${p.status==='pago'?'var(--green)':'var(--yellow)'}">${fmtR(p.valor)}</div>
+            <span class="badge ${p.status==='pago'?'bg':'by'}">${p.status==='pago'?'Pago':'Pendente'}</span>
+          </div>
+        </div>`).join('')}
     </div>
-    <div style="text-align:center;padding:10px 0">
-      <a href="https://wa.me/554898463-9257?text=Olá Punch and Roll! Sou ${a.nome} e preciso falar sobre minha mensalidade." target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">
+    <div style="text-align:center;padding:10px">
+      <a href="https://wa.me/554898463-9257?text=Olá! Sou ${a.nome} e preciso falar sobre minha mensalidade." target="_blank" 
+         style="display:inline-flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">
         💬 Falar com a academia
       </a>
     </div>
   `;
 }
 
-// ══════════════════════════════════════
-// AGENDA & CHECK-IN
-// ══════════════════════════════════════
+// AGENDA
 function renderAgenda() {
-  const a = alunoAtual;
-  const bloqueado = CFG.blockInadim && a.status==='atrasado';
-  const nowMin = now.getHours()*60+now.getMinutes();
-  const isHoje = diaSelecionado===diaAtual;
+  const a = aluno;
+  const bloqueado = a.status==='atrasado';
+  const tabs = DIAS.map(d=>`<button class="day-tab${d===diaSelecionado?' active':''}" onclick="selecionarDia('${d}')">${d}</button>`).join('');
+  const isHoje = diaSelecionado===diaHoje;
+  const aulasD = cache.aulas.filter(au=>au.dia===diaSelecionado&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
 
-  const tabs = DIAS.map(d=>
-    `<button class="day-tab${d===diaSelecionado?' active':''}" onclick="selecionarDia('${d}')">${d}</button>`
-  ).join('');
-
-  const aulasD = AULAS.filter(au=>au.dia===diaSelecionado&&aulaPermitida(au))
-    .sort((a,b)=>a.hora.localeCompare(b.hora));
-
-  let aulasHTML = '';
-  if(aulasD.length===0) {
-    aulasHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem aulas neste dia para sua modalidade</div>';
-  } else {
-    aulasHTML = aulasD.map(au=>{
-      const cks=CHECKINS[au.id]||[];
-      const ck=cks.find(c=>c.alunoId===a.id);
+  let html = `<div class="day-tabs">${tabs}</div>`;
+  if(bloqueado) html+='<div class="alert-r">🔴 Mensalidade em atraso. Regularize para fazer check-in.</div>';
+  if(aulasD.length===0) { html+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem aulas neste dia</div>'; }
+  else {
+    aulasD.forEach(au=>{
+      const ckFeito = cache.checkins.some(c=>c.aula_id===au.id);
       const [h,mi]=au.hora.split(':').map(Number);
-      const aulaMin=h*60+mi;
-      const diff=aulaMin-nowMin;
-      const cheio=cks.length>=au.vagas;
-      const pct=Math.round(cks.length/au.vagas*100);
-
+      const diff=(h*60+mi)-nowMin;
       let btn='';
-      if(ck) btn=`<button disabled style="padding:7px 12px;background:rgba(34,197,94,.3);color:var(--green);border:1px solid rgba(34,197,94,.5);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px">✓ Confirmado</button>`;
-      else if(bloqueado) btn=`<div style="font-size:10px;color:#f87171;text-align:center">⛔ Inadimplente</div>`;
-      else if(cheio) btn=`<div style="font-size:10px;color:#f87171;text-align:center">Turma cheia</div>`;
-      else if(!isHoje) btn=`<button onclick="fazerCheckin(${au.id},'agenda')" style="padding:7px 12px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Reservar</button>`;
-      else if(diff>CFG.antecedencia){const hh=Math.floor(diff/60),mm=diff%60;btn=`<div style="font-size:10px;color:var(--muted);text-align:center">Abre em ${hh>0?hh+'h ':''}${mm}min</div>`;}
-      else if(diff<-15) btn=`<div style="font-size:10px;color:var(--muted);text-align:center">Encerrado</div>`;
-      else btn=`<button onclick="fazerCheckin(${au.id},'agenda')" style="padding:7px 12px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">✓ Check-in</button>`;
-
-      return `<div class="aula-item">
+      if(ckFeito) btn=`<button disabled style="padding:7px 12px;background:rgba(34,197,94,.3);color:var(--green);border:1px solid rgba(34,197,94,.5);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px">✓ Confirmado</button>`;
+      else if(bloqueado) btn=`<span style="font-size:10px;color:#f87171">⛔ Inadimplente</span>`;
+      else if(!isHoje) btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Reservar</button>`;
+      else if(diff>120){const hh=Math.floor(diff/60),mm=diff%60;btn=`<span style="font-size:10px;color:var(--muted)">Abre em ${hh>0?hh+'h ':''}${mm}min</span>`;}
+      else if(diff<-15) btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
+      else btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">✓ Check-in</button>`;
+      html+=`<div class="aula-item">
         <div class="aula-hora">${au.hora}</div>
-        <div class="aula-info">
-          <div class="aula-nome">${au.nome}</div>
-          <div class="aula-meta">${cks.length}/${au.vagas} confirmados${cheio?' · <span style="color:#f87171">Lotado</span>':''}</div>
-          <div style="height:3px;background:var(--border);border-radius:3px;margin-top:4px;overflow:hidden;width:80px">
-            <div style="height:100%;width:${pct}%;background:${pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)'};border-radius:3px"></div>
-          </div>
-        </div>
+        <div class="aula-info"><div class="aula-nome">${au.nome}</div><div class="aula-meta">${au.vagas} vagas · ${au.modalidade==='boxe'?'🥊 Boxe':'🟦 Jiu-Jitsu'}</div></div>
         <div style="flex-shrink:0">${btn}</div>
       </div>`;
-    }).join('');
+    });
   }
-
-  document.getElementById('page-agenda').innerHTML = `
-    <div class="day-tabs">${tabs}</div>
-    ${bloqueado?'<div class="alert r">🔴 Mensalidade em atraso. Regularize para fazer check-in.</div>':''}
-    ${aulasHTML}
-  `;
+  document.getElementById('page-agenda').innerHTML = html;
 }
 
 function selecionarDia(dia) { diaSelecionado=dia; renderAgenda(); }
 
-async function fazerCheckin(aulaId, origem) {
-  const a = alunoAtual;
-  const token = localStorage.getItem('pr_token');
+async function fazerCheckin(aulaId) {
   try {
-    const res = await fetch(API_URL+'/api/checkins',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({aula_id:aulaId})
-    });
-    const data = await res.json();
-    if(!res.ok){alert(data.error||'Erro ao fazer check-in');return;}
-    if(!CHECKINS[aulaId]) CHECKINS[aulaId]=[];
-    const hora=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-    CHECKINS[aulaId].push({alunoId:a.id,nome:a.nome.split(' ')[0],hora});
+    await api('POST','/api/checkins',{aula_id:aulaId});
+    // Recarregar checkins
+    const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
+    cache.checkins = Array.isArray(cks)?cks:[];
     alert('✅ Check-in confirmado! Até lá! 🥊');
-    if(origem==='agenda') renderAgenda();
-    if(origem==='inicio') renderInicio();
-  } catch(e){alert('Erro ao fazer check-in. Tente novamente.');}
+    renderAgenda();
+    renderInicio();
+  } catch(e) { alert(e.message); }
 }
 
-// ══════════════════════════════════════
 // RECADOS
-// ══════════════════════════════════════
 function renderRecados() {
-  const pinned = RECADOS.filter(r=>r.pin);
-  const outros = RECADOS.filter(r=>!r.pin);
+  const pinned = cache.recados.filter(r=>r.pin);
+  const outros = cache.recados.filter(r=>!r.pin);
   const todos = [...pinned,...outros];
-
-  let html = '';
-  if(todos.length===0) {
-    html='<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px">Nenhum recado no momento</div>';
-  } else {
-    todos.forEach(r=>{
-      const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted2)';
-      const tipoBadge=r.tipo==='urgente'?'<span class="badge br">🔴 Urgente</span>':r.tipo==='evento'?'<span class="badge bb">🥊 Evento</span>':'<span class="badge">📢 Info</span>';
-      html+=`<div class="recado-item" style="border-left:3px solid ${cor}">
-        ${r.pin?'<div style="font-size:9px;color:var(--yellow);font-weight:600;margin-bottom:5px">📌 FIXADO</div>':''}
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:600;flex:1;line-height:1.3">${r.titulo}</div>
-          <div style="flex-shrink:0;margin-left:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-            ${tipoBadge}
-            <span style="font-size:10px;color:var(--muted)">${fmtD(r.data)}</span>
+  document.getElementById('page-recados').innerHTML = todos.length===0
+    ? '<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px">Nenhum recado</div>'
+    : todos.map(r=>{
+        const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted2)';
+        return `<div class="card" style="border-left:3px solid ${cor}">
+          ${r.pin?'<div style="font-size:9px;color:var(--yellow);font-weight:600;margin-bottom:5px">📌 FIXADO</div>':''}
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
+            <div style="font-size:13px;font-weight:600;flex:1">${r.titulo}</div>
+            <span style="font-size:10px;color:var(--muted);flex-shrink:0;margin-left:8px">${fmtD(r.criado_em)}</span>
           </div>
-        </div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.6">${r.body}</div>
-      </div>`;
-    });
-  }
-
-  document.getElementById('page-recados').innerHTML = html;
+          <div style="font-size:12px;color:var(--muted);line-height:1.6">${r.body}</div>
+        </div>`;
+      }).join('');
 }
+
+// Auto-login com token salvo
+(async function(){
+  if(!_token) return;
+  try {
+    const data = await api('GET','/api/alunos/0');
+  } catch(e) {
+    // Token pode ser válido mas rota não existe assim - tenta diferente
+  }
+  // Verificar token via checkin (qualquer rota autenticada)
+  try {
+    const r = await fetch(API+'/api/alunos/me',{headers:{'Authorization':'Bearer '+_token}});
+    if(r.ok) { const data=await r.json(); aluno=data; iniciarApp(); return; }
+  } catch(e){}
+  _token=''; localStorage.removeItem('pr_aluno_token');
+})();
 </script>
 </body>
 </html>
