@@ -172,6 +172,26 @@ const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
 // ══════════════════════════════════════
 // DADOS — em produção virão do backend
 // ══════════════════════════════════════
+// Carregar aulas e recados ao abrir a página (sem precisar de login)
+async function carregarAulasPublicas() {
+  try {
+    const [aulasRes, recadosRes] = await Promise.all([
+      fetch(API_URL+'/api/aulas').then(r=>r.json()),
+      fetch(API_URL+'/api/recados').then(r=>r.json()),
+    ]);
+    if(Array.isArray(aulasRes) && aulasRes.length > 0) {
+      AULAS.length = 0;
+      aulasRes.forEach(a => { AULAS.push(a); if(!CHECKINS[a.id]) CHECKINS[a.id]=[]; });
+      console.log('✅ Aulas:', AULAS.length);
+    }
+    if(Array.isArray(recadosRes) && recadosRes.length > 0) {
+      RECADOS.length = 0;
+      recadosRes.forEach(r => RECADOS.push(r));
+    }
+  } catch(e) { console.error('Erro aulas:', e.message); }
+}
+carregarAulasPublicas();
+
 const fmt = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
 const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return dd+'/'+m+'/'+y; };
 const now = new Date();
