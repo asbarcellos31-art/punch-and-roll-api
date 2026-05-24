@@ -731,26 +731,41 @@ async function apiDelete(path) {
 
 async function carregarDadosReais() {
   try {
-    const [aulasData, recadosData] = await Promise.all([
-      apiGet('/api/aulas'),
-      apiGet('/api/recados'),
-    ]);
-    if(Array.isArray(aulasData)) aulas.splice(0, aulas.length, ...aulasData);
-    if(Array.isArray(recadosData)) portalRecados.splice(0, portalRecados.length, ...recadosData);
+    // Carregar aulas
+    const aulasData = await apiGet('/api/aulas');
+    if(Array.isArray(aulasData) && aulasData.length > 0) {
+      aulas.splice(0, aulas.length, ...aulasData);
+    }
+
+    // Carregar recados
+    const recadosData = await apiGet('/api/recados');
+    if(Array.isArray(recadosData)) {
+      portalRecados.splice(0, portalRecados.length, ...recadosData);
+    }
+
+    // Carregar alunos do banco (limpa os demo)
     if(_token) {
       const alunosData = await apiGet('/api/alunos');
       if(Array.isArray(alunosData)) {
-        const mapped = alunosData.map(function(a) {
-          return Object.assign({}, a, {
-            venc: a.vencimento,
+        // Limpa TODOS os alunos demo e coloca os do banco
+        alunos.length = 0;
+        alunosData.forEach(function(a) {
+          alunos.push(Object.assign({}, a, {
+            venc: a.vencimento || a.venc || '',
             mat: (a.criado_em||'').slice(0,10),
-            aulasLiberadas: JSON.parse(a.aulas_liberadas||'[]')
-          });
+            aulasLiberadas: (() => { try { return JSON.parse(a.aulas_liberadas||'[]'); } catch(e){ return []; } })()
+          }));
         });
-        alunos.splice(0, alunos.length, ...mapped);
+        console.log('✅ Alunos carregados do banco:', alunos.length);
       }
+
+      // Atualizar badge
+      const badge = document.getElementById('badge-alunos');
+      if(badge) badge.textContent = alunos.length;
     }
-  } catch(e) { console.log('Usando dados locais:', e.message); }
+  } catch(e) { 
+    console.error('Erro ao carregar dados:', e.message); 
+  }
 }
 
 const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
