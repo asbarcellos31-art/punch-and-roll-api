@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Punch and Roll — Relatório Executivo</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--red:#d4111c;--dark:#0d1117;--blue:#1e3a8a;--green:#22c55e;--yellow:#f59e0b;--white:#f0f0f0}
+body{font-family:'DM Sans',sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh}
+
+/* PRINT */
+@media print{
+  .no-print{display:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{background:#f1f5f9!important}
+  .print-break{page-break-before:always;break-before:page}
+  @page{size:A4;margin:0}
+}
+
+/* CAPA */
+.capa{background:linear-gradient(135deg,#0d1117 60%,#1e3a8a 100%);padding:36px;position:relative;overflow:hidden;min-height:200px}
+.capa-bg{position:absolute;inset:0;opacity:.08;background:repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%);background-size:20px 20px}
+.capa-content{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
+.capa-logo{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.capa-logo-icon{width:56px;height:56px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px}
+.capa-brand{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:#fff}
+.capa-sub{font-size:11px;color:#60a5fa;letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+.capa-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,6vw,52px);color:#3b82f6;line-height:.95;margin-bottom:8px}
+.capa-badge{display:inline-block;background:#2563eb;color:#fff;font-weight:800;font-size:16px;padding:4px 16px;border-radius:4px}
+.capa-controls{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.capa-selects{display:flex;gap:8px}
+.capa-select{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none}
+.capa-btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn-capa{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;transition:all .2s}
+.btn-capa:hover{background:rgba(255,255,255,.2)}
+.btn-capa.primary{background:#2563eb;border-color:#2563eb}
+.btn-capa.primary:hover{background:#1d4ed8}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700}
+
+/* CONTAINER */
+.container{max-width:1100px;margin:0 auto;padding:32px 20px}
+.section{margin-bottom:40px}
+.section-label{font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:3px;margin-bottom:6px}
+.section-title{font-size:26px;font-weight:900;color:#1e293b;margin-bottom:4px}
+.section-sub{font-size:13px;color:#64748b}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+@media(max-width:700px){.grid4,.grid3{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+
+/* KPI CARD */
+.kpi-card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid #e2e8f0;position:relative;overflow:hidden}
+.kpi-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.kpi-val{font-size:28px;font-weight:900;color:#1e293b;line-height:1;margin-bottom:4px}
+.kpi-sub{font-size:11px;color:#64748b}
+.kpi-pct{margin-top:8px}
+.kpi-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.pill-green{background:#dcfce7;color:#15803d}
+.pill-yellow{background:#fef9c3;color:#92400e}
+.pill-red{background:#fee2e2;color:#b91c1c}
+.kpi-bar{height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin-top:8px}
+.kpi-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+
+/* CARD */
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-title{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* CHART BARS (CSS only) */
+.chart-wrap{display:flex;align-items:flex-end;gap:6px;height:160px;padding:8px 0}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.chart-bars{display:flex;gap:2px;align-items:flex-end;height:130px}
+.chart-bar{min-height:3px;border-radius:3px 3px 0 0;width:12px;transition:height .5s}
+.chart-label{font-size:9px;color:#94a3b8;font-weight:600}
+
+/* COLABORADORES */
+.colab-card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;position:relative}
+.colab-bar{height:4px;width:100%;border-radius:4px 4px 0 0;position:absolute;top:0;left:0}
+.colab-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0}
+.colab-name{font-size:15px;font-weight:800;color:#1e293b}
+.colab-role{font-size:11px;color:#94a3b8;margin-top:2px}
+.colab-val{font-size:22px;font-weight:900;margin:10px 0 4px}
+.colab-row{display:flex;justify-content:space-between;font-size:12px;color:#64748b;padding:4px 0;border-bottom:1px solid #f1f5f9}
+.colab-pct-bar{height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin-top:8px}
+
+/* STATUS */
+.status-card{border-radius:12px;padding:18px;color:#fff}
+.status-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;font-size:13px}
+
+/* DARK CARD */
+.dark-card{background:#1e3a8a;border-radius:14px;padding:20px;color:#fff}
+.dark-card-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* TEXTAREA */
+.insight-area{width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:12px;color:#e0e7ff;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;min-height:100px;outline:none}
+.insight-area::placeholder{color:rgba(255,255,255,.4)}
+.insight-area-light{width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;color:#334155;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;min-height:80px;outline:none}
+.insight-area-light::placeholder{color:#94a3b8}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 10px;font-weight:600;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+.tbl td{padding:9px 10px;border-bottom:1px solid #f1f5f9}
+.tbl tr:hover td{background:#f8fafc}
+.tbl tr.total td{font-weight:700;background:#f1f5f9}
+
+/* ALERT */
+.alert-r{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#b91c1c;margin-bottom:10px}
+.alert-y{background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:10px}
+.alert-g{background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;color:#15803d;margin-bottom:10px}
+
+/* FLUXO */
+.fluxo-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+.fluxo-label{color:#64748b}
+.fluxo-val{font-weight:700}
+
+/* PRINT HEADER */
+.print-header{display:none;background:#0d1117;padding:6px 14px;color:#60a5fa;font-size:10px;letter-spacing:1px}
+@media print{.print-header{display:block}}
+
+/* META BAR */
+.meta-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.meta-label{font-size:12px;color:#64748b;width:80px;flex-shrink:0}
+.meta-bar-wrap{flex:1;height:6px;background:#e2e8f0;border-radius:6px;overflow:hidden}
+.meta-bar-fill{height:100%;border-radius:6px}
+.meta-pct{font-size:11px;font-weight:700;width:40px;text-align:right;flex-shrink:0}
+
+/* OBJETIVO CARD */
+.obj-card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-top:4px solid}
+</style>
+</head>
+<body>
+
+<!-- CAPA -->
+<div class="capa">
+  <div class="capa-bg"></div>
+  <div class="capa-content">
+    <div>
+      <div class="capa-logo">
+        <div class="capa-logo-icon">🥊</div>
+        <div>
+          <div class="capa-brand">Punch and Roll</div>
+          <div class="capa-sub">Fight Team · São José, SC</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#60a5fa;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px">Relatório Executivo</div>
+      <div class="capa-title" id="capa-title">Maio 2026</div>
+      <div class="capa-badge" id="capa-badge">MAI/26</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <div style="width:3px;background:#3b82f6;border-radius:3px;height:36px"></div>
+        <div>
+          <div style="color:#fff;font-weight:600;font-size:13px">Análise de Performance Mensal</div>
+          <div style="color:#94a3b8;font-size:11px">Comparativo com metas e período anterior</div>
+        </div>
+      </div>
+    </div>
+    <div class="capa-controls no-print">
+      <div class="capa-selects">
+        <select class="capa-select" id="sel-mes" onchange="atualizar()">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5" selected>Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+        <select class="capa-select" id="sel-ano" onchange="atualizar()">
+          <option value="2025">2025</option><option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+        </select>
+      </div>
+      <div class="capa-btns">
+        <button class="btn-capa" onclick="window.print()">🖨️ Imprimir</button>
+        <button class="btn-capa" onclick="salvarRelatorio()">💾 Salvar</button>
+        <button class="btn-capa primary" onclick="voltarAdmin()">← Admin</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="main-content">
+
+  <!-- LOADING -->
+  <div id="loading" style="text-align:center;padding:60px;color:#64748b">
+    <div style="font-size:32px;margin-bottom:12px">⏳</div>
+    <div style="font-size:14px">Carregando dados...</div>
+  </div>
+
+  <!-- CONTEÚDO (preenchido pelo JS) -->
+  <div id="relatorio-content" style="display:none"></div>
+
+</div>
+
+<script>
+const API = 'https://punch-and-roll-api-production.up.railway.app';
+const _token = localStorage.getItem('pr_admin_token')||'';
+const MESES = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_A = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const CORES = ['#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444','#ec4899'];
+const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
+const fmtD = d => { if(!d) return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return `${dd}/${m}/${y}`; };
+
+let dadosCache = { alunos:[], aulas:[], pagamentos:[], checkins:[] };
+let insights = { receita:'', colaboradores:'', acoes:'', proxMes:'', obs:'' };
+
+function pill(pct, label) {
+  const cls = pct>=100?'pill-green':pct>=80?'pill-yellow':'pill-red';
+  const icon = pct>=100?'✅':pct>=80?'⚠️':'🔴';
+  return `<span class="kpi-pill ${cls}">${icon} ${label||pct.toFixed(0)+'% da meta'}</span>`;
+}
+
+function barColor(pct) { return pct>=100?'#22c55e':pct>=80?'#f59e0b':'#ef4444'; }
+
+function pillStatus(pct) {
+  if(pct>=100) return {bg:'#dcfce7',color:'#15803d',label:'VERDE',icon:'✅'};
+  if(pct>=80) return {bg:'#fef9c3',color:'#92400e',label:'AMARELO',icon:'⚠️'};
+  return {bg:'#fee2e2',color:'#b91c1c',label:'VERMELHO',icon:'⚠️'};
+}
+
+async function api(path) {
+  const r = await fetch(API+path, {headers:{'Authorization':'Bearer '+_token}});
+  return r.json();
+}
+
+async function carregarDados() {
+  try {
+    const [alunos, aulas, pags] = await Promise.all([
+      api('/api/alunos'), api('/api/aulas'), api('/api/pagamentos')
+    ]);
+    dadosCache.alunos = Array.isArray(alunos)?alunos:[];
+    dadosCache.aulas = Array.isArray(aulas)?aulas:[];
+    dadosCache.pagamentos = Array.isArray(pags)?pags:[];
+  } catch(e) { console.error(e); }
+}
+
+function getMesSel() { return parseInt(document.getElementById('sel-mes').value); }
+function getAnoSel() { return parseInt(document.getElementById('sel-ano').value); }
+
+function calcMetricas() {
+  const mes = getMesSel();
+  const ano = getAnoSel();
+  const alunos = dadosCache.alunos;
+  const pags = dadosCache.pagamentos;
+
+  const ativos = alunos.filter(a=>a.status==='ativo');
+  const atrasados = alunos.filter(a=>a.status==='atrasado');
+  const vencendo = alunos.filter(a=>a.status==='vencendo');
+
+  // Receita do mês
+  const recMes = pags.filter(p=>{
+    const d = p.data_pagamento||p.criado_em||'';
+    return parseInt(d.slice(5,7))===mes && parseInt(d.slice(0,4))===ano && p.status==='pago';
+  }).reduce((s,p)=>s+parseFloat(p.valor||0),0);
+
+  // Receita esperada (alunos ativos)
+  const recEsperada = ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+
+  // Metas (baseadas nos dados reais — academia pequena)
+  const metaAlunos = 30; // meta de alunos
+  const metaReceita = metaAlunos * 220; // R$ 220 médio por aluno
+  const metaNovosMes = 3; // novos alunos por mês
+
+  // Novos alunos no mês
+  const novosNoMes = alunos.filter(a=>{
+    const mat = a.mat||a.criado_em||'';
+    return parseInt(mat.slice(5,7))===mes && parseInt(mat.slice(0,4))===ano;
+  }).length;
+
+  // Inadimplência
+  const inadimTotal = atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+
+  // Histórico mensal (últimos 6 meses) — simulado com dados reais
+  const historico = Array.from({length:6},(_,i)=>{
+    const m2 = mes-5+i;
+    const m3 = m2<=0?m2+12:m2;
+    const ano2 = m2<=0?ano-1:ano;
+    const r = pags.filter(p=>{
+      const d=p.data_pagamento||p.criado_em||'';
+      return parseInt(d.slice(5,7))===m3&&parseInt(d.slice(0,4))===ano2&&p.status==='pago';
+    }).reduce((s,p)=>s+parseFloat(p.valor||0),0);
+    return {mes:m3,ano:ano2,receita:r,label:MESES_A[m3]};
+  });
+
+  // Cancelados no mês (alunos que saíram — sem dados históricos, estimamos 0)
+  const cancelados = 0;
+
+  // Aulas por modalidade
+  const aulasBoxe = dadosCache.aulas.filter(a=>a.modalidade==='boxe').length;
+  const aulasJJ = dadosCache.aulas.filter(a=>a.modalidade==='jiujitsu').length;
+
+  // Taxa de adimplência
+  const taxaAdim = alunos.length>0?Math.round(ativos.length/alunos.length*100):0;
+
+  // Próximo mês
+  const proxMes = mes===12?1:mes+1;
+  const proxAno = mes===12?ano+1:ano;
+
+  return {
+    mes, ano, alunos, ativos, atrasados, vencendo,
+    recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
+    novosNoMes, inadimTotal, historico, cancelados,
+    aulasBoxe, aulasJJ, taxaAdim, proxMes, proxAno,
+    pctReceita: metaReceita>0?Math.round(recMes/metaReceita*100):0,
+    pctAlunos: metaAlunos>0?Math.round(ativos.length/metaAlunos*100):0,
+    pctNovos: metaNovosMes>0?Math.round(novosNoMes/metaNovosMes*100):0,
+    pctAdim: taxaAdim,
+  };
+}
+
+function renderRelatorio(m) {
+  const maxRec = Math.max(...m.historico.map(h=>h.receita),m.metaReceita,1);
+  const statusGeral = m.pctReceita>=100&&m.pctAlunos>=100?'BOM':m.pctReceita>=80?'ATENÇÃO':'CRÍTICO';
+  const statusCor = statusGeral==='BOM'?'#22c55e':statusGeral==='ATENÇÃO'?'#f59e0b':'#ef4444';
+  const sp = pillStatus(m.pctReceita);
+
+  return `
+  <!-- PRINT HEADER -->
+  <div class="print-header">PUNCH AND ROLL FIGHT TEAM · RELATÓRIO EXECUTIVO ${MESES[m.mes].toUpperCase()} ${m.ano}</div>
+
+  <!-- SLIDE 1: DASHBOARD EXECUTIVO -->
+  <div class="section print-break">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div>
+        <div class="section-label">Dashboard Executivo</div>
+        <div class="section-title">Dashboard Executivo</div>
+        <div class="section-sub">Análise de performance ${MESES[m.mes]} ${m.ano} — Punch and Roll Fight Team</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:#fff;padding:8px 16px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="width:10px;height:10px;border-radius:50%;background:${statusCor}"></div>
+        <span style="font-size:13px;font-weight:700;color:${statusCor}">Status Geral: ${statusGeral}</span>
+      </div>
+    </div>
+
+    <!-- KPIs principais -->
+    <div class="grid4" style="margin-bottom:20px">
+      <div class="kpi-card" style="border-left-color:${pillStatus(m.pctReceita).border||'#e2e8f0'}">
+        <div class="kpi-label">Receita do Mês</div>
+        <div class="kpi-val">${fmtR(m.recMes)}</div>
+        <div class="kpi-sub">Meta: ${fmtR(m.metaReceita)}</div>
+        <div class="kpi-pct">${pill(m.pctReceita)}</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctReceita,100)}%;background:${barColor(m.pctReceita)}"></div></div>
+      </div>
+      <div class="kpi-card" style="border-left-color:${barColor(m.pctAlunos)}">
+        <div class="kpi-label">Alunos Ativos</div>
+        <div class="kpi-val">${m.ativos.length}</div>
+        <div class="kpi-sub">Meta: ${m.metaAlunos} alunos</div>
+        <div class="kpi-pct">${pill(m.pctAlunos)}</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctAlunos,100)}%;background:${barColor(m.pctAlunos)}"></div></div>
+      </div>
+      <div class="kpi-card" style="border-left-color:${barColor(m.pctNovos)}">
+        <div class="kpi-label">Novos Alunos/${MESES_A[m.mes]}</div>
+        <div class="kpi-val">${m.novosNoMes}</div>
+        <div class="kpi-sub">Meta: ${m.metaNovosMes}/mês</div>
+        <div class="kpi-pct">${pill(m.pctNovos)}</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctNovos,100)}%;background:${barColor(m.pctNovos)}"></div></div>
+      </div>
+      <div class="kpi-card" style="border-left-color:${barColor(m.pctAdim)}">
+        <div class="kpi-label">Taxa de Adimplência</div>
+        <div class="kpi-val">${m.pctAdim}%</div>
+        <div class="kpi-sub">${m.atrasados.length} inadimplente(s)</div>
+        <div class="kpi-pct">${pill(m.pctAdim,'')}</div>
+        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctAdim,100)}%;background:${barColor(m.pctAdim)}"></div></div>
+      </div>
+    </div>
+
+    <!-- Gráfico + Status -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">📈 Evolução de Receita — Últimos 6 meses</div>
+        <div class="chart-wrap">
+          ${m.historico.map(h=>{
+            const hPct = Math.round((h.receita/maxRec)*120);
+            const mPct = Math.round((m.metaReceita/maxRec)*120);
+            return `<div class="chart-col">
+              <div class="chart-bars">
+                <div class="chart-bar" style="height:${hPct}px;background:${h.mes===m.mes?'#3b82f6':'#93c5fd'}" title="${fmtR(h.receita)}"></div>
+                <div class="chart-bar" style="height:${mPct}px;background:#f97316;opacity:.5" title="Meta: ${fmtR(m.metaReceita)}"></div>
+              </div>
+              <div class="chart-label">${h.label}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:#94a3b8">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px;display:inline-block"></span>Receita</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#f97316;opacity:.5;border-radius:2px;display:inline-block"></span>Meta</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <!-- Status -->
+        <div style="background:#1e3a8a;border-radius:14px;padding:20px;color:#fff;flex:1">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px">Status ${MESES[m.mes]}</div>
+          ${m.pctReceita<100?`<div class="status-item"><span>⚠️</span><span>Gap de <strong>${fmtR(m.metaReceita-m.recMes)}</strong> na receita vs meta.</span></div>`:''}
+          ${m.atrasados.length>0?`<div class="status-item"><span>🔴</span><span><strong>${m.atrasados.length}</strong> aluno(s) com mensalidade em atraso — ${fmtR(m.inadimTotal)} em aberto.</span></div>`:''}
+          ${m.vencendo.length>0?`<div class="status-item"><span>⚠️</span><span><strong>${m.vencendo.length}</strong> aluno(s) com mensalidade vencendo em breve.</span></div>`:''}
+          ${m.novosNoMes>0?`<div class="status-item"><span>✅</span><span><strong>${m.novosNoMes}</strong> novo(s) aluno(s) matriculado(s) no mês.</span></div>`:''}
+          ${m.atrasados.length===0&&m.vencendo.length===0?`<div class="status-item"><span>✅</span><span>Todos os alunos estão em dia!</span></div>`:''}
+        </div>
+        <!-- Ação necessária -->
+        <div class="card">
+          <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:6px">⚡ Ação Necessária</div>
+          <textarea class="insight-area-light" id="ins-receita" placeholder="Clique para registrar ações necessárias para este mês...">${insights.receita}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: FINANCEIRO -->
+  <div class="section print-break">
+    <div class="section-label">Análise Financeira</div>
+    <div class="section-title">Receita e Mensalidades — ${MESES[m.mes]} ${m.ano}</div>
+    <div class="section-sub" style="margin-bottom:20px">Breakdown de receita, inadimplência e situação financeira</div>
+
+    <div class="grid2">
+      <div>
+        <!-- Receita card -->
+        <div class="kpi-card" style="border-left-color:${barColor(m.pctReceita)};margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div class="kpi-label">Receita ${MESES[m.mes]} ${m.ano}</div>
+              <div class="kpi-val">${fmtR(m.recMes)}</div>
+            </div>
+            <span style="font-size:28px">💰</span>
+          </div>
+          ${pill(m.pctReceita,`${m.pctReceita>=100?'↑':'↓'} ${m.pctReceita}% da meta`)}
+        </div>
+
+        <!-- Metas -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">🎯 Metas do Mês</div>
+          <div class="fluxo-row"><span class="fluxo-label">Meta de Receita</span><span class="fluxo-val" style="color:#1e3a8a">${fmtR(m.metaReceita)}</span></div>
+          <div class="fluxo-row"><span class="fluxo-label">Meta de Alunos</span><span class="fluxo-val">${m.metaAlunos} alunos</span></div>
+          <div class="fluxo-row"><span class="fluxo-label">Receita Esperada</span><span class="fluxo-val">${fmtR(m.recEsperada)}</span></div>
+          <div class="fluxo-row" style="border:none"><span class="fluxo-label">Novos Alunos/mês</span><span class="fluxo-val">${m.metaNovosMes} alunos</span></div>
+        </div>
+
+        <!-- Resultado -->
+        <div class="kpi-card" style="border-left-color:#22c55e">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="kpi-label">Receita Esperada (alunos ativos)</div>
+              <div class="kpi-val" style="color:#22c55e">${fmtR(m.recEsperada)}</div>
+              <span class="kpi-pill pill-green">Potencial mensal</span>
+            </div>
+            <span style="font-size:28px">📊</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Situação alunos -->
+      <div class="card">
+        <div class="card-title">👥 Situação dos Alunos</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#15803d">${m.ativos.length}</div>
+            <div style="font-size:11px;color:#166534">Ativos ✅</div>
+          </div>
+          <div style="background:#fee2e2;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#b91c1c">${m.atrasados.length}</div>
+            <div style="font-size:11px;color:#991b1b">Inadimplentes 🔴</div>
+            <div style="font-size:10px;color:#b91c1c">${fmtR(m.inadimTotal)}</div>
+          </div>
+          <div style="background:#fef9c3;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#92400e">${m.vencendo.length}</div>
+            <div style="font-size:11px;color:#78350f">Vencendo ⚠️</div>
+          </div>
+          <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#1e40af">${m.novosNoMes}</div>
+            <div style="font-size:11px;color:#1e3a8a">Novos/${MESES_A[m.mes]} 🆕</div>
+          </div>
+        </div>
+        <!-- Distribuição por modalidade -->
+        <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px">Distribuição por Modalidade</div>
+        ${['boxe','jiujitsu','ambos'].map(mod=>{
+          const n = m.alunos.filter(a=>a.modalidade===mod).length;
+          const pct = m.alunos.length>0?Math.round(n/m.alunos.length*100):0;
+          const label = mod==='boxe'?'🥊 Boxe':mod==='jiujitsu'?'🟦 Jiu-Jitsu':'🥊🟦 Ambos';
+          return `<div class="meta-row">
+            <span class="meta-label">${label}</span>
+            <div class="meta-bar-wrap"><div class="meta-bar-fill" style="width:${pct}%;background:${mod==='boxe'?'#d4111c':mod==='jiujitsu'?'#3b82f6':'#8b5cf6'}"></div></div>
+            <span class="meta-pct" style="color:#1e293b">${n} (${pct}%)</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: PERFORMANCE INSTRUTORES -->
+  <div class="section print-break">
+    <div class="section-label">Performance Individual</div>
+    <div class="section-title">Performance por Modalidade</div>
+    <div class="section-sub" style="margin-bottom:20px">Aulas e alunos por modalidade — ${MESES[m.mes]} ${m.ano}</div>
+
+    <div class="grid2" style="margin-bottom:20px">
+      ${['boxe','jiujitsu'].map((mod,i)=>{
+        const alunosMod = m.alunos.filter(a=>a.modalidade===mod||a.modalidade==='ambos');
+        const ativosMod = alunosMod.filter(a=>a.status==='ativo');
+        const aulasMod = m.aulasBoxe;
+        const recMod = ativosMod.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+        const label = mod==='boxe'?'🥊 Boxe':'🟦 Jiu-Jitsu';
+        const cor = CORES[i];
+        const aulas = mod==='boxe'?m.aulasBoxe:m.aulasJJ;
+        return `<div class="colab-card">
+          <div class="colab-bar" style="background:${cor}"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:4px">
+            <div class="colab-avatar" style="background:${cor}">${mod==='boxe'?'🥊':'🟦'}</div>
+            <div><div class="colab-name">${label}</div><div class="colab-role">${aulas} aulas/semana · ${ativosMod.length} alunos</div></div>
+          </div>
+          <div class="colab-val" style="color:${cor}">${fmtR(recMod)}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Receita estimada/mês</div>
+          <div class="colab-row"><span>Alunos Ativos</span><span style="font-weight:700">${ativosMod.length}</span></div>
+          <div class="colab-row"><span>Inadimplentes</span><span style="font-weight:700;color:#ef4444">${alunosMod.filter(a=>a.status==='atrasado').length}</span></div>
+          <div class="colab-row" style="border:none"><span>Aulas/semana</span><span style="font-weight:700">${aulas}</span></div>
+          <div class="colab-pct-bar"><div style="height:100%;border-radius:4px;background:${cor};width:${m.alunos.length>0?Math.round(alunosMod.length/m.alunos.length*100):0}%"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Insight colaboradores -->
+    <div class="dark-card">
+      <div class="dark-card-title">ℹ️ Análise das Modalidades</div>
+      <textarea class="insight-area" id="ins-colab" placeholder="Registre insights sobre o desempenho das modalidades, turmas e instrutores...">${insights.colaboradores}</textarea>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: OBJETIVOS E AÇÕES -->
+  <div class="section print-break">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div>
+        <div class="section-label">Reforço de Metas</div>
+        <div class="section-title">Objetivos 2026 — Ações Corretivas</div>
+        <div class="section-sub">Análise de ${MESES[m.mes]} e estratégias para o próximo mês</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:#fff;padding:8px 16px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <span style="font-size:12px;color:#64748b">Status Geral</span>
+        <div style="width:28px;height:28px;border-radius:50%;background:${statusCor};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800">!</div>
+        <span style="font-weight:700;color:${statusCor};font-size:13px">${statusGeral}</span>
+      </div>
+    </div>
+
+    <!-- 3 objetivos -->
+    <div class="grid3" style="margin-bottom:20px">
+      <div class="obj-card" style="border-top-color:#3b82f6">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:700;color:#2563eb;background:#dbeafe;padding:2px 8px;border-radius:20px">Financeiro</span>
+          <span style="font-size:22px">💰</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Receita Mensal</div>
+        <div style="font-size:26px;font-weight:900;color:#1e293b">+15%</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Meta: ${fmtR(m.metaReceita)}</div>
+        ${pill(m.pctReceita,`${m.pctReceita}% do ritmo`)}
+        <div style="font-size:11px;color:#64748b;margin-top:10px">
+          Recebido: ${fmtR(m.recMes)} vs Meta ${fmtR(m.metaReceita)}.
+          ${m.metaReceita>m.recMes?`Gap de ${fmtR(m.metaReceita-m.recMes)}.`:'Meta atingida! ✅'}
+        </div>
+      </div>
+      <div class="obj-card" style="border-top-color:#22c55e">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:700;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:20px">Retenção</span>
+          <span style="font-size:22px">⭐</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Taxa de Adimplência</div>
+        <div style="font-size:26px;font-weight:900;color:#1e293b">${m.pctAdim}%</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Meta: > 85%</div>
+        ${pill(m.pctAdim>85?100:m.pctAdim,'')}<br>
+        <div style="font-size:11px;color:#64748b;margin-top:10px">Manter alunos motivados e engajados. Acompanhar faltas.</div>
+      </div>
+      <div class="obj-card" style="border-top-color:#8b5cf6">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:700;color:#6d28d9;background:#ede9fe;padding:2px 8px;border-radius:20px">Expansão</span>
+          <span style="font-size:22px">👥</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Total de Alunos</div>
+        <div style="font-size:26px;font-weight:900;color:#1e293b">${m.alunos.length}/${m.metaAlunos}</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Novos este mês: ${m.novosNoMes}</div>
+        ${pill(m.pctAlunos)}<br>
+        <div style="font-size:11px;color:#64748b;margin-top:10px">${MESES[m.mes]}: ${m.novosNoMes} novo(s) aluno(s). Meta: ${m.metaNovosMes}/mês.</div>
+      </div>
+    </div>
+
+    <!-- Projeção + Ações corretivas -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">📈 Projeção vs Meta Anual</div>
+        ${[
+          {label:'Receita Atual',val:m.recMes*12,cor:'#ef4444'},
+          {label:'Meta Anual',val:m.metaReceita*12,cor:'#3b82f6'},
+          {label:'Esperada (ativos)',val:m.recEsperada*12,cor:'#22c55e'},
+        ].map(item=>{
+          const maxV = m.metaReceita*12*1.1;
+          const pct = Math.round((item.val/maxV)*100);
+          return `<div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span style="color:#64748b">${item.label}</span>
+              <span style="font-weight:700">${fmtR(item.val)}</span>
+            </div>
+            <div style="height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden">
+              <div style="height:100%;width:${Math.min(pct,100)}%;background:${item.cor};border-radius:6px"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="dark-card">
+        <div class="dark-card-title">⚡ Ações Corretivas</div>
+        <textarea class="insight-area" id="ins-acoes" placeholder="1. Intensificar prospecção de novos alunos
+2. Acompanhar inadimplentes com WhatsApp
+3. Criar ação promocional para indicações">${insights.acoes}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: INADIMPLENTES E FLUXO -->
+  <div class="section print-break">
+    <div class="grid2">
+      <!-- Inadimplentes -->
+      <div class="card">
+        <div class="card-title">⚠️ Inadimplentes — ${MESES[m.mes]}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:#fee2e2;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#b91c1c">${m.atrasados.length}</div>
+            <div style="font-size:11px;color:#991b1b">Em Atraso</div>
+            <div style="font-size:10px;color:#b91c1c">${fmtR(m.inadimTotal)}</div>
+          </div>
+          <div style="background:#fef9c3;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#92400e">${m.vencendo.length}</div>
+            <div style="font-size:11px;color:#78350f">Vencendo em breve</div>
+          </div>
+          <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#15803d">${m.ativos.length}</div>
+            <div style="font-size:11px;color:#166534">Em Dia</div>
+          </div>
+          <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#1e40af">${m.alunos.length}</div>
+            <div style="font-size:11px;color:#1e3a8a">Total Alunos</div>
+          </div>
+        </div>
+        <!-- Lista inadimplentes -->
+        ${m.atrasados.length>0?`
+        <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px">Lista de Inadimplentes</div>
+        ${m.atrasados.slice(0,5).map(a=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#fee2e2;border-radius:8px;margin-bottom:4px">
+            <div>
+              <div style="font-size:13px;font-weight:600">${a.nome}</div>
+              <div style="font-size:10px;color:#b91c1c">Venc: ${fmtD(a.venc||a.vencimento)} · ${a.plano||'—'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:800;color:#b91c1c">${fmtR(a.valor)}</div>
+              <a href="https://wa.me/55${(a.tel||'').replace(/\D/g,'')}?text=${encodeURIComponent('Olá '+a.nome.split(' ')[0]+'! 🥊 Sua mensalidade da Punch and Roll está em atraso. Regularize para manter seu acesso!')}" target="_blank" style="font-size:10px;color:#22c55e;text-decoration:none;font-weight:600">💬 Cobrar</a>
+            </div>
+          </div>`).join('')}
+        ${m.atrasados.length>5?`<div style="font-size:11px;color:#94a3b8;text-align:center;padding:8px">+ ${m.atrasados.length-5} aluno(s)...</div>`:''}`:'<div class="alert-g">✅ Nenhum aluno inadimplente!</div>'}
+      </div>
+
+      <!-- Fluxo de alunos -->
+      <div class="card">
+        <div class="card-title">🔄 Fluxo de Alunos — ${m.ano}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#15803d">${m.novosNoMes}</div>
+            <div style="font-size:11px;color:#166534">Novos/${MESES_A[m.mes]}</div>
+          </div>
+          <div style="background:#fee2e2;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#b91c1c">${m.cancelados}</div>
+            <div style="font-size:11px;color:#991b1b">Cancelamentos</div>
+          </div>
+          <div style="background:${(m.novosNoMes-m.cancelados)>=0?'#dcfce7':'#fee2e2'};border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:${(m.novosNoMes-m.cancelados)>=0?'#15803d':'#b91c1c'}">${m.novosNoMes-m.cancelados>=0?'+':''}${m.novosNoMes-m.cancelados}</div>
+            <div style="font-size:11px;color:#64748b">Saldo/${MESES_A[m.mes]}</div>
+          </div>
+          <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:900;color:#1e40af">${m.alunos.length}</div>
+            <div style="font-size:11px;color:#1e3a8a">Total Atual</div>
+          </div>
+        </div>
+        <div class="card-title" style="margin-bottom:10px">📋 Aulas por Semana</div>
+        <div class="fluxo-row"><span class="fluxo-label">🥊 Boxe</span><span class="fluxo-val">${m.aulasBoxe} aulas</span></div>
+        <div class="fluxo-row"><span class="fluxo-label">🟦 Jiu-Jitsu</span><span class="fluxo-val">${m.aulasJJ} aulas</span></div>
+        <div class="fluxo-row" style="border:none"><span class="fluxo-label" style="font-weight:700">Total</span><span class="fluxo-val">${m.aulasBoxe+m.aulasJJ} aulas/sem</span></div>
+
+        <div class="card-title" style="margin-top:16px;margin-bottom:10px">📝 Observações</div>
+        <textarea class="insight-area-light" id="ins-obs" placeholder="Registre observações sobre cancelamentos, motivos, ações preventivas...">${insights.obs}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: META PRÓXIMO MÊS -->
+  <div class="section print-break">
+    <div class="card">
+      <div class="card-title">🎯 Meta para ${MESES[m.proxMes]} ${m.proxAno}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:#2563eb;font-weight:600;margin-bottom:4px">Meta de Receita</div>
+          <div style="font-size:22px;font-weight:900;color:#1e40af">${fmtR(m.metaReceita)}</div>
+        </div>
+        <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:#15803d;font-weight:600;margin-bottom:4px">Meta de Alunos</div>
+          <div style="font-size:22px;font-weight:900;color:#15803d">${m.metaAlunos}</div>
+        </div>
+        <div style="background:#ede9fe;border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:#6d28d9;font-weight:600;margin-bottom:4px">Novos Alunos</div>
+          <div style="font-size:22px;font-weight:900;color:#6d28d9">${m.metaNovosMes}</div>
+        </div>
+      </div>
+      <textarea class="insight-area-light" id="ins-prox" placeholder="Defina estratégias e ações para ${MESES[m.proxMes]}..." style="min-height:100px">${insights.proxMes}</textarea>
+    </div>
+  </div>
+
+  <!-- BOTÕES FINAIS -->
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:32px" class="no-print">
+    <button onclick="window.print()" class="btn-capa" style="padding:10px 20px;background:#fff;color:#1e293b;border:1px solid #e2e8f0;border-radius:10px;font-weight:600">🖨️ Imprimir</button>
+    <button onclick="salvarRelatorio()" class="btn-capa primary" style="padding:10px 24px;background:#1e3a8a;color:#fff;border:none;border-radius:10px;font-weight:600">💾 Salvar Relatório</button>
+  </div>
+  `;
+}
+
+function atualizar() {
+  const mes = getMesSel();
+  const ano = getAnoSel();
+  const nomeMes = MESES[mes];
+  document.getElementById('capa-title').textContent = `${nomeMes} ${ano}`;
+  document.getElementById('capa-badge').textContent = `${MESES_A[mes].toUpperCase()}/${String(ano).slice(2)}`;
+  const m = calcMetricas();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('relatorio-content').style.display='block';
+  document.getElementById('relatorio-content').innerHTML = renderRelatorio(m);
+}
+
+function salvarRelatorio() {
+  insights.receita = document.getElementById('ins-receita')?.value||'';
+  insights.colaboradores = document.getElementById('ins-colab')?.value||'';
+  insights.acoes = document.getElementById('ins-acoes')?.value||'';
+  insights.obs = document.getElementById('ins-obs')?.value||'';
+  insights.proxMes = document.getElementById('ins-prox')?.value||'';
+  localStorage.setItem('pr_insights_'+getMesSel()+'_'+getAnoSel(), JSON.stringify(insights));
+  alert('✅ Relatório salvo!');
+}
+
+function voltarAdmin() {
+  window.location.href='/punch-and-roll-admin.html';
+}
+
+// Carregar insights salvos
+function carregarInsights() {
+  const saved = localStorage.getItem('pr_insights_'+getMesSel()+'_'+getAnoSel());
+  if(saved) try { Object.assign(insights, JSON.parse(saved)); } catch(e){}
+}
+
+// INIT
+(async function(){
+  if(!_token){ window.location.href='/punch-and-roll-admin.html'; return; }
+  carregarInsights();
+  await carregarDados();
+  atualizar();
+})();
+</script>
+</body>
+</html>

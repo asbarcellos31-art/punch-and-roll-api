@@ -191,6 +191,8 @@ textarea.fi{resize:none}
     <div class="sb-sec">Financeiro</div>
     <div class="sb-item" id="sb-financeiro" onclick="navTo('financeiro')"><span class="ico">💰</span>Financeiro</div>
     <div class="sb-item" id="sb-pagamentos" onclick="navTo('pagamentos')"><span class="ico">💳</span>Mensalidades</div>
+    <div class="sb-sec">Relatórios</div>
+    <div class="sb-item" onclick="window.location.href='/punch-and-roll-relatorio.html'"><span class="ico">📋</span>Relatório Executivo</div>
     <div class="sb-sec">Portal do Aluno</div>
     <div class="sb-item" id="sb-recados" onclick="navTo('recados')"><span class="ico">📢</span>Recados</div>
     <div class="sb-item" id="sb-documentos" onclick="navTo('documentos')"><span class="ico">📁</span>Documentos</div>
@@ -1425,7 +1427,30 @@ document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click
 let contas = [];
 let receitas = [];
 let finTab = 'dashboard';
+let metas = {}; // {mes: {receita, despesa, lucro}} mes=0 = anual
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+const CAT_RECEITA = ['Mensalidades','Matrículas','Aulas Avulsas','Eventos','Outros'];
+const CAT_DESPESA = ['Aluguel','Energia','Internet','Salários','Equipamentos','Marketing','Contador','Material','Outros'];
+
+const PROJECOES = {
+  pessimista:[
+    {ano:2026,receita:36000,despesa:14000,lucro:22000},{ano:2027,receita:37800,despesa:14700,lucro:23100},
+    {ano:2028,receita:39690,despesa:15435,lucro:24255},{ano:2029,receita:41675,despesa:16207,lucro:25468},
+    {ano:2030,receita:43759,despesa:17017,lucro:26742},
+  ],
+  realista:[
+    {ano:2026,receita:40000,despesa:14000,lucro:26000},{ano:2027,receita:44000,despesa:15400,lucro:28600},
+    {ano:2028,receita:48400,despesa:16940,lucro:31460},{ano:2029,receita:53240,despesa:18634,lucro:34606},
+    {ano:2030,receita:58564,despesa:20497,lucro:38067},
+  ],
+  otimista:[
+    {ano:2026,receita:48000,despesa:14000,lucro:34000},{ano:2027,receita:55200,despesa:16100,lucro:39100},
+    {ano:2028,receita:63480,despesa:18515,lucro:44965},{ano:2029,receita:73002,despesa:21293,lucro:51709},
+    {ano:2030,receita:83953,despesa:24487,lucro:59466},
+  ],
+};
 
 function renderFinanceiro() {
   const pg = document.getElementById('page-financeiro');
@@ -1591,32 +1616,335 @@ function marcarRecebido(id){const r=receitas.find(x=>x.id==id);if(r){r.status='r
 function excluirReceita(id){if(confirm('Excluir receita?')){receitas=receitas.filter(x=>x.id!=id);renderFinanceiro();}}
 
 function renderDRE() {
-  const totRec = receitas.reduce((s,r)=>s+parseFloat(r.valor||0),0);
-  const totDesp = contas.reduce((s,c)=>s+parseFloat(c.valor||0),0);
-  const resultado = totRec - totDesp;
-  const marg = totRec>0?((resultado/totRec)*100).toFixed(1):0;
-  const catR={}, catD={};
-  receitas.forEach(r=>{catR[r.tipo]=(catR[r.tipo]||0)+parseFloat(r.valor||0)});
-  contas.forEach(c=>{catD[c.cat]=(catD[c.cat]||0)+parseFloat(c.valor||0)});
+  // DRE por mês — linhas editáveis
+  const anoAtual = new Date().getFullYear();
+  
+  function getValMes(tipo, cat, mes) {
+    if(tipo==='R') return receitas.filter(r=>r.tipo===cat&&parseInt((r.data||'').slice(5,7))===mes).reduce((s,r)=>s+parseFloat(r.valor||0),0);
+    return contas.filter(c=>c.cat===cat&&parseInt((c.venc||'').slice(5,7))===mes).reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  }
+  
+  const totRecMes = m => receitas.filter(r=>parseInt((r.data||'').slice(5,7))===m).reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  const totDespMes = m => contas.filter(c=>parseInt((c.venc||'').slice(5,7))===m).reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const lucroMes = m => totRecMes(m) - totDespMes(m);
+  const totRecAno = Array.from({length:12},(_,i)=>totRecMes(i+1)).reduce((a,b)=>a+b,0);
+  const totDespAno = Array.from({length:12},(_,i)=>totDespMes(i+1)).reduce((a,b)=>a+b,0);
+  const lucroAno = totRecAno - totDespAno;
+  const margem = totRecAno>0?((lucroAno/totRecAno)*100).toFixed(1):0;
+
+  // Categorias únicas de receita e despesa
+  const catsR = [...new Set(receitas.map(r=>r.tipo||'Outros'))];
+  const catsD = [...new Set(contas.map(c=>c.cat||'Outros'))];
 
   document.getElementById('fin-content').innerHTML = `
-    <div class="grid2">
-      <div class="card">
-        <div class="card-title" style="color:var(--green)">📥 Receitas</div>
-        ${Object.entries(catR).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:12px"><span>${k}</span><span style="font-weight:500">${fmtR(v)}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">Nenhuma</div>'}
-        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:600"><span>Total</span><span style="color:var(--green)">${fmtR(totRec)}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">DRE — ${anoAtual} · Clique em "+ Nova Conta" ou "+ Receita" para lançar dados</div>
+    
+    <!-- Resultado anual -->
+    <div class="grid4" style="margin-bottom:14px">
+      <div class="kpi kg"><div class="kpi-label">Receita Total</div><div class="kpi-val">${fmtR(totRecAno)}</div></div>
+      <div class="kpi kr"><div class="kpi-label">Despesas Total</div><div class="kpi-val">${fmtR(totDespAno)}</div></div>
+      <div class="kpi ${lucroAno>=0?'kb':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="color:${lucroAno>=0?'var(--blue)':'#f87171'}">${fmtR(lucroAno)}</div></div>
+      <div class="kpi ky"><div class="kpi-label">Margem Líquida</div><div class="kpi-val">${margem}%</div></div>
+    </div>
+
+    <!-- Tabela DRE mensal -->
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="background:var(--panel2)">
+            <th style="text-align:left;padding:8px 10px;font-weight:600;min-width:160px;position:sticky;left:0;background:var(--panel2)">DESCRIÇÃO</th>
+            ${MESES.map(m=>`<th style="text-align:right;padding:8px 6px;font-weight:600;min-width:70px">${m}</th>`).join('')}
+            <th style="text-align:right;padding:8px 6px;font-weight:600;min-width:80px;background:var(--panel)">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- RECEITAS -->
+          <tr style="background:rgba(34,197,94,.08)">
+            <td colspan="14" style="padding:6px 10px;font-weight:700;color:var(--green);position:sticky;left:0;background:rgba(34,197,94,.08)">(+) RECEITAS</td>
+          </tr>
+          ${catsR.length===0?`<tr><td colspan="14" style="text-align:center;padding:12px;color:var(--muted)">Nenhuma receita lançada</td></tr>`:''}
+          ${catsR.map(cat=>{
+            const tot = Array.from({length:12},(_,i)=>getValMes('R',cat,i+1)).reduce((a,b)=>a+b,0);
+            return `<tr style="border-bottom:1px solid #1e1e1e">
+              <td style="padding:5px 10px;position:sticky;left:0;background:var(--dark)">${cat}</td>
+              ${Array.from({length:12},(_,i)=>{
+                const v=getValMes('R',cat,i+1);
+                return `<td style="text-align:right;padding:5px 6px;color:${v>0?'var(--green)':'var(--muted)'}">${v>0?fmtR(v):'—'}</td>`;
+              }).join('')}
+              <td style="text-align:right;padding:5px 6px;font-weight:600;background:var(--panel);color:var(--green)">${tot>0?fmtR(tot):'—'}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:rgba(34,197,94,.12);font-weight:700">
+            <td style="padding:6px 10px;position:sticky;left:0;background:rgba(34,197,94,.12)">(=) TOTAL RECEITAS</td>
+            ${Array.from({length:12},(_,i)=>{
+              const v=totRecMes(i+1);
+              return `<td style="text-align:right;padding:6px 6px;color:var(--green)">${v>0?fmtR(v):'—'}</td>`;
+            }).join('')}
+            <td style="text-align:right;padding:6px;font-weight:700;background:var(--panel);color:var(--green)">${fmtR(totRecAno)}</td>
+          </tr>
+          <!-- DESPESAS -->
+          <tr style="background:rgba(212,17,28,.08)">
+            <td colspan="14" style="padding:6px 10px;font-weight:700;color:#f87171;position:sticky;left:0;background:rgba(212,17,28,.08)">(-) DESPESAS</td>
+          </tr>
+          ${catsD.length===0?`<tr><td colspan="14" style="text-align:center;padding:12px;color:var(--muted)">Nenhuma despesa lançada</td></tr>`:''}
+          ${catsD.map(cat=>{
+            const tot = Array.from({length:12},(_,i)=>getValMes('D',cat,i+1)).reduce((a,b)=>a+b,0);
+            return `<tr style="border-bottom:1px solid #1e1e1e">
+              <td style="padding:5px 10px;position:sticky;left:0;background:var(--dark)">${cat}</td>
+              ${Array.from({length:12},(_,i)=>{
+                const v=getValMes('D',cat,i+1);
+                return `<td style="text-align:right;padding:5px 6px;color:${v>0?'#f87171':'var(--muted)'}">${v>0?fmtR(v):'—'}</td>`;
+              }).join('')}
+              <td style="text-align:right;padding:5px 6px;font-weight:600;background:var(--panel);color:#f87171">${tot>0?fmtR(tot):'—'}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:rgba(212,17,28,.12);font-weight:700">
+            <td style="padding:6px 10px;position:sticky;left:0;background:rgba(212,17,28,.12)">(=) TOTAL DESPESAS</td>
+            ${Array.from({length:12},(_,i)=>{
+              const v=totDespMes(i+1);
+              return `<td style="text-align:right;padding:6px 6px;color:#f87171">${v>0?fmtR(v):'—'}</td>`;
+            }).join('')}
+            <td style="text-align:right;padding:6px;font-weight:700;background:var(--panel);color:#f87171">${fmtR(totDespAno)}</td>
+          </tr>
+          <!-- RESULTADO -->
+          <tr style="background:rgba(59,130,246,.15);font-weight:700;font-size:12px">
+            <td style="padding:8px 10px;position:sticky;left:0;background:rgba(59,130,246,.15)">(=) LUCRO LÍQUIDO</td>
+            ${Array.from({length:12},(_,i)=>{
+              const v=lucroMes(i+1);
+              return `<td style="text-align:right;padding:8px 6px;color:${v>=0?'var(--blue)':'#f87171'}">${v!==0?fmtR(v):'—'}</td>`;
+            }).join('')}
+            <td style="text-align:right;padding:8px 6px;font-weight:700;background:var(--panel);color:${lucroAno>=0?'var(--blue)':'#f87171'}">${fmtR(lucroAno)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── METAS ──────────────────────────────
+function renderMetas() {
+  const mesAtual = new Date().getMonth()+1;
+  
+  function getMeta(mes, tipo) {
+    return metas[mes]?.[tipo]||0;
+  }
+  function setMeta(mes, tipo, val) {
+    if(!metas[mes]) metas[mes]={};
+    metas[mes][tipo]=val;
+    renderMetas();
+  }
+  
+  const totRecMes = m => receitas.filter(r=>parseInt((r.data||'').slice(5,7))===m).reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  
+  document.getElementById('fin-content').innerHTML = `
+    <div style="margin-bottom:14px">
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;margin-bottom:12px">🎯 Metas Mensais vs Realizado</h3>
+      
+      <!-- Meta anual -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">📌 Meta Anual</div>
+        <div class="grid2">
+          <div>
+            <label class="fl">Meta de Receita Anual</label>
+            <input class="fi" type="number" id="meta-anual-r" value="${getMeta(0,'receita')}" placeholder="0" onchange="setMeta(0,'receita',parseFloat(this.value)||0)" style="margin-bottom:8px">
+          </div>
+          <div>
+            <label class="fl">Meta de Lucro Anual</label>
+            <input class="fi" type="number" id="meta-anual-l" value="${getMeta(0,'lucro')}" placeholder="0" onchange="setMeta(0,'lucro',parseFloat(this.value)||0)">
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-title" style="color:#f87171">📤 Despesas</div>
-        ${Object.entries(catD).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:12px"><span>${k}</span><span style="font-weight:500">${fmtR(v)}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">Nenhuma</div>'}
-        <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:600"><span>Total</span><span style="color:#f87171">${fmtR(totDesp)}</span></div>
+      
+      <!-- Tabela mensal -->
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:var(--panel2)">
+              <th style="text-align:left;padding:8px 10px">MÊS</th>
+              <th style="text-align:right;padding:8px 8px">META RECEITA</th>
+              <th style="text-align:right;padding:8px 8px">REALIZADO</th>
+              <th style="text-align:right;padding:8px 8px">% ATING.</th>
+              <th style="text-align:center;padding:8px 8px">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${MESES_FULL.map((mes,i)=>{
+              const m = i+1;
+              const metaR = getMeta(m,'receita');
+              const realizado = totRecMes(m);
+              const pct = metaR>0?realizado/metaR:0;
+              const cor = pct>=1?'var(--green)':pct>=0.7?'var(--yellow)':'#f87171';
+              const status = pct>=0.8?'🟢':pct>0?'🟡':'🔴';
+              return `<tr style="border-bottom:1px solid #1e1e1e${m===mesAtual?';background:rgba(59,130,246,.05)':''}">
+                <td style="padding:8px 10px;font-weight:${m===mesAtual?'600':'400'}">${mes}${m===mesAtual?' ← atual':''}</td>
+                <td style="text-align:right;padding:8px">
+                  <input type="number" value="${metaR||''}" placeholder="—" 
+                    onchange="if(!metas[${m}])metas[${m}]={};metas[${m}].receita=parseFloat(this.value)||0;renderMetas()"
+                    style="background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:11px;width:90px;text-align:right;outline:none">
+                </td>
+                <td style="text-align:right;padding:8px;font-weight:500;color:${realizado>0?'var(--green)':'var(--muted)'}">${realizado>0?fmtR(realizado):'—'}</td>
+                <td style="text-align:right;padding:8px;color:${cor};font-weight:600">${metaR>0?(pct*100).toFixed(0)+'%':'—'}</td>
+                <td style="text-align:center;padding:8px">${metaR>0?status:'—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--panel);font-weight:700">
+              <td style="padding:8px 10px">TOTAL ANUAL</td>
+              <td style="text-align:right;padding:8px">${fmtR(Object.values(metas).filter((_,i)=>i>0).reduce((s,m)=>s+(m.receita||0),0))}</td>
+              <td style="text-align:right;padding:8px;color:var(--green)">${fmtR(Array.from({length:12},(_,i)=>totRecMes(i+1)).reduce((a,b)=>a+b,0))}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
+  `;
+}
+
+// ── PROJEÇÕES ──────────────────────────
+function renderProjecoes() {
+  const [cenario,setCenario] = (() => {
+    if(!window._cenario) window._cenario='realista';
+    return [window._cenario, v=>{window._cenario=v;renderProjecoes();}];
+  })();
+  const dados = PROJECOES[cenario];
+  
+  document.getElementById('fin-content').innerHTML = `
+    <!-- Premissas -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">⚙️ Premissas</div>
+      <div class="grid4">
+        ${[['Receita Base 2025',fmtR(30000)],['Taxa Pessimista','5% a.a.'],['Taxa Realista','10% a.a.'],['Taxa Otimista','15% a.a.']].map(([l,v])=>`
+          <div style="background:var(--panel2);border-radius:6px;padding:10px">
+            <div style="font-size:10px;color:var(--muted)">${l}</div>
+            <div style="font-size:14px;font-weight:600">${v}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    
+    <!-- Seletor -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      ${[['pessimista','📉 Pessimista (5%)'],['realista','📊 Realista (10%)'],['otimista','📈 Otimista (15%)']].map(([id,label])=>
+        `<button onclick="window._cenario='${id}';renderProjecoes()" class="btn ${cenario===id?'btn-r':'btn-ghost'} btn-sm">${label}</button>`
+      ).join('')}
+    </div>
+    
+    <!-- Tabela 3 cenários -->
+    ${['pessimista','realista','otimista'].map(c=>`
+      <div class="card" style="margin-bottom:12px${c===cenario?';border-color:var(--red)':''}">
+        <div class="card-title">${c==='pessimista'?'📉 Pessimista (5% a.a.)':c==='realista'?'📊 Realista (10% a.a.)':'📈 Otimista (15% a.a.)'}</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:var(--panel2)">
+                <th style="text-align:left;padding:6px 8px">ANO</th>
+                <th style="text-align:right;padding:6px 8px">RECEITA</th>
+                <th style="text-align:right;padding:6px 8px">DESPESAS</th>
+                <th style="text-align:right;padding:6px 8px">LUCRO EST.</th>
+                <th style="text-align:right;padding:6px 8px">MARGEM</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${PROJECOES[c].map(d=>`
+                <tr style="border-bottom:1px solid #1e1e1e">
+                  <td style="padding:6px 8px;font-weight:600">${d.ano}</td>
+                  <td style="text-align:right;padding:6px 8px">${fmtR(d.receita)}</td>
+                  <td style="text-align:right;padding:6px 8px;color:#f87171">${fmtR(d.despesa)}</td>
+                  <td style="text-align:right;padding:6px 8px;color:var(--green);font-weight:600">${fmtR(d.lucro)}</td>
+                  <td style="text-align:right;padding:6px 8px">${d.receita>0?((d.lucro/d.receita)*100).toFixed(0)+'%':'—'}</td>
+                </tr>`).join('')}
+              <tr style="background:var(--panel);font-weight:700">
+                <td style="padding:6px 8px">ACUMULADO</td>
+                <td style="text-align:right;padding:6px 8px">${fmtR(PROJECOES[c].reduce((s,d)=>s+d.receita,0))}</td>
+                <td style="text-align:right;padding:6px 8px;color:#f87171">${fmtR(PROJECOES[c].reduce((s,d)=>s+d.despesa,0))}</td>
+                <td style="text-align:right;padding:6px 8px;color:var(--green)">${fmtR(PROJECOES[c].reduce((s,d)=>s+d.lucro,0))}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+// ── INDICADORES ────────────────────────
+function renderIndicadores() {
+  const totRec = receitas.reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  const totRecebido = receitas.filter(r=>r.status==='recebido').reduce((s,r)=>s+parseFloat(r.valor||0),0);
+  const totDesp = contas.reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const totPago = contas.filter(c=>c.status==='pago').reduce((s,c)=>s+parseFloat(c.valor||0),0);
+  const lucro = totRec - totDesp;
+  const margem = totRec>0?lucro/totRec:0;
+  const eficiencia = totRec>0?totDesp/totRec:0;
+  const inadim = cache.alunos.filter(a=>a.status==='atrasado').length;
+  const totalAlunos = cache.alunos.length;
+  const taxaInadim = totalAlunos>0?inadim/totalAlunos:0;
+  const taxaAdim = 1-taxaInadim;
+  const recPorAluno = totalAlunos>0?totRec/totalAlunos:0;
+
+  const indicadores = [
+    {nome:'Margem de Lucro Líquido',formula:'Lucro / Receita',valor:margem,fmt:'pct',bench:'> 30%',ok:margem>=0.3},
+    {nome:'Eficiência Operacional',formula:'Despesas / Receita',valor:eficiencia,fmt:'pct',bench:'< 70%',ok:eficiencia<0.7},
+    {nome:'Taxa de Adimplência',formula:'Ativos / Total Alunos',valor:taxaAdim,fmt:'pct',bench:'> 85%',ok:taxaAdim>=0.85},
+    {nome:'Taxa de Inadimplência',formula:'Atrasados / Total Alunos',valor:taxaInadim,fmt:'pct',bench:'< 15%',ok:taxaInadim<0.15},
+    {nome:'Receita por Aluno',formula:'Receita Total / Nº Alunos',valor:recPorAluno,fmt:'brl',bench:'> R$ 200',ok:recPorAluno>=200},
+    {nome:'Recebimento Efetivo',formula:'Recebido / Previsto',valor:totRec>0?totRecebido/totRec:0,fmt:'pct',bench:'> 90%',ok:totRec>0&&totRecebido/totRec>=0.9},
+  ];
+
+  document.getElementById('fin-content').innerHTML = `
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="kpi kg"><div class="kpi-label">Receita Total</div><div class="kpi-val">${fmtR(totRec)}</div><div class="kpi-sub">${fmtR(totRecebido)} recebido</div></div>
+      <div class="kpi ${lucro>=0?'kb':'kr'}"><div class="kpi-label">Lucro Líquido</div><div class="kpi-val" style="color:${lucro>=0?'var(--blue)':'#f87171'}">${fmtR(lucro)}</div><div class="kpi-sub">Margem: ${(margem*100).toFixed(1)}%</div></div>
+    </div>
+    
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--panel2)">
+            <th style="text-align:left;padding:8px 12px">INDICADOR</th>
+            <th style="text-align:left;padding:8px 8px;color:var(--muted)">FÓRMULA</th>
+            <th style="text-align:right;padding:8px 8px">VALOR</th>
+            <th style="text-align:right;padding:8px 8px">BENCHMARK</th>
+            <th style="text-align:center;padding:8px 8px">STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${indicadores.map(ind=>`
+            <tr style="border-bottom:1px solid #1e1e1e">
+              <td style="padding:8px 12px;font-weight:500">${ind.nome}</td>
+              <td style="padding:8px;font-size:10px;color:var(--muted)">${ind.formula}</td>
+              <td style="text-align:right;padding:8px;font-weight:700;color:${ind.ok?'var(--green)':'#f87171'}">${ind.fmt==='pct'?(ind.valor*100).toFixed(1)+'%':fmtR(ind.valor)}</td>
+              <td style="text-align:right;padding:8px;color:var(--muted)">${ind.bench}</td>
+              <td style="text-align:center;padding:8px;font-size:16px">${ind.ok?'🟢':'🔴'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Gráfico visual indicadores -->
     <div class="card">
-      <div class="card-title">💡 Resultado</div>
+      <div class="card-title">📊 Resumo Visual</div>
       <div class="grid2">
-        <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="color:${resultado>=0?'var(--green)':'#f87171'}">${fmtR(resultado)}</div></div>
-        <div class="kpi kb"><div class="kpi-label">Margem</div><div class="kpi-val">${marg}%</div></div>
+        ${[
+          {label:'Margem Líquida',val:Math.min(margem,1),cor:'#22c55e'},
+          {label:'Adimplência',val:taxaAdim,cor:'#3b82f6'},
+          {label:'Eficiência (inv.)',val:Math.min(1-eficiencia,1),cor:'#8b5cf6'},
+          {label:'Recebimento',val:totRec>0?Math.min(totRecebido/totRec,1):0,cor:'#f59e0b'},
+        ].map(item=>{
+          const pct = Math.min(item.val,1);
+          const dashLen = 201;
+          return `<div style="text-align:center">
+            <div style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px">
+              <svg width="80" height="80" style="transform:rotate(-90deg)">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="var(--border)" stroke-width="8"/>
+                <circle cx="40" cy="40" r="32" fill="none" stroke="${item.cor}" stroke-width="8" stroke-dasharray="${(pct*dashLen).toFixed(0)} ${dashLen}" stroke-linecap="round"/>
+              </svg>
+              <span style="position:absolute;font-size:12px;font-weight:700">${(pct*100).toFixed(0)}%</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">${item.label}</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>
   `;
