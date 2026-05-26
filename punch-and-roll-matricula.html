@@ -70,10 +70,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .pay-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border-radius:6px;padding:4px}
 .pay-tab{flex:1;padding:10px;border-radius:4px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--muted);background:transparent;transition:all .2s;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
 .pay-tab.active{background:var(--panel2);color:var(--white);border:1px solid var(--border)}
-.pix-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center;display:none}
+.pix-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:24px;display:none}
 .pix-box.active{display:block}
-.pix-chave{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--white);word-break:break-all;cursor:pointer;transition:background .15s;margin-bottom:6px}
-.pix-chave:hover{background:var(--border)}
+.pix-key-box{background:var(--panel);border:2px dashed var(--red);border-radius:10px;padding:20px;text-align:center;margin:16px 0}
+.pix-key{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--white);word-break:break-all;margin:8px 0}
+.btn-copiar{width:100%;padding:12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-top:8px}
+.btn-copiar:hover{background:var(--red2)}
+.btn-copiar.copiado{background:var(--green)}
 .credit-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:20px;display:none}
 .credit-box.active{display:block}
 .card-preview{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:10px;padding:18px;margin-bottom:16px;border:1px solid #2a2a4a;position:relative;overflow:hidden}
@@ -104,8 +107,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .success-step:last-child{border-bottom:none}
 .success-step-n{width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
-.pix-gerado{background:rgba(22,163,74,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:14px;margin-top:14px;display:none;text-align:center}
-.pix-gerado.active{display:block}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
@@ -227,17 +228,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 
     <!-- PIX -->
     <div class="pix-box active" id="pix-box">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Clique em <strong style="color:var(--white)">GERAR PIX</strong> para criar seu QR Code. Após o pagamento, a matrícula é confirmada automaticamente!</div>
-      <div id="pix-qr-box" style="width:180px;height:180px;background:#fff;border-radius:8px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;overflow:hidden">
-        <div style="text-align:center;padding:10px"><div style="font-size:28px;margin-bottom:4px">🔲</div><div style="font-size:10px;color:#999">QR Code<br>aparece aqui</div></div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        Copie a chave PIX abaixo, abra seu banco e faça o pagamento. Após pagar, clique em <strong style="color:var(--white)">JÁ PAGUEI</strong> e envie o comprovante pelo WhatsApp.
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px" id="pix-copy-label" style="display:none">Ou copie o código PIX:</div>
-      <div class="pix-chave" id="pix-chave-display" onclick="copiarPIX()" style="display:none"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:12px"><span id="copy-hint"></span></div>
-      <div style="font-size:13px;color:var(--muted)">Valor: <strong id="pix-valor-display" style="color:var(--white)">—</strong></div>
-      <div class="pix-gerado" id="pix-gerado">
-        <div style="font-size:13px;color:var(--green2);font-weight:600;margin-bottom:6px"><span class="spinner"></span>Aguardando pagamento PIX...</div>
-        <div style="font-size:12px;color:var(--muted)">Confirma automaticamente quando o pagamento for identificado.</div>
+
+      <div class="pix-key-box">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🔲 Chave PIX</div>
+        <div class="pix-key" id="pix-chave-text">bc7dbf9f-28c6-4768-b84c-03b65f63ac43</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Mercado Pago · Anderson Santos Barcellos</div>
+        <button class="btn-copiar" id="btn-copiar" onclick="copiarPIX()">📋 COPIAR CHAVE PIX</button>
+      </div>
+
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Valor a pagar:</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--white)" id="pix-valor-display">—</div>
+      </div>
+
+      <div style="background:rgba(22,163,74,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:12px;font-size:12px;color:var(--green2);margin-bottom:16px">
+        ✓ Após pagar, clique em <strong>JÁ PAGUEI</strong> e envie o comprovante via WhatsApp para confirmar sua matrícula.
       </div>
     </div>
 
@@ -262,24 +270,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
     </div>
 
     <div style="height:20px"></div>
-    <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">GERAR PIX</button>
-    <button class="btn-back" id="btn-voltar" onclick="setStep(2)">← Voltar</button>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados · Mercado Pago</div>
+    <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">JÁ PAGUEI — CONFIRMAR MATRÍCULA</button>
+    <button class="btn-back" onclick="setStep(2)">← Voltar</button>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados</div>
   </div>
 
   <!-- VIEW 4 -->
   <div class="view" id="view-4">
     <div class="success-screen">
       <div class="success-icon">✓</div>
-      <div class="success-title">MATRÍCULA CONFIRMADA!</div>
-      <div class="success-sub" id="success-msg">Parabéns! Você agora faz parte da família Punch and Roll Fight Team.</div>
+      <div class="success-title">MATRÍCULA RECEBIDA!</div>
+      <div class="success-sub" id="success-msg">Parabéns! Sua matrícula foi registrada. Envie o comprovante pelo WhatsApp para confirmar.</div>
       <div class="success-steps">
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Próximos passos:</div>
-        <div class="success-step"><div class="success-step-n">1</div><div>Você receberá um e-mail de confirmação com seus dados de acesso ao portal.</div></div>
-        <div class="success-step"><div class="success-step-n">2</div><div>Acesse o portal do aluno para ver a agenda e fazer check-in nas aulas!</div></div>
+        <div class="success-step"><div class="success-step-n">1</div><div>Envie o comprovante do PIX para o WhatsApp <strong>(48) 98463-9257</strong></div></div>
+        <div class="success-step"><div class="success-step-n">2</div><div>Nossa equipe confirma e ativa seu acesso ao portal.</div></div>
         <div class="success-step"><div class="success-step-n">3</div><div>Sua senha inicial é <strong>123</strong> — altere após o primeiro acesso.</div></div>
       </div>
-      <div style="font-size:12px;color:var(--muted)">Dúvidas? <a href="https://wa.me/554898463-9257" style="color:var(--green2);text-decoration:none">💬 (48) 98463-9257</a></div>
+      <a href="https://wa.me/554898463-9257?text=Olá!%20Acabei%20de%20fazer%20minha%20matrícula%20na%20Punch%20and%20Roll%20e%20vou%20enviar%20o%20comprovante%20do%20PIX." 
+         style="display:inline-block;padding:14px 28px;background:var(--green);color:#fff;text-decoration:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:16px">
+        💬 ENVIAR COMPROVANTE NO WHATSAPP
+      </a>
+      <div style="font-size:12px;color:var(--muted)">Dúvidas? <a href="https://wa.me/554898463-9257" style="color:var(--green2);text-decoration:none">(48) 98463-9257</a></div>
     </div>
   </div>
 </section>
@@ -288,7 +300,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 
 <script>
 const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
-const MP_PUBLIC_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+const MP_PUBLIC_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';
+const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+const PIX_CHAVE = 'bc7dbf9f-28c6-4768-b84c-03b65f63ac43';
 
 const PLANOS = {
   boxe:[
@@ -315,7 +329,7 @@ const BENEFICIOS={
 
 const fmtR=v=>'R$ '+Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 const todayStr=new Date().toISOString().slice(0,10);
-let S={modalidade:'boxe',planoId:null,plano:null,payMethod:'pix',dados:{},pixPaymentId:null,pixInterval:null,pixGerado:false};
+let S={modalidade:'boxe',planoId:null,plano:null,payMethod:'pix',dados:{}};
 
 function setStep(n){
   document.querySelectorAll('.view').forEach((v,i)=>v.classList.toggle('active',i===n-1));
@@ -399,7 +413,6 @@ function irParaPagamento(){
   renderResumoPagamento();
   atualizarParcelamento();
   document.getElementById('pix-valor-display').textContent=fmtR(S.plano.valor*S.plano.meses);
-  // Atualiza botão conforme método
   atualizarBotao();
 }
 
@@ -416,7 +429,7 @@ function renderResumo(elId){
 function renderResumoPagamento(){renderResumo('resumo-pagamento');renderResumo('resumo-topo');}
 
 function setPayMethod(m){
-  S.payMethod=m;S.pixGerado=false;
+  S.payMethod=m;
   document.getElementById('pay-pix-tab').classList.toggle('active',m==='pix');
   document.getElementById('pay-credit-tab').classList.toggle('active',m==='credito');
   document.getElementById('pix-box').classList.toggle('active',m==='pix');
@@ -426,8 +439,8 @@ function setPayMethod(m){
 
 function atualizarBotao(){
   const btn=document.getElementById('btn-pagar');
-  btn.innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
-  btn.style.background='';btn.disabled=false;
+  btn.innerHTML=S.payMethod==='pix'?'JÁ PAGUEI — CONFIRMAR MATRÍCULA':'CONFIRMAR PAGAMENTO';
+  btn.disabled=false;btn.style.background='';
 }
 
 function atualizarParcelamento(){
@@ -443,10 +456,15 @@ function atualizarParcelamento(){
 }
 
 function copiarPIX(){
-  const chave=document.getElementById('pix-chave-display').textContent;
-  const hint=document.getElementById('copy-hint');
-  navigator.clipboard.writeText(chave).then(()=>{hint.textContent='✓ Copiado!';setTimeout(()=>hint.textContent='',2000);})
-  .catch(()=>{const el=document.createElement('textarea');el.value=chave;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);hint.textContent='✓ Copiado!';setTimeout(()=>hint.textContent='',2000);});
+  const btn=document.getElementById('btn-copiar');
+  navigator.clipboard.writeText(PIX_CHAVE).then(()=>{
+    btn.textContent='✓ COPIADO!';btn.classList.add('copiado');
+    setTimeout(()=>{btn.textContent='📋 COPIAR CHAVE PIX';btn.classList.remove('copiado');},3000);
+  }).catch(()=>{
+    const el=document.createElement('textarea');el.value=PIX_CHAVE;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
+    btn.textContent='✓ COPIADO!';btn.classList.add('copiado');
+    setTimeout(()=>{btn.textContent='📋 COPIAR CHAVE PIX';btn.classList.remove('copiado');},3000);
+  });
 }
 
 function calcVenc(inicio,meses){const d=new Date(inicio);d.setMonth(d.getMonth()+meses);return d.toISOString().slice(0,10);}
@@ -457,87 +475,25 @@ async function processarPagamento(){
 
   try{
     if(S.payMethod==='pix'){
-      // Gera PIX sem salvar aluno ainda
-      const pixRes=await fetch(API_URL+'/api/pagamentos/pix/temp',{
+      // Salva aluno como aguardando pagamento
+      const apiRes=await fetch(API_URL+'/api/alunos/publico',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          valor:S.plano.valor*S.plano.meses,
-          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
-          email:S.dados.email,
-          nome:S.dados.nome,
-          cpf:S.dados.cpf,
+          nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
+          tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
+          cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
+          parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
+          nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
+          plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
+          inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
+          payMethod:'pix',obs:'Aguardando confirmação do comprovante PIX',origem:'auto-cadastro'
         })
       });
-
-      // Se rota temp não existir ainda, usa a normal com status pendente
-      let pixData;
-      if(pixRes.ok){
-        pixData=await pixRes.json();
-      } else {
-        // fallback — salva aluno como pendente e gera PIX
-        const apiRes=await fetch(API_URL+'/api/alunos/publico',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
-            tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
-            cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
-            parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
-            nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
-            plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
-            inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
-            payMethod:'pix',obs:'aguardando_pix',origem:'auto-cadastro'
-          })
-        });
-        const alunoData=await apiRes.json();
-
-        const pRes=await fetch(API_URL+'/api/pagamentos/pix',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            aluno_id:alunoData.id,
-            valor:S.plano.valor*S.plano.meses,
-            descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
-            email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
-          })
-        });
-        if(!pRes.ok){const err=await pRes.json();throw new Error(err.error||'Erro ao gerar PIX');}
-        pixData=await pRes.json();
-      }
-
-      S.pixPaymentId=pixData.payment_id;
-
-      // Mostrar QR Code
-      if(pixData.qr_code_base64){
-        document.getElementById('pix-qr-box').innerHTML=
-          '<img src="data:image/png;base64,'+pixData.qr_code_base64+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
-      }
-      if(pixData.qr_code){
-        document.getElementById('pix-chave-display').textContent=pixData.qr_code;
-        document.getElementById('pix-chave-display').style.display='block';
-        document.getElementById('pix-copy-label').style.display='block';
-      }
-
-      document.getElementById('pix-gerado').classList.add('active');
-      btn.innerHTML='⏳ AGUARDANDO PAGAMENTO PIX...';
-      btn.style.background='#1a3a2a';
-      document.getElementById('btn-voltar').style.display='none';
-      S.pixGerado=true;
-
-      // Polling a cada 5s
-      S.pixInterval=setInterval(async()=>{
-        try{
-          const stRes=await fetch(API_URL+'/api/pagamentos/status/'+S.pixPaymentId);
-          const st=await stRes.json();
-          if(st.status==='approved'){
-            clearInterval(S.pixInterval);
-            document.getElementById('success-msg').textContent=
-              'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento PIX confirmado! Você já faz parte da Punch and Roll. 🥊';
-            setStep(4);
-          }
-        }catch(e){}
-      },5000);
+      if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
+      document.getElementById('success-msg').textContent=
+        'Matrícula registrada, '+S.dados.nome.split(' ')[0]+'! Agora envie o comprovante do PIX pelo WhatsApp para ativar seu acesso. 🥊';
+      setStep(4);
 
     } else {
       // CARTÃO
@@ -558,7 +514,6 @@ async function processarPagamento(){
         identificationType:'CPF',identificationNumber:S.dados.cpf.replace(/\D/g,''),
       });
 
-      // Só salva aluno se cartão for aprovado — faz tudo junto no backend
       const apiRes=await fetch(API_URL+'/api/alunos/publico',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -582,8 +537,7 @@ async function processarPagamento(){
           aluno_id:alunoData.id,
           valor:S.plano.valor*S.plano.meses,
           descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
-          token:cardToken.id,
-          email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
+          token:cardToken.id,email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
           parcelas:document.getElementById('f-parcelas').value,
           payment_method_id:cardToken.payment_method_id,
         })
@@ -599,13 +553,11 @@ async function processarPagamento(){
         throw new Error('Pagamento não aprovado. Verifique os dados do cartão.');
       }
     }
-
   }catch(err){
     console.error(err);
     alert('Erro: '+err.message);
     btn.disabled=false;
-    btn.innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
-    btn.style.background='';
+    btn.innerHTML=S.payMethod==='pix'?'JÁ PAGUEI — CONFIRMAR MATRÍCULA':'CONFIRMAR PAGAMENTO';
   }
 }
 
