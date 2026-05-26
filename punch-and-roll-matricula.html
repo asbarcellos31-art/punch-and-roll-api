@@ -6,6 +6,7 @@
 <title>Punch and Roll Fight Team — Matricule-se</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://sdk.mercadopago.com/js/v2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -16,8 +17,6 @@
 }
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white);min-height:100vh;overflow-x:hidden}
-
-/* HERO */
 .hero{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px 40px;overflow:hidden}
 .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(212,17,28,.18) 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,rgba(212,17,28,.08) 0%,transparent 60%)}
 .hero-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:100px;background:linear-gradient(to bottom,var(--red),transparent)}
@@ -34,13 +33,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .stat-n{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--red)}
 .stat-l{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
 .scroll-arrow{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;animation:bounce 2s infinite;cursor:pointer;color:var(--muted);font-size:14px}
-
-/* SECTION */
 .section{padding:60px 20px;max-width:680px;margin:0 auto}
 .section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:8px}
 .section-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,6vw,42px);letter-spacing:2px;margin-bottom:24px;line-height:1}
-
-/* STEPS */
 .steps{display:flex;align-items:center;margin-bottom:32px}
 .step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative}
 .step:not(:last-child)::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:1px;background:var(--border);z-index:0}
@@ -51,13 +46,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .step-label{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center}
 .step.active .step-label{color:var(--white)}
 .step.done .step-label{color:var(--red)}
-
-/* MOD TABS */
 .mod-tabs{display:flex;gap:6px;margin-bottom:20px;background:var(--panel);border-radius:6px;padding:4px}
 .mod-tab{flex:1;padding:10px;border-radius:4px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);background:transparent;transition:all .2s;text-align:center}
 .mod-tab.active{background:var(--red);color:#fff}
-
-/* PLAN CARDS */
 .planos-grid{display:grid;gap:10px;margin-bottom:24px}
 .plano-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
 .plano-card:hover{border-color:var(--muted2)}
@@ -72,8 +63,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .plano-economia{font-size:11px;color:var(--green2);margin-top:2px;font-weight:500}
 .plano-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--white);opacity:.8;margin-top:10px}
 .plano-check:before{content:'✓';color:var(--green2);font-weight:700}
-
-/* FORM */
 .form-sec{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .fg{margin-bottom:12px}
 .fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
@@ -83,17 +72,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .fi option{background:var(--panel2)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fi-error{border-color:#f87171!important}
-
-/* PAY TABS */
 .pay-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border-radius:6px;padding:4px}
 .pay-tab{flex:1;padding:10px;border-radius:4px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--muted);background:transparent;transition:all .2s;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
 .pay-tab.active{background:var(--panel2);color:var(--white);border:1px solid var(--border)}
-
 .pix-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center;display:none}
 .pix-box.active{display:block}
 .pix-chave{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--white);word-break:break-all;cursor:pointer;transition:background .15s;margin-bottom:6px}
 .pix-chave:hover{background:var(--border)}
-
 .credit-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:20px;display:none}
 .credit-box.active{display:block}
 .card-preview{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:10px;padding:18px;margin-bottom:16px;border:1px solid #2a2a4a;position:relative;overflow:hidden}
@@ -103,26 +88,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .card-info-row{display:flex;justify-content:space-between;margin-top:10px}
 .card-info-label{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:1px}
 .card-info-val{font-size:13px;color:#e2e8f0;font-weight:500;margin-top:2px}
-
-/* RESUMO */
 .resumo-box{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px}
 .resumo-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
 .resumo-row:last-child{border-bottom:none}
 .resumo-total{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--white)}
 .resumo-label{color:var(--muted)}
-
-/* VIEWS */
 .view{display:none;animation:fadeUp .4s ease both}
 .view.active{display:block}
-
-/* BUTTONS */
 .btn-submit{width:100%;padding:16px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;cursor:pointer;transition:all .2s;box-shadow:0 4px 24px rgba(212,17,28,.3)}
 .btn-submit:hover{background:var(--red2);transform:translateY(-1px)}
 .btn-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .btn-back{width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all .2s;margin-top:10px}
 .btn-back:hover{color:var(--white);border-color:var(--muted2)}
-
-/* SUCCESS */
 .success-screen{text-align:center;padding:40px 20px;animation:fadeUp .6s ease both}
 .success-icon{width:80px;height:80px;border-radius:50%;background:rgba(22,163,74,.15);border:2px solid var(--green2);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 20px;animation:popIn .5s .3s ease both}
 .success-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;margin-bottom:8px}
@@ -131,15 +108,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .success-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
 .success-step:last-child{border-bottom:none}
 .success-step-n{width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
-
+/* PIX aguardando */
+.pix-aguardando{background:rgba(22,163,74,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:16px;margin-top:16px;display:none}
+.pix-aguardando.active{display:block}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
 @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-
 @media(min-width:600px){
   .planos-grid{grid-template-columns:repeat(3,1fr)}
   .section{padding:80px 32px}
@@ -148,7 +125,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 </head>
 <body>
 
-<!-- HERO -->
 <section class="hero">
   <div class="hero-bg"></div>
   <div class="hero-line"></div>
@@ -170,7 +146,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <div class="scroll-arrow" onclick="document.getElementById('matricula').scrollIntoView({behavior:'smooth'})">↓</div>
 </section>
 
-<!-- FORMULÁRIO -->
 <section class="section" id="matricula">
   <div class="section-label">Matrícula Online</div>
   <div class="section-title">COMECE HOJE</div>
@@ -202,7 +177,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <!-- VIEW 2: DADOS -->
   <div class="view" id="view-2">
     <div class="resumo-box" id="resumo-topo"></div>
-
     <div class="form-sec">👤 Dados Pessoais</div>
     <div class="form-row">
       <div class="fg"><label class="fl">Nome Completo *</label><input class="fi" id="f-nome" placeholder="Seu nome completo"></div>
@@ -212,7 +186,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       <div class="fg"><label class="fl">Data de Nascimento *</label><input class="fi" type="date" id="f-nasc"></div>
       <div class="fg"><label class="fl">Sexo</label><select class="fi" id="f-sexo"><option value="">Selecione</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select></div>
     </div>
-
     <div class="form-sec">📞 Contato</div>
     <div class="form-row">
       <div class="fg"><label class="fl">WhatsApp *</label><input class="fi" id="f-tel" placeholder="(48) 98463-9257" maxlength="15" oninput="maskTel(this)"></div>
@@ -223,7 +196,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       <div class="fg"><label class="fl">Cidade</label><input class="fi" id="f-cidade" value="São José" placeholder="São José"></div>
       <div class="fg"><label class="fl">CEP</label><input class="fi" id="f-cep" placeholder="00000-000" maxlength="9" oninput="maskCEP(this)"></div>
     </div>
-
     <div class="form-sec">🚨 Contato de Emergência</div>
     <div class="form-row">
       <div class="fg"><label class="fl">Nome *</label><input class="fi" id="f-emerg-nome" placeholder="Nome do responsável"></div>
@@ -232,13 +204,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
     <div class="fg"><label class="fl">Parentesco</label>
       <select class="fi" id="f-parentesco"><option value="">Selecione</option><option>Pai/Mãe</option><option>Cônjuge</option><option>Filho(a)</option><option>Irmão/Irmã</option><option>Outro</option></select>
     </div>
-
     <div class="form-sec">🏥 Saúde</div>
     <div class="fg"><label class="fl">Condições / Lesões</label>
       <textarea class="fi" id="f-saude" rows="2" placeholder="Ex: hipertensão, lesão no joelho... (deixe em branco se nenhuma)" style="resize:none"></textarea>
     </div>
     <div class="fg"><label class="fl">Alergias</label><input class="fi" id="f-alergia" placeholder="Ex: penicilina... (deixe em branco se nenhuma)"></div>
-
     <div class="form-sec">📋 Experiência</div>
     <div class="fg"><label class="fl">Nível na modalidade</label>
       <select class="fi" id="f-nivel">
@@ -248,7 +218,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
         <option value="avancado">Avançado — pratico há mais de 3 anos</option>
       </select>
     </div>
-
     <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:16px">
       <label style="display:flex;gap:10px;cursor:pointer;font-size:12px;line-height:1.5;color:var(--muted)">
         <input type="checkbox" id="f-termos" style="accent-color:var(--red);flex-shrink:0;margin-top:2px">
@@ -270,19 +239,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 
     <!-- PIX -->
     <div class="pix-box active" id="pix-box">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Após o pagamento, envie o comprovante para confirmar sua matrícula.</div>
-      <!-- QR Code gerado via Mercado Pago API -->
-      <div style="width:160px;height:160px;background:#fff;border-radius:8px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center" id="pix-qr-box">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">QR Code gerado automaticamente pelo Mercado Pago. Pague e sua matrícula é confirmada na hora!</div>
+
+      <!-- QR Code real -->
+      <div id="pix-qr-box" style="width:180px;height:180px;background:#fff;border-radius:8px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;overflow:hidden">
         <div style="text-align:center;padding:10px">
           <div style="font-size:28px;margin-bottom:4px">🔲</div>
-          <div style="font-size:10px;color:#999">QR Code<br>Mercado Pago</div>
+          <div style="font-size:10px;color:#999">QR Code aparece<br>ao confirmar</div>
         </div>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Ou copie a chave PIX:</div>
-      <div class="pix-chave" id="pix-chave-display" onclick="copiarPIX()">contato@punchandroll.com.br</div>
+
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Ou copie o código PIX:</div>
+      <div class="pix-chave" id="pix-chave-display" onclick="copiarPIX()">Clique em confirmar para gerar</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Toque para copiar · <span id="copy-hint"></span></div>
       <div style="font-size:13px;color:var(--muted)">Valor: <strong id="pix-valor-display" style="color:var(--white)">—</strong></div>
-      <div style="margin-top:12px;background:rgba(22,163,74,.1);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:10px;font-size:12px;color:var(--green2)">✓ PIX confirmado automaticamente via Mercado Pago</div>
+
+      <!-- Status PIX -->
+      <div class="pix-aguardando" id="pix-aguardando">
+        <div style="font-size:13px;color:var(--green2);font-weight:600;margin-bottom:6px"><span class="spinner"></span>Aguardando pagamento...</div>
+        <div style="font-size:12px;color:var(--muted)">O sistema confirma automaticamente assim que o PIX for pago.</div>
+      </div>
     </div>
 
     <!-- CARTÃO -->
@@ -301,14 +277,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
         <div class="fg"><label class="fl">Validade</label><input class="fi" id="f-card-exp" placeholder="MM/AA" maxlength="5" oninput="maskExp(this)"></div>
         <div class="fg"><label class="fl">CVV</label><input class="fi" id="f-card-cvv" placeholder="•••" maxlength="4" type="password"></div>
       </div>
-      <div class="fg"><label class="fl">Parcelamento</label><select class="fi" id="f-parcelas" onchange="atualizarParcelamento()"></select></div>
+      <div class="fg"><label class="fl">Parcelamento</label><select class="fi" id="f-parcelas"></select></div>
       <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;font-size:11px;color:var(--muted)">🔒 Pagamento seguro via Mercado Pago</div>
     </div>
 
     <div style="height:20px"></div>
     <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">CONFIRMAR MATRÍCULA</button>
     <button class="btn-back" onclick="setStep(2)">← Voltar</button>
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados · Mercado Pago</div>
   </div>
 
   <!-- VIEW 4: SUCESSO -->
@@ -326,7 +302,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       <div style="font-size:12px;color:var(--muted);line-height:1.6">Dúvidas? <a href="https://wa.me/554898463-9257" style="color:var(--green2);text-decoration:none">💬 WhatsApp: (48) 98463-9257</a></div>
     </div>
   </div>
-
 </section>
 
 <footer style="text-align:center;padding:30px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">
@@ -334,48 +309,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 </footer>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// ⚙️ CONFIGURAÇÕES — substituir antes de publicar
-// ═══════════════════════════════════════════════════════
 const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
-const CONFIG = {
-  // MERCADO PAGO
-  MP_PUBLIC_KEY:   'TEST-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
-  MP_ACCESS_TOKEN: 'TEST-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-  PIX_CHAVE:       'contato@punchandroll.com.br',
+const MP_PUBLIC_KEY = 'APP_USR-cb31e5ab-2720-4b41-908d-d5811ba5b576';
 
-  // SENDGRID
-  SENDGRID_API_KEY: 'SG.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-  EMAIL_ADMIN:      'contato@punchandroll.com.br',
-  EMAIL_FROM: 'noreply@punchandroll.com.br',
+// Inicializa SDK Mercado Pago
+const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
 
-  // WHATSAPP API (Evolution API / Z-API / WPP Connect)
-  WA_API_URL:     'https://SUA-API-WHATSAPP.com/message/sendText/INSTANCE',
-  WA_API_KEY:     'SUA-CHAVE-API',
-  WA_ADMIN_NUM:   '554898463-9257',
-
-  // WEBHOOK para alimentar o sistema principal
-  SISTEMA_WEBHOOK: '',
-};
-
-// ═══════════════════════════════════════════════════════
-// DADOS DOS PLANOS
-// ═══════════════════════════════════════════════════════
 const PLANOS = {
   boxe: [
-    {id:'mensal_boxe',  nome:'Mensal',    desc:'Boxe', valor:200, meses:1,  popular:false},
-    {id:'semestral_boxe',nome:'Semestral',desc:'Boxe', valor:190, meses:6,  popular:true,  economia:'Economize R$ 60'},
-    {id:'anual_boxe',   nome:'Anual',     desc:'Boxe', valor:180, meses:12, popular:false, economia:'Economize R$ 240'},
+    {id:'mensal_boxe',   nome:'Mensal',    desc:'Boxe',            valor:200, meses:1,  popular:false},
+    {id:'semestral_boxe',nome:'Semestral', desc:'Boxe',            valor:190, meses:6,  popular:true,  economia:'Economize R$ 60'},
+    {id:'anual_boxe',    nome:'Anual',     desc:'Boxe',            valor:180, meses:12, popular:false, economia:'Economize R$ 240'},
   ],
   jiujitsu: [
-    {id:'mensal_jj',    nome:'Mensal',    desc:'Jiu-Jitsu', valor:200, meses:1,  popular:false},
-    {id:'semestral_jj', nome:'Semestral', desc:'Jiu-Jitsu', valor:190, meses:6,  popular:true,  economia:'Economize R$ 60'},
-    {id:'anual_jj',     nome:'Anual',     desc:'Jiu-Jitsu', valor:180, meses:12, popular:false, economia:'Economize R$ 240'},
+    {id:'mensal_jj',     nome:'Mensal',    desc:'Jiu-Jitsu',       valor:200, meses:1,  popular:false},
+    {id:'semestral_jj',  nome:'Semestral', desc:'Jiu-Jitsu',       valor:190, meses:6,  popular:true,  economia:'Economize R$ 60'},
+    {id:'anual_jj',      nome:'Anual',     desc:'Jiu-Jitsu',       valor:180, meses:12, popular:false, economia:'Economize R$ 240'},
   ],
   ambos: [
-    {id:'mensal_amb',   nome:'Mensal',    desc:'Boxe + Jiu-Jitsu', valor:350, meses:1,  popular:false},
-    {id:'semestral_amb',nome:'Semestral', desc:'Boxe + Jiu-Jitsu', valor:330, meses:6,  popular:true,  economia:'Economize R$ 120'},
-    {id:'anual_amb',    nome:'Anual',     desc:'Boxe + Jiu-Jitsu', valor:310, meses:12, popular:false, economia:'Economize R$ 480'},
+    {id:'mensal_amb',    nome:'Mensal',    desc:'Boxe + Jiu-Jitsu',valor:350, meses:1,  popular:false},
+    {id:'semestral_amb', nome:'Semestral', desc:'Boxe + Jiu-Jitsu',valor:330, meses:6,  popular:true,  economia:'Economize R$ 120'},
+    {id:'anual_amb',     nome:'Anual',     desc:'Boxe + Jiu-Jitsu',valor:310, meses:12, popular:false, economia:'Economize R$ 480'},
   ],
 };
 
@@ -385,18 +339,12 @@ const BENEFICIOS = {
   ambos:    ['TODAS as aulas (Boxe + Jiu-Jitsu)','Check-in pelo portal do aluno','Acesso completo às turmas','Melhor custo-benefício','Todos os professores'],
 };
 
-// ═══════════════════════════════════════════════════════
-// ESTADO
-// ═══════════════════════════════════════════════════════
 const fmtR = v => 'R$ ' + Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-const fmtD = d => { if(!d) return '—'; const[y,m,dd]=d.split('-'); return dd+'/'+m+'/'+y; };
 const todayStr = new Date().toISOString().slice(0,10);
 
-let S = { modalidade:'boxe', planoId:null, plano:null, payMethod:'pix', dados:{}, pagamento:{} };
+let S = { modalidade:'boxe', planoId:null, plano:null, payMethod:'pix', dados:{}, alunoId:null, pixPaymentId:null, pixCode:null, pixInterval:null };
 
-// ═══════════════════════════════════════════════════════
-// NAVEGAÇÃO ENTRE STEPS
-// ═══════════════════════════════════════════════════════
+// ── STEPS ──
 function setStep(n) {
   document.querySelectorAll('.view').forEach((v,i) => v.classList.toggle('active', i===n-1));
   for(let i=1;i<=4;i++){
@@ -405,55 +353,47 @@ function setStep(n) {
     if(i<n) s.classList.add('done');
     else if(i===n) s.classList.add('active');
   }
-  const top = document.getElementById('matricula').offsetTop - 20;
-  window.scrollTo({top, behavior:'smooth'});
+  window.scrollTo({top: document.getElementById('matricula').offsetTop - 20, behavior:'smooth'});
 }
 
-// ═══════════════════════════════════════════════════════
-// STEP 1 — PLANO
-// ═══════════════════════════════════════════════════════
+// ── PLANOS ──
 function setMod(mod) {
-  S.modalidade = mod; S.planoId = null; S.plano = null;
+  S.modalidade=mod; S.planoId=null; S.plano=null;
   document.querySelectorAll('.mod-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('mod-'+({boxe:'boxe',jiujitsu:'jj',ambos:'amb'}[mod])).classList.add('active');
   renderPlanos(); renderBeneficios();
 }
 
 function renderPlanos() {
-  const grid = document.getElementById('planos-grid');
-  grid.innerHTML = '';
+  const grid=document.getElementById('planos-grid'); grid.innerHTML='';
   PLANOS[S.modalidade].forEach(p => {
-    const div = document.createElement('div');
-    div.className = 'plano-card' + (S.planoId===p.id?' selected':'');
-    div.onclick = () => { S.planoId=p.id; S.plano=p; renderPlanos(); };
-    const total = p.meses===1 ? 'por mês' : 'Total: '+fmtR(p.valor*p.meses);
-    div.innerHTML =
-      (p.popular ? '<div class="plano-badge">+ POPULAR</div>' : '') +
-      '<div class="plano-nome">'+p.nome+' — '+p.desc+'</div>' +
-      '<div class="plano-price"><sup>R$</sup>'+p.valor+'<span>/mês</span></div>' +
-      '<div class="plano-total">'+total+'</div>' +
-      (p.economia ? '<div class="plano-economia">'+p.economia+'</div>' : '') +
+    const div=document.createElement('div');
+    div.className='plano-card'+(S.planoId===p.id?' selected':'');
+    div.onclick=()=>{ S.planoId=p.id; S.plano=p; renderPlanos(); };
+    div.innerHTML=
+      (p.popular?'<div class="plano-badge">+ POPULAR</div>':'')+
+      '<div class="plano-nome">'+p.nome+' — '+p.desc+'</div>'+
+      '<div class="plano-price"><sup>R$</sup>'+p.valor+'<span>/mês</span></div>'+
+      '<div class="plano-total">'+(p.meses===1?'por mês':'Total: '+fmtR(p.valor*p.meses))+'</div>'+
+      (p.economia?'<div class="plano-economia">'+p.economia+'</div>':'')+
       '<div class="plano-check">Cancele quando quiser</div>';
     grid.appendChild(div);
   });
 }
 
 function renderBeneficios() {
-  document.getElementById('beneficios-list').innerHTML = BENEFICIOS[S.modalidade]
-    .map(b => '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px"><span style="color:var(--green2);font-weight:700">✓</span>'+b+'</div>')
-    .join('');
+  document.getElementById('beneficios-list').innerHTML=BENEFICIOS[S.modalidade]
+    .map(b=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px"><span style="color:var(--green2);font-weight:700">✓</span>'+b+'</div>').join('');
 }
 
 function irParaDados() {
-  if(!S.planoId) { alert('Selecione um plano para continuar!'); return; }
+  if(!S.planoId){alert('Selecione um plano para continuar!');return;}
   setStep(2);
 }
 
-// ═══════════════════════════════════════════════════════
-// STEP 2 — DADOS
-// ═══════════════════════════════════════════════════════
+// ── DADOS ──
 function irParaPagamento() {
-  const campos = [
+  const campos=[
     {id:'f-nome',msg:'Informe seu nome completo'},
     {id:'f-cpf',msg:'Informe seu CPF'},
     {id:'f-nasc',msg:'Informe sua data de nascimento'},
@@ -462,279 +402,220 @@ function irParaPagamento() {
     {id:'f-emerg-nome',msg:'Informe o contato de emergência'},
     {id:'f-emerg-tel',msg:'Informe o telefone de emergência'},
   ];
-  for(const c of campos) {
-    const el = document.getElementById(c.id);
-    if(!el.value.trim()) { el.classList.add('fi-error'); alert(c.msg); el.focus(); return; }
+  for(const c of campos){
+    const el=document.getElementById(c.id);
+    if(!el.value.trim()){el.classList.add('fi-error');alert(c.msg);el.focus();return;}
     el.classList.remove('fi-error');
   }
-  if(!document.getElementById('f-termos').checked) { alert('Aceite os termos para continuar.'); return; }
-  const email = document.getElementById('f-email').value;
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('E-mail inválido!'); return; }
-
-  S.dados = {
-    nome:      document.getElementById('f-nome').value.trim(),
-    cpf:       document.getElementById('f-cpf').value.trim(),
-    nasc:      document.getElementById('f-nasc').value,
-    sexo:      document.getElementById('f-sexo').value,
-    tel:       document.getElementById('f-tel').value.trim(),
-    email:     document.getElementById('f-email').value.trim(),
-    end:       document.getElementById('f-end').value.trim(),
-    cidade:    document.getElementById('f-cidade').value.trim(),
-    cep:       document.getElementById('f-cep').value.trim(),
-    emergNome: document.getElementById('f-emerg-nome').value.trim(),
-    emergTel:  document.getElementById('f-emerg-tel').value.trim(),
+  if(!document.getElementById('f-termos').checked){alert('Aceite os termos para continuar.');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('f-email').value)){alert('E-mail inválido!');return;}
+  S.dados={
+    nome:document.getElementById('f-nome').value.trim(),
+    cpf:document.getElementById('f-cpf').value.trim(),
+    nasc:document.getElementById('f-nasc').value,
+    sexo:document.getElementById('f-sexo').value,
+    tel:document.getElementById('f-tel').value.trim(),
+    email:document.getElementById('f-email').value.trim(),
+    end:document.getElementById('f-end').value.trim(),
+    cidade:document.getElementById('f-cidade').value.trim(),
+    cep:document.getElementById('f-cep').value.trim(),
+    emergNome:document.getElementById('f-emerg-nome').value.trim(),
+    emergTel:document.getElementById('f-emerg-tel').value.trim(),
     parentesco:document.getElementById('f-parentesco').value,
-    saude:     document.getElementById('f-saude').value.trim(),
-    alergia:   document.getElementById('f-alergia').value.trim(),
-    nivel:     document.getElementById('f-nivel').value,
+    saude:document.getElementById('f-saude').value.trim(),
+    alergia:document.getElementById('f-alergia').value.trim(),
+    nivel:document.getElementById('f-nivel').value,
   };
-
   setStep(3);
   renderResumoPagamento();
   atualizarParcelamento();
-  document.getElementById('pix-valor-display').textContent = fmtR(S.plano.valor * S.plano.meses);
+  document.getElementById('pix-valor-display').textContent=fmtR(S.plano.valor*S.plano.meses);
 }
 
 function renderResumo(elId) {
-  const p = S.plano; if(!p) return;
-  const total = p.valor * p.meses;
-  document.getElementById(elId).innerHTML =
+  const p=S.plano; if(!p) return;
+  document.getElementById(elId).innerHTML=
     '<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Resumo</div>'+
     '<div class="resumo-row"><span class="resumo-label">Plano</span><span>'+p.nome+' — '+p.desc+'</span></div>'+
     '<div class="resumo-row"><span class="resumo-label">Duração</span><span>'+p.meses+(p.meses===1?' mês':' meses')+'</span></div>'+
     (S.dados.nome?'<div class="resumo-row"><span class="resumo-label">Aluno</span><span>'+S.dados.nome.split(' ')[0]+'</span></div>':'')+
-    '<div class="resumo-row"><span class="resumo-label" style="font-weight:600;color:var(--white)">Total</span><span class="resumo-total">'+fmtR(total)+'</span></div>';
+    '<div class="resumo-row"><span class="resumo-label" style="font-weight:600;color:var(--white)">Total</span><span class="resumo-total">'+fmtR(p.valor*p.meses)+'</span></div>';
 }
 
-function renderResumoPagamento() { renderResumo('resumo-pagamento'); renderResumo('resumo-topo'); }
+function renderResumoPagamento(){renderResumo('resumo-pagamento');renderResumo('resumo-topo');}
 
-// ═══════════════════════════════════════════════════════
-// STEP 3 — PAGAMENTO
-// ═══════════════════════════════════════════════════════
+// ── PAGAMENTO ──
 function setPayMethod(m) {
-  S.payMethod = m;
-  document.getElementById('pay-pix-tab').classList.toggle('active', m==='pix');
-  document.getElementById('pay-credit-tab').classList.toggle('active', m==='credito');
-  document.getElementById('pix-box').classList.toggle('active', m==='pix');
-  document.getElementById('credit-box').classList.toggle('active', m==='credito');
+  S.payMethod=m;
+  document.getElementById('pay-pix-tab').classList.toggle('active',m==='pix');
+  document.getElementById('pay-credit-tab').classList.toggle('active',m==='credito');
+  document.getElementById('pix-box').classList.toggle('active',m==='pix');
+  document.getElementById('credit-box').classList.toggle('active',m==='credito');
 }
 
 function atualizarParcelamento() {
   if(!S.plano) return;
-  const total = S.plano.valor * S.plano.meses;
-  const sel = document.getElementById('f-parcelas'); sel.innerHTML='';
-  const max = Math.min(12, S.plano.meses>1?12:3);
+  const total=S.plano.valor*S.plano.meses;
+  const sel=document.getElementById('f-parcelas'); sel.innerHTML='';
+  const max=Math.min(12,S.plano.meses>1?12:3);
   for(let i=1;i<=max;i++){
     const op=document.createElement('option'); op.value=i;
-    op.textContent = i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
+    op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
     sel.appendChild(op);
   }
 }
 
 function copiarPIX() {
-  const chave = CONFIG.PIX_CHAVE;
-  const hint = document.getElementById('copy-hint');
-  navigator.clipboard.writeText(chave).then(()=>{ hint.textContent='✓ Copiado!'; setTimeout(()=>hint.textContent='',2000); })
+  const chave=document.getElementById('pix-chave-display').textContent;
+  if(chave.includes('Clique')) return;
+  const hint=document.getElementById('copy-hint');
+  navigator.clipboard.writeText(chave).then(()=>{hint.textContent='✓ Copiado!';setTimeout(()=>hint.textContent='',2000);})
   .catch(()=>{
-    const el=document.createElement('textarea'); el.value=chave; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-    hint.textContent='✓ Copiado!'; setTimeout(()=>hint.textContent='',2000);
+    const el=document.createElement('textarea');el.value=chave;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
+    hint.textContent='✓ Copiado!';setTimeout(()=>hint.textContent='',2000);
   });
 }
 
-async function processarPagamento() {
-  if(S.payMethod==='credito'){
-    const num=document.getElementById('f-card-num').value.replace(/\s/g,'');
-    const name=document.getElementById('f-card-name').value.trim();
-    const exp=document.getElementById('f-card-exp').value;
-    const cvv=document.getElementById('f-card-cvv').value;
-    if(!num||num.length<16){alert('Número do cartão inválido!');return;}
-    if(!name){alert('Informe o nome no cartão!');return;}
-    if(!exp||exp.length<5){alert('Validade inválida!');return;}
-    if(!cvv||cvv.length<3){alert('CVV inválido!');return;}
-    S.pagamento={num,name,exp,cvv,parcelas:document.getElementById('f-parcelas').value};
-  }
+function calcVenc(inicio,meses){
+  const d=new Date(inicio);d.setMonth(d.getMonth()+meses);return d.toISOString().slice(0,10);
+}
 
+async function processarPagamento() {
   const btn=document.getElementById('btn-pagar');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>PROCESSANDO...';
 
   try {
-    // ─────────────────────────────────────
-    // 1. MERCADO PAGO — Criar preferência de pagamento
-    // Descomentar quando tiver as credenciais:
-    // ─────────────────────────────────────
-    /*
-    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+CONFIG.MP_ACCESS_TOKEN,
-        'X-Idempotency-Key':Date.now().toString(),
-      },
-      body: JSON.stringify({
-        transaction_amount: S.plano.valor * S.plano.meses,
-        description: 'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
-        payment_method_id: S.payMethod==='pix' ? 'pix' : 'credit_card',
-        payer:{
-          email: S.dados.email,
-          first_name: S.dados.nome.split(' ')[0],
-          last_name: S.dados.nome.split(' ').slice(1).join(' '),
-          identification:{ type:'CPF', number:S.dados.cpf.replace(/\D/g,'') },
-        },
-        installments: parseInt(S.pagamento.parcelas||1),
-        notification_url: CONFIG.SISTEMA_WEBHOOK,
-      })
-    });
-    const mpData = await mpRes.json();
-    // PIX: mpData.point_of_interaction.transaction_data.qr_code_base64
-    // Crédito: mpData.status === 'approved'
-    */
-
-    // ─────────────────────────────────────
-    // 2. SENDGRID — E-mail admin
-    // ─────────────────────────────────────
-    /*
-    await fetch('https://api.sendgrid.com/v3/mail/send',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+CONFIG.SENDGRID_API_KEY},
-      body: JSON.stringify({
-        personalizations:[{to:[{email:CONFIG.EMAIL_ADMIN}]}],
-        from:{email:CONFIG.EMAIL_FROM,name:'Punch and Roll Sistema'},
-        subject:'🥊 Nova Matrícula — '+S.dados.nome,
-        html: emailAdmin(),
-      })
-    });
-    // E-mail de boas-vindas para o aluno
-    await fetch('https://api.sendgrid.com/v3/mail/send',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+CONFIG.SENDGRID_API_KEY},
-      body: JSON.stringify({
-        personalizations:[{to:[{email:S.dados.email,name:S.dados.nome}]}],
-        from:{email:CONFIG.EMAIL_FROM,name:'Punch and Roll Fight Team'},
-        subject:'✅ Matrícula confirmada — Punch and Roll Fight Team',
-        html: emailAluno(),
-      })
-    });
-    */
-
-    // ─────────────────────────────────────
-    // 3. WHATSAPP — Notificação admin + boas-vindas aluno
-    // ─────────────────────────────────────
-    /*
-    const msgAdmin =
-      '🥊 *Nova Matrícula!*\n\n'+
-      '*Aluno:* '+S.dados.nome+'\n'+
-      '*Modalidade:* '+S.plano.desc+'\n'+
-      '*Plano:* '+S.plano.nome+' — '+fmtR(S.plano.valor)+'/mês\n'+
-      '*Pagamento:* '+(S.payMethod==='pix'?'PIX':'Cartão')+'\n'+
-      '*WhatsApp:* '+S.dados.tel+'\n'+
-      '*E-mail:* '+S.dados.email+'\n'+
-      '*Saúde:* '+(S.dados.saude||'Nenhuma')+'\n'+
-      '*Data:* '+fmtD(todayStr);
-    await fetch(CONFIG.WA_API_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':CONFIG.WA_API_KEY},body:JSON.stringify({number:CONFIG.WA_ADMIN_NUM,text:msgAdmin})});
-
-    const telAluno = '55'+S.dados.tel.replace(/\D/g,'');
-    const msgAluno =
-      '🥊 Olá, *'+S.dados.nome.split(' ')[0]+'*! Seja bem-vindo(a) à *Punch and Roll Fight Team*!\n\n'+
-      'Sua matrícula no plano *'+S.plano.nome+' de '+S.plano.desc+'* foi recebida.\n\n'+
-      'Em breve nossa equipe confirma o pagamento e agenda sua primeira aula. 💪';
-    await fetch(CONFIG.WA_API_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':CONFIG.WA_API_KEY},body:JSON.stringify({number:telAluno,text:msgAluno})});
-    */
-
-    // ─────────────────────────────────────
-    // 4. ALIMENTAR SISTEMA — salva localmente e envia webhook
-    // ─────────────────────────────────────
-    const novoAluno = {
-      id: Date.now(),
-      nome:S.dados.nome, cpf:S.dados.cpf, nasc:S.dados.nasc, sexo:S.dados.sexo,
-      tel:S.dados.tel, email:S.dados.email, end:S.dados.end, cidade:S.dados.cidade, cep:S.dados.cep,
-      emergNome:S.dados.emergNome, emergTel:S.dados.emergTel, parentesco:S.dados.parentesco,
-      saude:S.dados.saude, alergia:S.dados.alergia, nivel:S.dados.nivel,
-      modalidade:S.modalidade, planoId:S.planoId,
-      plano:S.plano.nome+' — '+S.plano.desc,
-      valor:S.plano.valor, meses:S.plano.meses,
-      inicio:todayStr, venc:calcVenc(todayStr,S.plano.meses),
-      pagto:S.payMethod, status:'aguardando_pagamento', mat:todayStr, origem:'auto-cadastro',
-    };
-    // Enviar para a API real
-    const apiRes = await fetch('https://punch-and-roll-api-production.up.railway.app/api/alunos/publico',{
+    // 1. Salvar aluno no sistema
+    const apiRes=await fetch(API_URL+'/api/alunos/publico',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        nome:S.dados.nome, cpf:S.dados.cpf, nasc:S.dados.nasc, sexo:S.dados.sexo,
-        tel:S.dados.tel, email:S.dados.email, end:S.dados.end, cidade:S.dados.cidade,
-        cep:S.dados.cep, emergNome:S.dados.emergNome, emergTel:S.dados.emergTel,
-        parentesco:S.dados.parentesco, saude:S.dados.saude, alergia:S.dados.alergia,
-        nivel:S.dados.nivel, modalidade:S.modalidade, planoId:S.planoId,
-        plano:S.plano.nome+' — '+S.plano.desc, valor:S.plano.valor, meses:S.plano.meses,
-        inicio:todayStr, venc:calcVenc(todayStr,S.plano.meses),
-        payMethod:S.payMethod, obs:'', origem:'auto-cadastro'
+        nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
+        tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
+        cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
+        parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
+        nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
+        plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
+        inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
+        payMethod:S.payMethod,obs:'',origem:'auto-cadastro'
       })
     });
-    if(!apiRes.ok){const err=await apiRes.json(); throw new Error(err.error||'Erro ao salvar');}
+    if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
+    const alunoData=await apiRes.json();
+    S.alunoId=alunoData.id;
 
-    // SUCESSO
-    document.getElementById('success-msg').textContent =
-      'Parabéns, '+S.dados.nome.split(' ')[0]+'! Sua matrícula foi recebida. Um e-mail de confirmação foi enviado para '+S.dados.email+'.';
-    setStep(4);
+    // 2. PIX
+    if(S.payMethod==='pix'){
+      const pixRes=await fetch(API_URL+'/api/pagamentos/pix',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          aluno_id:S.alunoId,
+          valor:S.plano.valor*S.plano.meses,
+          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
+          email:S.dados.email,
+          nome:S.dados.nome,
+          cpf:S.dados.cpf,
+        })
+      });
+      if(!pixRes.ok){const err=await pixRes.json();throw new Error(err.error||'Erro ao gerar PIX');}
+      const pixData=await pixRes.json();
+      S.pixPaymentId=pixData.payment_id;
+      S.pixCode=pixData.qr_code;
+
+      // Mostrar QR Code
+      if(pixData.qr_code_base64){
+        document.getElementById('pix-qr-box').innerHTML=
+          '<img src="data:image/png;base64,'+pixData.qr_code_base64+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
+      }
+      if(pixData.qr_code){
+        document.getElementById('pix-chave-display').textContent=pixData.qr_code;
+      }
+      document.getElementById('pix-aguardando').classList.add('active');
+
+      btn.disabled=false;
+      btn.innerHTML='✓ PIX GERADO — AGUARDANDO PAGAMENTO';
+      btn.style.background='#1a4731';
+
+      // Polling — verifica a cada 5s se foi pago
+      S.pixInterval=setInterval(async()=>{
+        try{
+          const stRes=await fetch(API_URL+'/api/pagamentos/status/'+S.pixPaymentId);
+          const st=await stRes.json();
+          if(st.status==='approved'){
+            clearInterval(S.pixInterval);
+            document.getElementById('success-msg').textContent=
+              'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento PIX confirmado! Você já faz parte da Punch and Roll. 🥊';
+            setStep(4);
+          }
+        }catch(e){}
+      },5000);
+
+    // 3. CARTÃO
+    } else {
+      const num=document.getElementById('f-card-num').value.replace(/\s/g,'');
+      const name=document.getElementById('f-card-name').value.trim();
+      const exp=document.getElementById('f-card-exp').value;
+      const cvv=document.getElementById('f-card-cvv').value;
+      if(!num||num.length<16){alert('Número do cartão inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR MATRÍCULA';return;}
+      if(!name){alert('Informe o nome no cartão!');btn.disabled=false;btn.innerHTML='CONFIRMAR MATRÍCULA';return;}
+      if(!exp||exp.length<5){alert('Validade inválida!');btn.disabled=false;btn.innerHTML='CONFIRMAR MATRÍCULA';return;}
+      if(!cvv||cvv.length<3){alert('CVV inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR MATRÍCULA';return;}
+
+      // Tokenizar cartão via SDK do MP (seguro — dados não passam pelo nosso servidor)
+      const [mes,ano]=exp.split('/');
+      const cardToken=await mp.createCardToken({
+        cardNumber: num,
+        cardholderName: name,
+        cardExpirationMonth: mes,
+        cardExpirationYear: '20'+ano,
+        securityCode: cvv,
+        identificationType: 'CPF',
+        identificationNumber: S.dados.cpf.replace(/\D/g,''),
+      });
+
+      const cardRes=await fetch(API_URL+'/api/pagamentos/cartao',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          aluno_id:S.alunoId,
+          valor:S.plano.valor*S.plano.meses,
+          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
+          token:cardToken.id,
+          email:S.dados.email,
+          nome:S.dados.nome,
+          cpf:S.dados.cpf,
+          parcelas:document.getElementById('f-parcelas').value,
+          payment_method_id:cardToken.payment_method_id,
+        })
+      });
+      if(!cardRes.ok){const err=await cardRes.json();throw new Error(err.error||'Erro no pagamento');}
+      const cardData=await cardRes.json();
+
+      if(cardData.status==='approved'){
+        document.getElementById('success-msg').textContent=
+          'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento aprovado! Você já faz parte da Punch and Roll. 🥊';
+        setStep(4);
+      } else {
+        throw new Error('Pagamento não aprovado: '+cardData.status_detail);
+      }
+    }
 
   } catch(err) {
     console.error(err);
-    alert('Erro ao processar. Tente novamente ou entre em contato via WhatsApp.');
+    alert('Erro: '+err.message+'\n\nTente novamente ou entre em contato via WhatsApp.');
     btn.disabled=false; btn.innerHTML='CONFIRMAR MATRÍCULA';
+    btn.style.background='';
   }
 }
 
-function calcVenc(inicio, meses) {
-  const d=new Date(inicio); d.setMonth(d.getMonth()+meses);
-  return d.toISOString().slice(0,10);
-}
-
-// ═══════════════════════════════════════════════════════
-// TEMPLATES DE E-MAIL (SendGrid)
-// ═══════════════════════════════════════════════════════
-function emailAdmin() {
-  const rows = [
-    ['Aluno',S.dados.nome],['CPF',S.dados.cpf],['WhatsApp',S.dados.tel],['E-mail',S.dados.email],
-    ['Modalidade',S.plano.desc],['Plano',S.plano.nome+' — '+fmtR(S.plano.valor)+'/mês'],
-    ['Total',fmtR(S.plano.valor*S.plano.meses)],['Pagamento',S.payMethod==='pix'?'PIX':'Cartão'],
-    ['Saúde',S.dados.saude||'Nenhuma'],['Alergias',S.dados.alergia||'Nenhuma'],
-    ['Emergência',S.dados.emergNome+' — '+S.dados.emergTel],['Data',fmtD(todayStr)],
-  ];
-  return '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f0f0f;color:#f2f2f2;padding:32px;border-radius:8px">'
-    +'<h2 style="color:#d4111c;margin-bottom:20px">🥊 Nova Matrícula Recebida!</h2>'
-    +'<table style="width:100%;border-collapse:collapse">'
-    +rows.map(([l,v])=>'<tr><td style="padding:8px;border-bottom:1px solid #222;color:#888;width:40%">'+l+'</td><td style="padding:8px;border-bottom:1px solid #222;font-weight:500">'+v+'</td></tr>').join('')
-    +'</table>'
-    +'<div style="margin-top:20px;padding:12px;background:#d4111c;border-radius:6px;text-align:center">Verifique o pagamento e ative o aluno no sistema.</div>'
-    +'</div>';
-}
-
-function emailAluno() {
-  return '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f0f0f;color:#f2f2f2;padding:32px;border-radius:8px">'
-    +'<div style="text-align:center;margin-bottom:28px"><div style="font-size:48px">🥊</div><h1 style="color:#d4111c;font-size:28px;letter-spacing:2px;margin-top:10px">PUNCH AND ROLL</h1></div>'
-    +'<h2 style="color:#22c55e;margin-bottom:16px">✅ Matrícula Confirmada!</h2>'
-    +'<p>Olá, <strong>'+S.dados.nome.split(' ')[0]+'</strong>!</p>'
-    +'<p style="margin:12px 0;color:#aaa">Sua matrícula na <strong style="color:#f2f2f2">Punch and Roll Fight Team</strong> foi recebida com sucesso.</p>'
-    +'<div style="background:#1c1c1c;border-radius:8px;padding:16px;margin:20px 0">'
-    +'<div style="margin-bottom:8px"><span style="color:#888">Plano:</span> <strong>'+S.plano.nome+' — '+S.plano.desc+'</strong></div>'
-    +'<div style="margin-bottom:8px"><span style="color:#888">Valor:</span> <strong>'+fmtR(S.plano.valor)+'/mês</strong></div>'
-    +'<div><span style="color:#888">Total:</span> <strong>'+fmtR(S.plano.valor*S.plano.meses)+'</strong></div></div>'
-    +'<p style="color:#aaa">Nossa equipe vai entrar em contato pelo WhatsApp <strong style="color:#f2f2f2">'+S.dados.tel+'</strong> para confirmar o pagamento.</p>'
-    +'<div style="margin-top:24px;text-align:center;padding:16px;background:#d4111c;border-radius:6px"><strong>Bem-vindo à família Punch and Roll! 💪</strong></div>'
-    +'<p style="margin-top:20px;font-size:12px;color:#555;text-align:center">Punch and Roll Fight Team · São José, SC · (48) 98463-9257</p>'
-    +'</div>';
-}
-
-// ═══════════════════════════════════════════════════════
-// MÁSCARAS
-// ═══════════════════════════════════════════════════════
+// ── MÁSCARAS ──
 function maskCPF(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');el.value=v}
 function maskTel(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>10)v=v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');else if(v.length>6)v=v.replace(/(\d{2})(\d{4,5})(\d{0,4})/,'($1) $2-$3');else if(v.length>2)v=v.replace(/(\d{2})(\d*)/,'($1) $2');el.value=v}
 function maskCEP(el){let v=el.value.replace(/\D/g,'').slice(0,8);if(v.length>5)v=v.replace(/(\d{5})(\d{0,3})/,'$1-$2');el.value=v}
 function maskCard(el){let v=el.value.replace(/\D/g,'').slice(0,16);v=v.replace(/(.{4})/g,'$1 ').trim();el.value=v;document.getElementById('card-num-preview').textContent=(v+'•••• •••• •••• ••••').slice(0,19);const b=v[0]==='4'?'VISA':v.startsWith('5')||v.startsWith('2')?'MASTERCARD':v.startsWith('3')?'AMEX':'CARTÃO';document.getElementById('card-brand').textContent=b}
 function maskExp(el){let v=el.value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.replace(/(\d{2})(\d{0,2})/,'$1/$2');el.value=v;document.getElementById('card-exp-preview').textContent=v||'MM/AA'}
 
-// INIT
 renderPlanos();
 renderBeneficios();
 </script>
