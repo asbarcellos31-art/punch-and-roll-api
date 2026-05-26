@@ -180,7 +180,6 @@ async function setupDB() {
       )
     `);
 
-    // Seed aulas padrão — sempre verifica e insere se vazio
     const [aulaCount] = await conn.query('SELECT COUNT(*) as n FROM aulas');
     console.log('Aulas no banco:', aulaCount[0].n);
     if (aulaCount[0].n === 0) {
@@ -210,7 +209,6 @@ async function setupDB() {
       }
     }
 
-    // Seed admin padrão
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -227,8 +225,6 @@ async function setupDB() {
 // ══════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════
-
-// Login admin
 app.post('/api/auth/admin', async (req, res) => {
   try {
     const { email, senha } = req.body;
@@ -243,16 +239,12 @@ app.post('/api/auth/admin', async (req, res) => {
   }
 });
 
-// Login aluno
 app.post('/api/auth/aluno', async (req, res) => {
   try {
     const { login, senha } = req.body;
     const loginLower = (login||'').toLowerCase().trim();
     const [rows] = await db.query(
-      `SELECT * FROM alunos WHERE 
-        LOWER(email) = ? OR 
-        LOWER(SUBSTRING_INDEX(nome,' ',1)) = ? OR
-        LOWER(nome) LIKE ?`,
+      `SELECT * FROM alunos WHERE LOWER(email) = ? OR LOWER(SUBSTRING_INDEX(nome,' ',1)) = ? OR LOWER(nome) LIKE ?`,
       [loginLower, loginLower, loginLower+'%']
     );
     if (!rows.length) return res.status(401).json({ error: 'Aluno não encontrado. Use seu e-mail ou primeiro nome.' });
@@ -263,9 +255,9 @@ app.post('/api/auth/aluno', async (req, res) => {
     const token = jwt.sign({ id: aluno.id, tipo: 'aluno', nome: aluno.nome }, JWT_SECRET, { expiresIn: '30d' });
     res.json({
       token, tipo: 'aluno',
-      aluno: { 
-        id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade, 
-        status: aluno.status, plano: aluno.plano, valor: aluno.valor, 
+      aluno: {
+        id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade,
+        status: aluno.status, plano: aluno.plano, valor: aluno.valor,
         vencimento: aluno.vencimento, tel: aluno.tel, email: aluno.email
       }
     });
@@ -284,8 +276,6 @@ app.get('/api/alunos', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-
-// Dados do aluno logado
 app.get('/api/alunos/me', auth, async (req, res) => {
   try {
     if(req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
@@ -312,15 +302,8 @@ app.post('/api/alunos', auth, adminOnly, async (req, res) => {
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,aulas_liberadas,obs,status,senha,origem)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.pagto,JSON.stringify(d.aulasLiberadas||[]),d.obs,'ativo',senhaHash,d.origem||'admin']);
-    
-    const novoAluno = { id: result.insertId, ...d };
-    
-    // Notificar via WhatsApp
     await notificarWA(d.tel, `Olá ${d.nome.split(' ')[0]}! 🥊 Bem-vindo(a) à *Punch and Roll Fight Team*! Seu cadastro foi realizado. Sua senha de acesso ao portal é: *123* (altere após o primeiro acesso). Qualquer dúvida: (48) 98463-9257`);
-    
-    // Email admin
     await enviarEmailAdmin('🥊 Novo Aluno Cadastrado', `<h2>Novo aluno: ${d.nome}</h2><p>Modalidade: ${d.modalidade}</p><p>Plano: ${d.plano}</p><p>WhatsApp: ${d.tel}</p><p>E-mail: ${d.email}</p>`);
-    
     res.json({ id: result.insertId, message: 'Aluno cadastrado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -345,7 +328,6 @@ app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Redefinir senha do aluno
 app.put('/api/alunos/:id/senha', auth, adminOnly, async (req, res) => {
   try {
     const { senha } = req.body;
@@ -356,7 +338,6 @@ app.put('/api/alunos/:id/senha', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Aluno alterar própria senha
 app.put('/api/auth/aluno/senha', auth, async (req, res) => {
   try {
     const { senha_atual, nova_senha } = req.body;
@@ -371,7 +352,6 @@ app.put('/api/auth/aluno/senha', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Auto-cadastro público (página de matrícula)
 app.post('/api/alunos/publico', async (req, res) => {
   try {
     const d = req.body;
@@ -381,18 +361,11 @@ app.post('/api/alunos/publico', async (req, res) => {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.payMethod,d.obs,'aguardando_pagamento',senhaHash,'auto-cadastro']);
 
-    // WA admin
     await notificarWA(process.env.WA_ADMIN_NUM || '554898463-9257',
       `🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Modalidade:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}\n*E-mail:* ${d.email}`);
-    
-    // WA aluno
     await notificarWA(d.tel,
-      `Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*\nAcesse: https://asbarcellos31-art.github.io/maciel-team/portal-aluno.html`);
-
-    // Email admin
+      `Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*`);
     await enviarEmailAdmin('🥊 Nova Matrícula Online', `<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p><p>Email: ${d.email}</p>`);
-
-    // Email aluno
     await enviarEmailAluno(d.email, d.nome, 'Matrícula recebida — Punch and Roll',
       `<h2>Olá, ${d.nome.split(' ')[0]}!</h2><p>Sua matrícula foi recebida. Entraremos em contato em breve.</p><p>Plano: <strong>${d.plano}</strong></p>`);
 
@@ -460,20 +433,13 @@ app.post('/api/checkins', auth, async (req, res) => {
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hoje = new Date().toISOString().slice(0,10);
     const hora = new Date().toTimeString().slice(0,5);
-
-    // Verificar se já fez checkin hoje nessa aula
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,hoje]);
     if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
-
-    // Verificar status do aluno
     const [aluno] = await db.query('SELECT status FROM alunos WHERE id=?',[aluno_id]);
     if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso. Regularize para fazer check-in.' });
-
-    // Verificar vagas
     const [aula] = await db.query('SELECT vagas FROM aulas WHERE id=?',[aula_id]);
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,hoje]);
     if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
-
     await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,hoje,hora]);
     res.json({ message: 'Check-in confirmado! 🥊' });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -543,6 +509,113 @@ app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
     }
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── MERCADO PAGO — PIX ───────────────
+app.post('/api/pagamentos/pix', async (req, res) => {
+  try {
+    const { aluno_id, valor, descricao, email, nome, cpf } = req.body;
+    const idempotencyKey = `pix-${aluno_id}-${Date.now()}`;
+    const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
+      transaction_amount: parseFloat(valor),
+      description: descricao || 'Mensalidade Punch and Roll Fight Team',
+      payment_method_id: 'pix',
+      payer: {
+        email: email,
+        first_name: nome.split(' ')[0],
+        last_name: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
+        identification: { type: 'CPF', number: cpf.replace(/\D/g, '') }
+      },
+      notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
+    }, {
+      headers: {
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey
+      }
+    });
+    const payment = mpRes.data;
+    await db.query(
+      'INSERT INTO pagamentos (aluno_id, descricao, valor, status, metodo, mp_payment_id) VALUES (?,?,?,?,?,?)',
+      [aluno_id, descricao, valor, 'pendente', 'pix', String(payment.id)]
+    );
+    res.json({
+      payment_id: payment.id,
+      status: payment.status,
+      qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
+      qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64,
+      ticket_url: payment.point_of_interaction?.transaction_data?.ticket_url,
+      valor: valor
+    });
+  } catch (e) {
+    console.error('MP PIX error:', e.response?.data || e.message);
+    res.status(500).json({ error: e.response?.data?.message || e.message });
+  }
+});
+
+// ── MERCADO PAGO — CARTÃO ────────────
+app.post('/api/pagamentos/cartao', async (req, res) => {
+  try {
+    const { aluno_id, valor, descricao, token, email, nome, cpf, parcelas, payment_method_id } = req.body;
+    const idempotencyKey = `card-${aluno_id}-${Date.now()}`;
+    const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
+      transaction_amount: parseFloat(valor),
+      token: token,
+      description: descricao || 'Mensalidade Punch and Roll Fight Team',
+      installments: parseInt(parcelas) || 1,
+      payment_method_id: payment_method_id,
+      payer: {
+        email: email,
+        first_name: nome.split(' ')[0],
+        last_name: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
+        identification: { type: 'CPF', number: cpf.replace(/\D/g, '') }
+      },
+      notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
+    }, {
+      headers: {
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey
+      }
+    });
+    const payment = mpRes.data;
+    await db.query(
+      'INSERT INTO pagamentos (aluno_id, descricao, valor, status, metodo, mp_payment_id) VALUES (?,?,?,?,?,?)',
+      [aluno_id, descricao, valor, payment.status === 'approved' ? 'pago' : 'pendente', 'cartao', String(payment.id)]
+    );
+    if (payment.status === 'approved') {
+      await db.query("UPDATE alunos SET status='ativo' WHERE id=?", [aluno_id]);
+      const [aluno] = await db.query('SELECT nome, tel FROM alunos WHERE id=?', [aluno_id]);
+      if (aluno.length) {
+        await notificarWA(aluno[0].tel, `✅ Pagamento aprovado, ${aluno[0].nome.split(' ')[0]}! Seu acesso à Punch and Roll está ativo. 🥊`);
+      }
+    }
+    res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail, valor: valor });
+  } catch (e) {
+    console.error('MP Cartão error:', e.response?.data || e.message);
+    res.status(500).json({ error: e.response?.data?.message || e.message });
+  }
+});
+
+// ── MERCADO PAGO — CONSULTAR STATUS ──
+app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
+  try {
+    const mpRes = await axios.get(
+      `https://api.mercadopago.com/v1/payments/${req.params.payment_id}`,
+      { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } }
+    );
+    const payment = mpRes.data;
+    if (payment.status === 'approved') {
+      const [pag] = await db.query("SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?", [String(req.params.payment_id)]);
+      if (pag.length) {
+        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?", [String(req.params.payment_id)]);
+        await db.query("UPDATE alunos SET status='ativo' WHERE id=?", [pag[0].aluno_id]);
+      }
+    }
+    res.json({ status: payment.status, status_detail: payment.status_detail });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ══════════════════════════════════════
@@ -621,18 +694,13 @@ app.post('/api/marketing/enviar', auth, adminOnly, async (req, res) => {
     else if (segmento === 'vencendo') { q += " AND status='vencendo'"; }
     else if (segmento === 'ativos') { q += " AND status='ativo'"; }
     const [alvos] = await db.query(q, params);
-
     let enviados = 0;
     for (const alvo of alvos) {
-      const msg = texto
-        .replace(/{nome}/g, alvo.nome.split(' ')[0])
-        .replace(/{vencimento}/g, '')
-        .replace(/{dias}/g, '3');
+      const msg = texto.replace(/{nome}/g, alvo.nome.split(' ')[0]).replace(/{vencimento}/g, '').replace(/{dias}/g, '3');
       if (tipo === 'wa') await notificarWA(alvo.tel, msg);
       if (tipo === 'email') await enviarEmailAluno(alvo.email, alvo.nome, titulo, '<p>'+msg+'</p>');
       enviados++;
     }
-
     await db.query('INSERT INTO marketing_msgs (tipo,titulo,texto,segmento,status,qtd_enviados) VALUES (?,?,?,?,?,?)',[tipo,titulo,texto,segmento,'enviado',enviados]);
     res.json({ enviados, message: `Enviado para ${enviados} aluno(s)!` });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -650,10 +718,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       });
       const payment = mpRes.data;
       if (payment.status === 'approved') {
-        // Atualizar pagamento no banco
         await db.query("UPDATE pagamentos SET status='pago', mp_payment_id=? WHERE mp_payment_id=?",[data.id, data.id]);
-        // Ativar aluno
-        const [pag] = await db.query('SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?',[data.id]);
+        const [pag] = await db.query('SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
         if (pag.length) {
           await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[pag[0].aluno_id]);
           const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[pag[0].aluno_id]);
