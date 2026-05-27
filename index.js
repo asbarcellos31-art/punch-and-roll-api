@@ -782,7 +782,7 @@ app.get('/api/health', async (req, res) => {
     const [alunos] = await db.query('SELECT COUNT(*) as n FROM alunos');
     res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0', aulas: aulas[0].n, alunos: alunos[0].n });
   } catch(e) {
-    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0'
+    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0'});
   }
 });
 
