@@ -18,18 +18,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// ══════════════════════════════════════
-// BANCO DE DADOS
-// ══════════════════════════════════════
 const db = mysql2.createPool({
   uri: process.env.DATABASE_URL,
   waitForConnections: true,
   connectionLimit: 10,
 });
 
-// ══════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════
 const JWT_SECRET = process.env.JWT_SECRET || 'punchandroll2026secret';
 
 function auth(req, res, next) {
@@ -48,9 +42,30 @@ function adminOnly(req, res, next) {
   next();
 }
 
-// ══════════════════════════════════════
-// SETUP — criar tabelas se não existirem
-// ══════════════════════════════════════
+// Verifica permissão específica para colaboradores
+function perm(permissao) {
+  return (req, res, next) => {
+    if (req.user.tipo !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+    // admin_master tem tudo
+    if (req.user.nivel === 'master') return next();
+    // verifica permissão específica
+    const perms = req.user.permissoes || [];
+    if (!perms.includes(permissao)) return res.status(403).json({ error: 'Sem permissão para esta ação' });
+    next();
+  };
+}
+
+// Middleware flexível — admin master passa sempre, colaborador verifica permissão
+function adminOuPerm(permissao) {
+  return (req, res, next) => {
+    if (req.user.tipo !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+    if (req.user.nivel === 'master') return next();
+    const perms = req.user.permissoes || [];
+    if (perms.includes(permissao)) return next();
+    return res.status(403).json({ error: 'Sem permissão para esta ação' });
+  };
+}
+
 async function setupDB() {
   const conn = await db.getConnection();
   try {
@@ -163,9 +178,17 @@ async function setupDB() {
         nome VARCHAR(200),
         email VARCHAR(200) UNIQUE,
         senha VARCHAR(200),
+        nivel VARCHAR(20) DEFAULT 'master',
+        permissoes JSON,
+        ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Adicionar colunas se não existirem (migração)
+    try { await conn.query("ALTER TABLE admin_users ADD COLUMN nivel VARCHAR(20) DEFAULT 'master'"); } catch(e){}
+    try { await conn.query("ALTER TABLE admin_users ADD COLUMN permissoes JSON"); } catch(e){}
+    try { await conn.query("ALTER TABLE admin_users ADD COLUMN ativo BOOLEAN DEFAULT TRUE"); } catch(e){}
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS marketing_msgs (
@@ -181,7 +204,6 @@ async function setupDB() {
     `);
 
     const [aulaCount] = await conn.query('SELECT COUNT(*) as n FROM aulas');
-    console.log('Aulas no banco:', aulaCount[0].n);
     if (aulaCount[0].n === 0) {
       const aulasDefault = [
         ['Boxe Iniciante','07:00','Segunda',15,'boxe'],
@@ -212,11 +234,14 @@ async function setupDB() {
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
-      await conn.query('INSERT INTO admin_users (nome,email,senha) VALUES (?,?,?)',['Admin PR','admin@punchandroll.com.br',senha]);
+      await conn.query(
+        "INSERT INTO admin_users (nome,email,senha,nivel,permissoes,ativo) VALUES (?,?,?,?,?,?)",
+        ['Admin PR','admin@punchandroll.com.br',senha,'master',JSON.stringify([]),true]
+      );
       console.log('Admin criado: admin@punchandroll.com.br / admin123');
     }
 
-    console.log('✅ Banco configurado com sucesso!');
+    console.log('✅ Banco configurado!');
   } finally {
     conn.release();
   }
@@ -230,10 +255,18 @@ app.post('/api/auth/admin', async (req, res) => {
     const { email, senha } = req.body;
     const [rows] = await db.query('SELECT * FROM admin_users WHERE email = ?', [email]);
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado' });
+    if (!rows[0].ativo) return res.status(401).json({ error: 'Usuário desativado' });
     const ok = await bcrypt.compare(senha, rows[0].senha);
     if (!ok) return res.status(401).json({ error: 'Senha incorreta' });
-    const token = jwt.sign({ id: rows[0].id, tipo: 'admin', nome: rows[0].nome }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, nome: rows[0].nome, tipo: 'admin' });
+    const permissoes = (() => { try { return JSON.parse(rows[0].permissoes || '[]'); } catch(e) { return []; } })();
+    const token = jwt.sign({
+      id: rows[0].id,
+      tipo: 'admin',
+      nome: rows[0].nome,
+      nivel: rows[0].nivel || 'master',
+      permissoes,
+    }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, nome: rows[0].nome, tipo: 'admin', nivel: rows[0].nivel || 'master', permissoes });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -247,23 +280,81 @@ app.post('/api/auth/aluno', async (req, res) => {
       `SELECT * FROM alunos WHERE LOWER(email) = ? OR LOWER(SUBSTRING_INDEX(nome,' ',1)) = ? OR LOWER(nome) LIKE ?`,
       [loginLower, loginLower, loginLower+'%']
     );
-    if (!rows.length) return res.status(401).json({ error: 'Aluno não encontrado. Use seu e-mail ou primeiro nome.' });
+    if (!rows.length) return res.status(401).json({ error: 'Aluno não encontrado.' });
     const aluno = rows[0];
-    if (!aluno.senha) return res.status(401).json({ error: 'Senha não configurada. Contate a academia.' });
+    if (!aluno.senha) return res.status(401).json({ error: 'Senha não configurada.' });
     const ok = await bcrypt.compare(senha, aluno.senha);
     if (!ok) return res.status(401).json({ error: 'Senha incorreta' });
     const token = jwt.sign({ id: aluno.id, tipo: 'aluno', nome: aluno.nome }, JWT_SECRET, { expiresIn: '30d' });
     res.json({
       token, tipo: 'aluno',
-      aluno: {
-        id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade,
-        status: aluno.status, plano: aluno.plano, valor: aluno.valor,
-        vencimento: aluno.vencimento, tel: aluno.tel, email: aluno.email
-      }
+      aluno: { id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade, status: aluno.status, plano: aluno.plano, valor: aluno.valor, vencimento: aluno.vencimento, tel: aluno.tel, email: aluno.email }
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ══════════════════════════════════════
+// EQUIPE — Gestão de admins/colaboradores
+// ══════════════════════════════════════
+
+// Listar equipe (só master)
+app.get('/api/equipe', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' || req.user.nivel !== 'master') return res.status(403).json({ error: 'Apenas o admin master pode gerenciar a equipe' });
+    const [rows] = await db.query('SELECT id, nome, email, nivel, permissoes, ativo, criado_em FROM admin_users ORDER BY criado_em');
+    res.json(rows.map(r => ({
+      ...r,
+      permissoes: (() => { try { return JSON.parse(r.permissoes || '[]'); } catch(e) { return []; } })()
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Criar membro da equipe (só master)
+app.post('/api/equipe', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' || req.user.nivel !== 'master') return res.status(403).json({ error: 'Apenas o admin master pode criar usuários' });
+    const { nome, email, senha, nivel, permissoes } = req.body;
+    if (!nome || !email || !senha) return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios' });
+    const [existe] = await db.query('SELECT id FROM admin_users WHERE email = ?', [email]);
+    if (existe.length) return res.status(400).json({ error: 'E-mail já cadastrado' });
+    const hash = await bcrypt.hash(senha, 10);
+    const perms = nivel === 'master' ? [] : (permissoes || []);
+    const [result] = await db.query(
+      'INSERT INTO admin_users (nome, email, senha, nivel, permissoes, ativo) VALUES (?,?,?,?,?,?)',
+      [nome, email, hash, nivel || 'colaborador', JSON.stringify(perms), true]
+    );
+    res.json({ id: result.insertId, message: 'Usuário criado!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Editar membro (só master)
+app.put('/api/equipe/:id', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' || req.user.nivel !== 'master') return res.status(403).json({ error: 'Apenas o admin master pode editar usuários' });
+    const { nome, email, nivel, permissoes, ativo, senha } = req.body;
+    const perms = nivel === 'master' ? [] : (permissoes || []);
+    if (senha) {
+      const hash = await bcrypt.hash(senha, 10);
+      await db.query('UPDATE admin_users SET nome=?, email=?, nivel=?, permissoes=?, ativo=?, senha=? WHERE id=?',
+        [nome, email, nivel, JSON.stringify(perms), ativo ? 1 : 0, hash, req.params.id]);
+    } else {
+      await db.query('UPDATE admin_users SET nome=?, email=?, nivel=?, permissoes=?, ativo=? WHERE id=?',
+        [nome, email, nivel, JSON.stringify(perms), ativo ? 1 : 0, req.params.id]);
+    }
+    res.json({ message: 'Usuário atualizado!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Excluir membro (só master, não pode excluir a si mesmo)
+app.delete('/api/equipe/:id', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' || req.user.nivel !== 'master') return res.status(403).json({ error: 'Apenas o admin master pode excluir usuários' });
+    if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'Você não pode excluir sua própria conta' });
+    await db.query('DELETE FROM admin_users WHERE id=?', [req.params.id]);
+    res.json({ message: 'Usuário removido!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════
@@ -302,8 +393,8 @@ app.post('/api/alunos', auth, adminOnly, async (req, res) => {
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,aulas_liberadas,obs,status,senha,origem)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.pagto,JSON.stringify(d.aulasLiberadas||[]),d.obs,'ativo',senhaHash,d.origem||'admin']);
-    await notificarWA(d.tel, `Olá ${d.nome.split(' ')[0]}! 🥊 Bem-vindo(a) à *Punch and Roll Fight Team*! Seu cadastro foi realizado. Sua senha de acesso ao portal é: *123* (altere após o primeiro acesso). Qualquer dúvida: (48) 98463-9257`);
-    await enviarEmailAdmin('🥊 Novo Aluno Cadastrado', `<h2>Novo aluno: ${d.nome}</h2><p>Modalidade: ${d.modalidade}</p><p>Plano: ${d.plano}</p><p>WhatsApp: ${d.tel}</p><p>E-mail: ${d.email}</p>`);
+    await notificarWA(d.tel, `Olá ${d.nome.split(' ')[0]}! 🥊 Bem-vindo(a) à *Punch and Roll Fight Team*! Seu cadastro foi realizado. Sua senha de acesso ao portal é: *123*`);
+    await enviarEmailAdmin('🥊 Novo Aluno', `<h2>${d.nome}</h2><p>Modalidade: ${d.modalidade}</p><p>WhatsApp: ${d.tel}</p>`);
     res.json({ id: result.insertId, message: 'Aluno cadastrado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -348,7 +439,7 @@ app.put('/api/auth/aluno/senha', auth, async (req, res) => {
     if(!ok) return res.status(401).json({ error: 'Senha atual incorreta' });
     const hash = await bcrypt.hash(nova_senha, 10);
     await db.query('UPDATE alunos SET senha=? WHERE id=?', [hash, req.user.id]);
-    res.json({ message: 'Senha alterada com sucesso!' });
+    res.json({ message: 'Senha alterada!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -360,15 +451,10 @@ app.post('/api/alunos/publico', async (req, res) => {
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,obs,status,senha,origem)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.payMethod,d.obs,'aguardando_pagamento',senhaHash,'auto-cadastro']);
-
-    await notificarWA(process.env.WA_ADMIN_NUM || '554898463-9257',
-      `🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Modalidade:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}\n*E-mail:* ${d.email}`);
-    await notificarWA(d.tel,
-      `Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*`);
-    await enviarEmailAdmin('🥊 Nova Matrícula Online', `<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p><p>Email: ${d.email}</p>`);
-    await enviarEmailAluno(d.email, d.nome, 'Matrícula recebida — Punch and Roll',
-      `<h2>Olá, ${d.nome.split(' ')[0]}!</h2><p>Sua matrícula foi recebida. Entraremos em contato em breve.</p><p>Plano: <strong>${d.plano}</strong></p>`);
-
+    await notificarWA(process.env.WA_ADMIN_NUM||'554898463-9257',`🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Plano:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}`);
+    await notificarWA(d.tel,`Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*`);
+    await enviarEmailAdmin('🥊 Nova Matrícula Online',`<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p>`);
+    await enviarEmailAluno(d.email,d.nome,'Matrícula recebida — Punch and Roll',`<h2>Olá, ${d.nome.split(' ')[0]}!</h2><p>Sua matrícula foi recebida. Entraremos em contato em breve.</p><p>Plano: <strong>${d.plano}</strong></p>`);
     res.json({ id: result.insertId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -413,10 +499,7 @@ app.delete('/api/aulas/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/checkins', auth, async (req, res) => {
   try {
     const { aula_id, data, aluno_id } = req.query;
-    let q = `SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora, au.dia
-             FROM checkins c
-             JOIN alunos a ON c.aluno_id = a.id
-             JOIN aulas au ON c.aula_id = au.id WHERE 1=1`;
+    let q = `SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora, au.dia FROM checkins c JOIN alunos a ON c.aluno_id = a.id JOIN aulas au ON c.aula_id = au.id WHERE 1=1`;
     const params = [];
     if (aula_id) { q += ' AND c.aula_id = ?'; params.push(aula_id); }
     if (data) { q += ' AND c.data_checkin = ?'; params.push(data); }
@@ -436,7 +519,7 @@ app.post('/api/checkins', auth, async (req, res) => {
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,hoje]);
     if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
     const [aluno] = await db.query('SELECT status FROM alunos WHERE id=?',[aluno_id]);
-    if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso. Regularize para fazer check-in.' });
+    if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso.' });
     const [aula] = await db.query('SELECT vagas FROM aulas WHERE id=?',[aula_id]);
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,hoje]);
     if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
@@ -504,48 +587,36 @@ app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
   try {
     const { aluno_id, descricao, valor, data_pagamento, status, metodo } = req.body;
     const [result] = await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,data_pagamento,status,metodo) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,data_pagamento,status,metodo]);
-    if (status === 'pago') {
-      await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
-    }
+    if (status === 'pago') await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── MERCADO PAGO — PIX ───────────────
+// ── MERCADO PAGO — PIX ──
 app.post('/api/pagamentos/pix', async (req, res) => {
   try {
     const { aluno_id, valor, descricao, email, nome, cpf } = req.body;
-    const idempotencyKey = `pix-${aluno_id}-${Date.now()}`;
     const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
       transaction_amount: parseFloat(valor),
-      description: descricao || 'Mensalidade Punch and Roll Fight Team',
+      description: descricao || 'Mensalidade Punch and Roll',
       payment_method_id: 'pix',
       payer: {
-        email: email,
-        first_name: nome.split(' ')[0],
+        email, first_name: nome.split(' ')[0],
         last_name: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
-        identification: { type: 'CPF', number: cpf.replace(/\D/g, '') }
+        identification: { type: 'CPF', number: cpf.replace(/\D/g,'') }
       },
       notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
     }, {
-      headers: {
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': idempotencyKey
-      }
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': `pix-${aluno_id}-${Date.now()}` }
     });
     const payment = mpRes.data;
-    await db.query(
-      'INSERT INTO pagamentos (aluno_id, descricao, valor, status, metodo, mp_payment_id) VALUES (?,?,?,?,?,?)',
-      [aluno_id, descricao, valor, 'pendente', 'pix', String(payment.id)]
-    );
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,'pendente','pix',String(payment.id)]);
     res.json({
-      payment_id: payment.id,
-      status: payment.status,
+      payment_id: payment.id, status: payment.status,
       qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
       qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64,
       ticket_url: payment.point_of_interaction?.transaction_data?.ticket_url,
-      valor: valor
+      valor
     });
   } catch (e) {
     console.error('MP PIX error:', e.response?.data || e.message);
@@ -553,69 +624,52 @@ app.post('/api/pagamentos/pix', async (req, res) => {
   }
 });
 
-// ── MERCADO PAGO — CARTÃO ────────────
+// ── MERCADO PAGO — CARTÃO ──
 app.post('/api/pagamentos/cartao', async (req, res) => {
   try {
     const { aluno_id, valor, descricao, token, email, nome, cpf, parcelas, payment_method_id } = req.body;
-    const idempotencyKey = `card-${aluno_id}-${Date.now()}`;
     const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
-      transaction_amount: parseFloat(valor),
-      token: token,
-      description: descricao || 'Mensalidade Punch and Roll Fight Team',
+      transaction_amount: parseFloat(valor), token,
+      description: descricao || 'Mensalidade Punch and Roll',
       installments: parseInt(parcelas) || 1,
-      payment_method_id: payment_method_id,
+      payment_method_id,
       payer: {
-        email: email,
-        first_name: nome.split(' ')[0],
+        email, first_name: nome.split(' ')[0],
         last_name: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
-        identification: { type: 'CPF', number: cpf.replace(/\D/g, '') }
+        identification: { type: 'CPF', number: cpf.replace(/\D/g,'') }
       },
       notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
     }, {
-      headers: {
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': idempotencyKey
-      }
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': `card-${aluno_id}-${Date.now()}` }
     });
     const payment = mpRes.data;
-    await db.query(
-      'INSERT INTO pagamentos (aluno_id, descricao, valor, status, metodo, mp_payment_id) VALUES (?,?,?,?,?,?)',
-      [aluno_id, descricao, valor, payment.status === 'approved' ? 'pago' : 'pendente', 'cartao', String(payment.id)]
-    );
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,payment.status==='approved'?'pago':'pendente','cartao',String(payment.id)]);
     if (payment.status === 'approved') {
-      await db.query("UPDATE alunos SET status='ativo' WHERE id=?", [aluno_id]);
-      const [aluno] = await db.query('SELECT nome, tel FROM alunos WHERE id=?', [aluno_id]);
-      if (aluno.length) {
-        await notificarWA(aluno[0].tel, `✅ Pagamento aprovado, ${aluno[0].nome.split(' ')[0]}! Seu acesso à Punch and Roll está ativo. 🥊`);
-      }
+      await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+      const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
+      if (aluno.length) await notificarWA(aluno[0].tel,`✅ Pagamento aprovado, ${aluno[0].nome.split(' ')[0]}! Seu acesso está ativo. 🥊`);
     }
-    res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail, valor: valor });
+    res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail, valor });
   } catch (e) {
     console.error('MP Cartão error:', e.response?.data || e.message);
     res.status(500).json({ error: e.response?.data?.message || e.message });
   }
 });
 
-// ── MERCADO PAGO — CONSULTAR STATUS ──
+// ── STATUS PAGAMENTO ──
 app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
   try {
-    const mpRes = await axios.get(
-      `https://api.mercadopago.com/v1/payments/${req.params.payment_id}`,
-      { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } }
-    );
+    const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${req.params.payment_id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
     const payment = mpRes.data;
     if (payment.status === 'approved') {
-      const [pag] = await db.query("SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?", [String(req.params.payment_id)]);
+      const [pag] = await db.query("SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?",[String(req.params.payment_id)]);
       if (pag.length) {
-        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?", [String(req.params.payment_id)]);
-        await db.query("UPDATE alunos SET status='ativo' WHERE id=?", [pag[0].aluno_id]);
+        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?",[String(req.params.payment_id)]);
+        await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[pag[0].aluno_id]);
       }
     }
     res.json({ status: payment.status, status_detail: payment.status_detail });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════
@@ -665,7 +719,7 @@ app.delete('/api/documentos/:id', auth, adminOnly, async (req, res) => {
 });
 
 // ══════════════════════════════════════
-// DASHBOARD / STATS
+// DASHBOARD
 // ══════════════════════════════════════
 app.get('/api/dashboard', auth, adminOnly, async (req, res) => {
   try {
@@ -689,14 +743,13 @@ app.post('/api/marketing/enviar', auth, adminOnly, async (req, res) => {
   try {
     const { tipo, titulo, texto, segmento } = req.body;
     let q = 'SELECT nome, tel, email, modalidade FROM alunos WHERE 1=1';
-    const params = [];
-    if (segmento === 'atrasados') { q += " AND status='atrasado'"; }
-    else if (segmento === 'vencendo') { q += " AND status='vencendo'"; }
-    else if (segmento === 'ativos') { q += " AND status='ativo'"; }
-    const [alvos] = await db.query(q, params);
+    if (segmento === 'atrasados') q += " AND status='atrasado'";
+    else if (segmento === 'vencendo') q += " AND status='vencendo'";
+    else if (segmento === 'ativos') q += " AND status='ativo'";
+    const [alvos] = await db.query(q);
     let enviados = 0;
     for (const alvo of alvos) {
-      const msg = texto.replace(/{nome}/g, alvo.nome.split(' ')[0]).replace(/{vencimento}/g, '').replace(/{dias}/g, '3');
+      const msg = texto.replace(/{nome}/g, alvo.nome.split(' ')[0]).replace(/{vencimento}/g,'').replace(/{dias}/g,'3');
       if (tipo === 'wa') await notificarWA(alvo.tel, msg);
       if (tipo === 'email') await enviarEmailAluno(alvo.email, alvo.nome, titulo, '<p>'+msg+'</p>');
       enviados++;
@@ -713,27 +766,20 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
   try {
     const { type, data } = req.body;
     if (type === 'payment') {
-      const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`, {
-        headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
-      });
+      const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
       if (payment.status === 'approved') {
-        await db.query("UPDATE pagamentos SET status='pago', mp_payment_id=? WHERE mp_payment_id=?",[data.id, data.id]);
+        await db.query("UPDATE pagamentos SET status='pago', mp_payment_id=? WHERE mp_payment_id=?",[data.id,data.id]);
         const [pag] = await db.query('SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
         if (pag.length) {
           await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[pag[0].aluno_id]);
           const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[pag[0].aluno_id]);
-          if (aluno.length) {
-            await notificarWA(aluno[0].tel, `✅ Pagamento confirmado, ${aluno[0].nome.split(' ')[0]}! Seu acesso à Punch and Roll está ativo. 🥊`);
-          }
+          if (aluno.length) await notificarWA(aluno[0].tel,`✅ Pagamento confirmado, ${aluno[0].nome.split(' ')[0]}! Seu acesso está ativo. 🥊`);
         }
       }
     }
     res.sendStatus(200);
-  } catch (e) {
-    console.error('Webhook MP error:', e.message);
-    res.sendStatus(500);
-  }
+  } catch (e) { console.error('Webhook MP error:', e.message); res.sendStatus(500); }
 });
 
 // ══════════════════════════════════════
@@ -743,9 +789,7 @@ async function notificarWA(tel, msg) {
   if (!process.env.WA_API_URL || !process.env.WA_API_KEY) return;
   try {
     const num = '55' + tel.replace(/\D/g,'');
-    await axios.post(process.env.WA_API_URL, { number: num, text: msg }, {
-      headers: { 'apikey': process.env.WA_API_KEY, 'Content-Type': 'application/json' }
-    });
+    await axios.post(process.env.WA_API_URL, { number: num, text: msg }, { headers: { 'apikey': process.env.WA_API_KEY, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('WA error:', e.message); }
 }
 
@@ -755,8 +799,7 @@ async function enviarEmailAdmin(assunto, html) {
     await axios.post('https://api.sendgrid.com/v3/mail/send', {
       personalizations: [{ to: [{ email: process.env.EMAIL_ADMIN }] }],
       from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
-      subject: assunto,
-      content: [{ type: 'text/html', value: html }],
+      subject: assunto, content: [{ type: 'text/html', value: html }],
     }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('Email admin error:', e.message); }
 }
@@ -767,8 +810,7 @@ async function enviarEmailAluno(email, nome, assunto, html) {
     await axios.post('https://api.sendgrid.com/v3/mail/send', {
       personalizations: [{ to: [{ email, name: nome }] }],
       from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Fight Team' },
-      subject: assunto,
-      content: [{ type: 'text/html', value: html }],
+      subject: assunto, content: [{ type: 'text/html', value: html }],
     }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('Email aluno error:', e.message); }
 }
@@ -780,10 +822,8 @@ app.get('/api/health', async (req, res) => {
   try {
     const [aulas] = await db.query('SELECT COUNT(*) as n FROM aulas');
     const [alunos] = await db.query('SELECT COUNT(*) as n FROM alunos');
-    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.0.0', aulas: aulas[0].n, alunos: alunos[0].n });
-  } catch(e) {
-    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0' });
-  }
+    res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0', aulas: aulas[0].n, alunos: alunos[0].n });
+  } catch(e) { res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0' }); }
 });
 
 // ══════════════════════════════════════
