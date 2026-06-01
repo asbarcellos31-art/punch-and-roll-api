@@ -744,6 +744,9 @@ async function renderCheckins() {
 }
 
 let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente';
+const _agora=new Date(); let contasMes=`${_agora.getFullYear()}-${String(_agora.getMonth()+1).padStart(2,'0')}`;
+function contasMesNav(delta){const[y,m]=contasMes.split('-').map(Number);const nd=new Date(y,m-1+delta,1);contasMes=`${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,'0')}`;renderFinContas();}
+function contasMesLabel(){if(!contasMes)return'Todos os meses';const[y,m]=contasMes.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});}
 
 async function renderFinanceiro() {
   finResumo=null;
@@ -902,13 +905,30 @@ function renderFinDRE(){
 
 function renderFinContas(){
   const todas=finResumo?.despesas||[];
-  const filtradas=contasFilter==='todas'?todas:contasFilter==='pago'?todas.filter(d=>d.status==='pago'):contasFilter==='vencida'?todas.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):todas.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
-  const totalPend=todas.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-  const qtdVenc=todas.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
+  const doMes=contasMes?todas.filter(d=>d.data_vencimento&&d.data_vencimento.startsWith(contasMes)):todas;
+  const filtradas=contasFilter==='todas'?doMes:contasFilter==='pago'?doMes.filter(d=>d.status==='pago'):contasFilter==='vencida'?doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+  const totalPend=doMes.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const totalPago=doMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const qtdVenc=doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
   document.getElementById('fin-content').innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-size:12px;color:var(--muted)">${todas.filter(d=>d.status==='pendente').length} pendente(s) · ${fmtR(totalPend)}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px">
+      <div style="display:flex;align-items:center;gap:4px">
+        <button onclick="contasMesNav(-1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">◀</button>
+        <span style="font-size:12px;font-weight:600;min-width:120px;text-align:center;text-transform:capitalize">${contasMesLabel()}</span>
+        <button onclick="contasMesNav(1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">▶</button>
+        <button onclick="contasMes='';renderFinContas()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:${!contasMes?'var(--red)':'var(--panel2)'};color:${!contasMes?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer">Todos</button>
+      </div>
       <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:8px 10px">
+        <div style="font-size:10px;color:var(--muted)">A pagar</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:#f87171">${fmtR(totalPend)}</div>
+      </div>
+      <div style="flex:1;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 10px">
+        <div style="font-size:10px;color:var(--muted)">Pago</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(totalPago)}</div>
+      </div>
     </div>
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
     <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
