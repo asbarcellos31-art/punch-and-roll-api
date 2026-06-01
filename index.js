@@ -845,6 +845,16 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ══════════════════════════════════════
+// DIAGNÓSTICO (temporário)
+app.get('/api/debug/schema', auth, adminOnly, async (req, res) => {
+  try {
+    const [checkins] = await db.query('DESCRIBE checkins');
+    const [pagamentos] = await db.query('DESCRIBE pagamentos');
+    const [alunos] = await db.query('DESCRIBE alunos');
+    res.json({ checkins, pagamentos, alunos });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // START
 // ══════════════════════════════════════
 const PORT = process.env.PORT || 3000;
