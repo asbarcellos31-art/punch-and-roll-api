@@ -416,7 +416,6 @@ app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('DELETE FROM checkins WHERE aluno_id = ?', [req.params.id]);
     await db.query('DELETE FROM pagamentos WHERE aluno_id = ?', [req.params.id]);
-    await db.query('DELETE FROM documentos WHERE aluno_id = ?', [req.params.id]);
     await db.query('DELETE FROM alunos WHERE id = ?', [req.params.id]);
     res.json({ message: 'Aluno removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
