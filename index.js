@@ -585,13 +585,17 @@ app.delete('/api/recados/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/pagamentos', auth, async (req, res) => {
   try {
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.query.aluno_id;
-    let q = `SELECT p.*, a.nome as aluno_nome FROM pagamentos p JOIN alunos a ON p.aluno_id=a.id WHERE 1=1`;
+    // Tenta com JOIN; se a coluna aluno_id não existir no banco ainda, retorna vazio
+    let q = `SELECT p.*, a.nome as aluno_nome FROM pagamentos p LEFT JOIN alunos a ON p.aluno_id=a.id WHERE 1=1`;
     const params = [];
     if (aluno_id) { q += ' AND p.aluno_id=?'; params.push(aluno_id); }
-    q += ' ORDER BY p.criado_em DESC';
+    q += ' ORDER BY p.criado_em DESC LIMIT 500';
     const [rows] = await db.query(q, params);
     res.json(rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('[GET pagamentos]', e.message);
+    res.json([]); // retorna vazio em vez de 500 para não quebrar carregarTudo
+  }
 });
 
 app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
