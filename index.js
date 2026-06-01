@@ -414,6 +414,9 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
 
 app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
+    await db.query('DELETE FROM checkins WHERE aluno_id = ?', [req.params.id]);
+    await db.query('DELETE FROM pagamentos WHERE aluno_id = ?', [req.params.id]);
+    await db.query('DELETE FROM documentos WHERE aluno_id = ?', [req.params.id]);
     await db.query('DELETE FROM alunos WHERE id = ?', [req.params.id]);
     res.json({ message: 'Aluno removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -589,6 +592,13 @@ app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
     const [result] = await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,data_pagamento,status,metodo) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,data_pagamento,status,metodo]);
     if (status === 'pago') await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
     res.json({ id: result.insertId });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/pagamentos/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM pagamentos WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Pagamento removido!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

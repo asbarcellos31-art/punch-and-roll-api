@@ -362,10 +362,11 @@ async function iniciarApp() {
 
 async function carregarTudo() {
   try {
-    const [alunos, aulas, recados] = await Promise.all([GET('/api/alunos'),GET('/api/aulas'),GET('/api/recados')]);
+    const [alunos, aulas, recados, pagamentos] = await Promise.all([GET('/api/alunos'),GET('/api/aulas'),GET('/api/recados'),GET('/api/pagamentos')]);
     cache.alunos = Array.isArray(alunos) ? alunos.map(normalizeAluno) : [];
     cache.aulas  = Array.isArray(aulas)  ? aulas  : [];
     cache.recados= Array.isArray(recados)? recados : [];
+    mensHistorico = Array.isArray(pagamentos) ? pagamentos.map(p=>({id:p.id, alunoId:p.aluno_id, alunoNome:p.aluno_nome, valor:p.valor, data:p.data_pagamento, metodo:p.metodo, status:p.status})) : [];
   } catch(e) { console.error('Erro ao carregar dados:', e.message); }
 }
 
@@ -951,7 +952,7 @@ async function confirmarPagamento(){
 }
 
 async function registrarPagamento(alunoId){abrirModalRegistrarPag(alunoId);}
-function excluirHistorico(id){if(!confirm('Remover?'))return;mensHistorico=mensHistorico.filter(x=>x.id!=id);renderMensHistorico();}
+async function excluirHistorico(id){if(!confirm('Remover pagamento?'))return;try{await DEL('/api/pagamentos/'+id);mensHistorico=mensHistorico.filter(x=>x.id!=id);renderMensHistorico();}catch(e){alert('Erro: '+e.message);}}
 
 function verHistoricoAluno(id,nome){
   const hist=mensHistorico.filter(h=>h.alunoId===id);
