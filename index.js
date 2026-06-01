@@ -413,12 +413,21 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
 });
 
 app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
+  const conn = await db.getConnection();
   try {
-    await db.query('DELETE FROM checkins WHERE aluno_id = ?', [req.params.id]);
-    await db.query('DELETE FROM pagamentos WHERE aluno_id = ?', [req.params.id]);
-    await db.query('DELETE FROM alunos WHERE id = ?', [req.params.id]);
+    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+    await conn.query('DELETE FROM checkins WHERE aluno_id = ?', [req.params.id]);
+    await conn.query('DELETE FROM pagamentos WHERE aluno_id = ?', [req.params.id]);
+    await conn.query('DELETE FROM alunos WHERE id = ?', [req.params.id]);
+    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
     res.json({ message: 'Aluno removido!' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    await conn.query('SET FOREIGN_KEY_CHECKS = 1').catch(()=>{});
+    console.error('[DELETE aluno] Erro:', e.message, e.sql || '');
+    res.status(500).json({ error: e.message });
+  } finally {
+    conn.release();
+  }
 });
 
 app.put('/api/alunos/:id/senha', auth, adminOnly, async (req, res) => {
