@@ -849,14 +849,21 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ══════════════════════════════════════
-// DIAGNÓSTICO (temporário)
-app.get('/api/debug/schema', auth, adminOnly, async (req, res) => {
+// FINANCEIRO
+// ══════════════════════════════════════
+app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
   try {
-    const [checkins] = await db.query('DESCRIBE checkins');
-    const [pagamentos] = await db.query('DESCRIBE pagamentos');
-    const [alunos] = await db.query('DESCRIBE alunos');
-    res.json({ checkins, pagamentos, alunos });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const [historico] = await db.query(`
+      SELECT DATE_FORMAT(data_pagamento, '%Y-%m') as mes,
+             COALESCE(SUM(valor),0) as total,
+             COUNT(*) as qtd
+      FROM pagamentos
+      WHERE status='pago' AND data_pagamento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      GROUP BY mes
+      ORDER BY mes
+    `);
+    res.json({ historico });
+  } catch (e) { res.json({ historico: [] }); }
 });
 
 // START

@@ -741,33 +741,189 @@ async function renderCheckins() {
   } catch(e) { document.getElementById('checkins-lista').innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
 }
 
-function renderFinanceiro() {
-  const pg = document.getElementById('page-financeiro');
-  const atrasados = cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo = cache.alunos.filter(a=>a.status==='vencendo');
-  const totalAberto = atrasados.reduce((s,a)=>s+(a.valor||0),0);
-  pg.innerHTML = `
-    <div class="grid2">
-      <div class="kpi kr"><div class="kpi-label">Em Atraso</div><div class="kpi-val">${fmtR(totalAberto)}</div><div class="kpi-sub">${atrasados.length} aluno(s)</div></div>
-      <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo.length}</div><div class="kpi-sub">aluno(s)</div></div>
+let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null;
+
+async function renderFinanceiro() {
+  finResumo=null;
+  const pg=document.getElementById('page-financeiro');
+  pg.innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
+  try{finResumo=await GET('/api/financeiro/resumo');}catch(e){finResumo={historico:[]};}
+  pg.innerHTML=`
+    <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
+      ${[['geral','📊 Geral'],['historico','📋 Histórico'],['inadimplencia','🔴 Inadimplência']].map(([id,lbl])=>
+        `<button onclick="finNavTo('${id}')" id="fin-tab-${id}" style="flex:1;padding:7px 6px;border-radius:5px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;background:${finTab===id?'var(--red)':'transparent'};color:${finTab===id?'#fff':'var(--muted)'}">${lbl}</button>`
+      ).join('')}
     </div>
-    ${atrasados.length>0?`<div class="card"><div class="card-title">🔴 Inadimplentes</div>${atrasados.map(a=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1e1e1e">
-        <div><div style="font-size:13px;font-weight:500">${a.nome}</div><div style="font-size:11px;color:var(--muted)">Venc: ${fmtD(a.venc)}</div></div>
-        <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:#f87171">${fmtR(a.valor)}</div>
-        <button class="btn btn-g btn-sm" onclick="regularizar(${a.id})">✓ Regularizar</button></div>
-      </div>`).join('')}</div>`:'<div class="alert alert-g">✅ Todos os alunos estão em dia!</div>'}
-    ${vencendo.length>0?`<div class="card"><div class="card-title">⚠️ Vencendo em breve</div>${vencendo.map(a=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1e1e1e">
-        <div><div style="font-size:13px;font-weight:500">${a.nome}</div><div style="font-size:11px;color:var(--muted)">Venc: ${fmtD(a.venc)}</div></div>
-        <span class="badge by">Vencendo</span>
-      </div>`).join('')}</div>`:''}`;
+    <div id="fin-content"></div>`;
+  renderFinTab();
+}
+
+function finNavTo(tab){
+  finTab=tab;
+  ['geral','historico','inadimplencia'].forEach(id=>{
+    const b=document.getElementById('fin-tab-'+id);
+    if(b){b.style.background=id===tab?'var(--red)':'transparent';b.style.color=id===tab?'#fff':'var(--muted)';}
+  });
+  if(_finChart){try{_finChart.destroy();}catch(e){}_finChart=null;}
+  if(_finChartDoughnut){try{_finChartDoughnut.destroy();}catch(e){}_finChartDoughnut=null;}
+  renderFinTab();
+}
+
+function renderFinTab(){
+  if(finTab==='geral')renderFinGeral();
+  else if(finTab==='historico')renderFinHistorico();
+  else if(finTab==='inadimplencia')renderFinInadimplencia();
+}
+
+function renderFinGeral(){
+  const ativos=cache.alunos.filter(a=>a.status==='ativo');
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
+  const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
+  const nAtivos=ativos.length;
+  const valorAberto=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const ticketMedio=nAtivos>0?ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0)/nAtivos:0;
+  const recPotencial=cache.alunos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const taxaAdim=cache.alunos.length>0?Math.round(nAtivos/cache.alunos.length*100):0;
+  const agora=new Date();
+  const mesCur=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
+  const mesAntDt=new Date(agora.getFullYear(),agora.getMonth()-1,1);
+  const mesAntKey=`${mesAntDt.getFullYear()}-${String(mesAntDt.getMonth()+1).padStart(2,'0')}`;
+  const recMesAtual=parseFloat(finResumo?.historico?.find(h=>h.mes===mesCur)?.total||0);
+  const recMesAnt=parseFloat(finResumo?.historico?.find(h=>h.mes===mesAntKey)?.total||0);
+  const variacao=recMesAnt>0?((recMesAtual-recMesAnt)/recMesAnt*100).toFixed(1):null;
+  const pctMeta=recPotencial>0?Math.min(100,Math.round(recMesAtual/recPotencial*100)):0;
+  const nomeMes=agora.toLocaleDateString('pt-BR',{month:'long'});
+  document.getElementById('fin-content').innerHTML=`
+    <div class="grid4">
+      <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMesAtual)}</div>${variacao!==null?`<div class="kpi-sub" style="color:${parseFloat(variacao)>=0?'var(--green)':'#f87171'}">${parseFloat(variacao)>=0?'▲':'▼'} ${Math.abs(variacao)}% vs anterior</div>`:'<div class="kpi-sub">este mês</div>'}</div>
+      <div class="kpi kb"><div class="kpi-label">Alunos Ativos</div><div class="kpi-val">${nAtivos}</div><div class="kpi-sub">${taxaAdim}% adimplência</div></div>
+      <div class="kpi kr"><div class="kpi-label">Em Aberto</div><div class="kpi-val" style="font-size:18px">${fmtR(valorAberto)}</div><div class="kpi-sub">${atrasados.length} inadimplente(s)</div></div>
+      <div class="kpi ky"><div class="kpi-label">Ticket Médio</div><div class="kpi-val" style="font-size:18px">${fmtR(ticketMedio)}</div><div class="kpi-sub">por aluno ativo</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📈 Cobrança vs Potencial</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;color:var(--muted)">Cobrado em ${nomeMes}</span>
+        <span style="font-size:12px;font-weight:600">${fmtR(recMesAtual)}<span style="color:var(--muted);font-weight:400"> / ${fmtR(recPotencial)}</span></span>
+      </div>
+      <div style="height:10px;background:var(--border);border-radius:10px;overflow:hidden"><div style="height:100%;width:${pctMeta}%;background:${pctMeta>=80?'var(--green)':pctMeta>=50?'var(--yellow)':'var(--red)'};border-radius:10px"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px">
+        <span style="font-size:10px;color:var(--muted)">${pctMeta}% do potencial cobrado</span>
+        ${vencendo.length>0?`<span style="font-size:10px;color:var(--yellow)">⚠️ ${vencendo.length} vencendo</span>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Evolução — Últimos 6 Meses</div>
+      <div style="position:relative;height:160px"><canvas id="fin-chart-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🥊 Distribuição por Modalidade</div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div style="position:relative;width:90px;height:90px;flex-shrink:0"><canvas id="fin-chart-modal"></canvas></div>
+        <div style="flex:1">
+          ${['boxe','jiujitsu','ambos'].map(mod=>{
+            const n=cache.alunos.filter(a=>a.status==='ativo'&&a.modalidade===mod).length;
+            const pct=nAtivos>0?Math.round(n/nAtivos*100):0;
+            const cor=mod==='boxe'?'var(--red)':mod==='jiujitsu'?'var(--blue)':'var(--yellow)';
+            const lbl=mod==='boxe'?'🥊 Boxe':mod==='jiujitsu'?'🟦 Jiu-Jitsu':'🥊🟦 Ambos';
+            return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:11px">${lbl}</span><span style="font-size:11px;font-weight:600;color:${cor}">${n} (${pct}%)</span></div><div style="height:5px;background:var(--border);border-radius:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${cor};border-radius:5px"></div></div></div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+    ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
+    ${vencendo.length>0?`<div class="alert alert-y">⚠️ ${vencendo.length} aluno(s) vencendo em breve</div>`:''}
+    ${atrasados.length===0&&vencendo.length===0?'<div class="alert alert-g">✅ Todos os alunos estão em dia!</div>':''}`;
+  setTimeout(()=>{
+    const ctxBar=document.getElementById('fin-chart-bar');
+    if(ctxBar){
+      const labels=[],valores=[];
+      const ag=new Date();
+      for(let i=5;i>=0;i--){
+        const dt=new Date(ag.getFullYear(),ag.getMonth()-i,1);
+        const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+        labels.push(dt.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''));
+        const f=finResumo?.historico?.find(h=>h.mes===key);
+        valores.push(f?parseFloat(f.total):0);
+      }
+      _finChart=new Chart(ctxBar,{type:'bar',data:{labels,datasets:[{data:valores,backgroundColor:labels.map((_,i)=>i===5?'rgba(212,17,28,0.85)':'rgba(212,17,28,0.3)'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#666',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:10},callback:v=>'R$'+v}}}}});
+    }
+    const ctxDt=document.getElementById('fin-chart-modal');
+    const boxe=cache.alunos.filter(a=>a.status==='ativo'&&a.modalidade==='boxe').length;
+    const jj=cache.alunos.filter(a=>a.status==='ativo'&&a.modalidade==='jiujitsu').length;
+    const am=cache.alunos.filter(a=>a.status==='ativo'&&a.modalidade==='ambos').length;
+    if(ctxDt&&(boxe+jj+am)>0){
+      _finChartDoughnut=new Chart(ctxDt,{type:'doughnut',data:{labels:['Boxe','Jiu-Jitsu','Ambos'],datasets:[{data:[boxe,jj,am],backgroundColor:['rgba(212,17,28,0.8)','rgba(59,130,246,0.8)','rgba(245,158,11,0.8)'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+    }
+  },60);
+}
+
+function renderFinHistorico(){
+  const byMonth={};
+  mensHistorico.forEach(p=>{
+    const mes=(p.data||'').slice(0,7);
+    if(!mes)return;
+    if(!byMonth[mes]){byMonth[mes]={total:0,qtd:0,itens:[]};}
+    byMonth[mes].total+=parseFloat(p.valor||0);
+    byMonth[mes].qtd++;
+    byMonth[mes].itens.push(p);
+  });
+  const meses=Object.keys(byMonth).sort().reverse();
+  document.getElementById('fin-content').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--muted)">${mensHistorico.length} pagamento(s)</div>
+      <button class="btn btn-r btn-sm" onclick="navTo('pagamentos');setTimeout(()=>mensNavTo('historico'),50)">📋 Todos</button>
+    </div>
+    ${meses.length===0?'<div class="loading">Nenhum pagamento registrado</div>':
+      meses.map(mes=>{
+        const m=byMonth[mes];
+        const dt=new Date(mes+'-02');
+        const label=dt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+        return `<div class="card" style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;text-transform:capitalize">${label}</div>
+            <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(m.total)}</div><div style="font-size:10px;color:var(--muted)">${m.qtd} pgt(s)</div></div>
+          </div>
+          ${m.itens.slice(0,5).map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border)">
+            <div><div style="font-size:12px;font-weight:500">${p.alunoNome||'—'}</div><div style="font-size:10px;color:var(--muted)">${fmtD(p.data)} · ${p.metodo||'—'}</div></div>
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--green)">${fmtR(p.valor)}</span>
+          </div>`).join('')}
+          ${m.itens.length>5?`<div style="font-size:11px;color:var(--muted);text-align:center;padding:5px">+${m.itens.length-5} mais</div>`:''}
+        </div>`;
+      }).join('')}`;
+}
+
+function renderFinInadimplencia(){
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
+  const valorAberto=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const taxaAdim=cache.alunos.length>0?Math.round((cache.alunos.length-atrasados.length)/cache.alunos.length*100):100;
+  document.getElementById('fin-content').innerHTML=`
+    <div class="grid2">
+      <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados.length}</div><div class="kpi-sub">${fmtR(valorAberto)} em aberto</div></div>
+      <div class="kpi ${taxaAdim>=80?'kg':'ky'}"><div class="kpi-label">Adimplência</div><div class="kpi-val">${taxaAdim}%</div><div class="kpi-sub">dos alunos</div></div>
+    </div>
+    ${atrasados.length===0?'<div class="alert alert-g">✅ Nenhum aluno inadimplente!</div>':
+      atrasados.map(a=>`<div class="item">
+        <div class="item-top">
+          <div><div class="item-name">${a.nome}</div><div class="item-meta">📱 ${a.tel||'—'} · Venc: ${fmtD(a.venc)}</div></div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:#f87171">${fmtR(a.valor)}</div>
+        </div>
+        <div class="item-acts">
+          <button onclick="cobrarWA(${a.id})" style="flex:1;padding:7px 10px;background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">💬 Cobrar WA</button>
+          <button class="btn btn-g btn-sm" style="flex:1" onclick="regularizar(${a.id})">✓ Regularizar</button>
+        </div>
+      </div>`).join('')}`;
 }
 
 async function regularizar(id) {
   const a = cache.alunos.find(x=>x.id===id);
-  if(!a||!confirm('Marcar '+a.nome+' como regularizado?')) return;
-  try { await PUT('/api/alunos/'+id,{...a,status:'ativo'}); await carregarTudo(); renderFinanceiro(); }
+  if(!a||!confirm('Marcar '+a.nome.split(' ')[0]+' como regularizado?')) return;
+  try {
+    await PUT('/api/alunos/'+id,{...a,status:'ativo'});
+    await carregarTudo();
+    finResumo=null;
+    if(currentPage==='financeiro') renderFinanceiro();
+  }
   catch(e) { alert('Erro: '+e.message); }
 }
 
