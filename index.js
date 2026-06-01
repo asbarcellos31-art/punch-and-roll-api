@@ -203,33 +203,20 @@ async function setupDB() {
       )
     `);
 
-    const [aulaCount] = await conn.query('SELECT COUNT(*) as n FROM aulas');
-    if (aulaCount[0].n === 0) {
-      const aulasDefault = [
-        ['Boxe Iniciante','07:00','Segunda',15,'boxe'],
-        ['Sparring','09:00','Segunda',8,'boxe'],
-        ['Condicionamento','19:00','Segunda',20,'boxe'],
-        ['Boxe Intermediário','07:00','Terça',12,'boxe'],
-        ['Jiu-Jitsu','08:00','Terça',12,'jiujitsu'],
-        ['Técnica','19:30','Terça',10,'boxe'],
-        ['Boxe Iniciante','07:00','Quarta',15,'boxe'],
-        ['Jiu-Jitsu','09:00','Quarta',12,'jiujitsu'],
-        ['Feminino','10:00','Quarta',10,'boxe'],
-        ['Sparring','19:00','Quarta',8,'boxe'],
-        ['Boxe Intermediário','07:00','Quinta',12,'boxe'],
-        ['Jiu-Jitsu','08:00','Quinta',12,'jiujitsu'],
-        ['Condicionamento','19:30','Quinta',20,'boxe'],
-        ['Boxe Iniciante','07:00','Sexta',15,'boxe'],
-        ['Técnica','09:00','Sexta',10,'boxe'],
-        ['Jiu-Jitsu','19:00','Sexta',12,'jiujitsu'],
-        ['All Levels','09:00','Sábado',20,'boxe'],
-        ['Jiu-Jitsu Open Mat','10:30','Sábado',15,'jiujitsu'],
-        ['Kids Boxe','10:30','Sábado',12,'boxe'],
-      ];
-      for (const [nome,hora,dia,vagas,modalidade] of aulasDefault) {
-        await conn.query('INSERT INTO aulas (nome,hora,dia,vagas,modalidade) VALUES (?,?,?,?,?)',[nome,hora,dia,vagas,modalidade]);
-      }
-    }
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS despesas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        descricao VARCHAR(300) NOT NULL,
+        valor DECIMAL(10,2),
+        data_vencimento DATE,
+        data_pagamento DATE,
+        status VARCHAR(20) DEFAULT 'pendente',
+        categoria VARCHAR(100),
+        metodo VARCHAR(20) DEFAULT 'pix',
+        obs TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
@@ -853,17 +840,62 @@ app.get('/api/health', async (req, res) => {
 // ══════════════════════════════════════
 app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
   try {
-    const [historico] = await db.query(`
-      SELECT DATE_FORMAT(data_pagamento, '%Y-%m') as mes,
-             COALESCE(SUM(valor),0) as total,
-             COUNT(*) as qtd
-      FROM pagamentos
-      WHERE status='pago' AND data_pagamento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
-      GROUP BY mes
-      ORDER BY mes
+    const [historicoRec] = await db.query(`
+      SELECT DATE_FORMAT(data_pagamento, '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
+      FROM pagamentos WHERE status='pago' AND data_pagamento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      GROUP BY mes ORDER BY mes
     `);
-    res.json({ historico });
-  } catch (e) { res.json({ historico: [] }); }
+    const [historicoDes] = await db.query(`
+      SELECT DATE_FORMAT(data_vencimento, '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
+      FROM despesas WHERE data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      GROUP BY mes ORDER BY mes
+    `);
+    const [despesas] = await db.query(
+      `SELECT * FROM despesas ORDER BY FIELD(status,'pendente','pago'), data_vencimento ASC LIMIT 300`
+    );
+    const [cats] = await db.query(
+      `SELECT DISTINCT categoria FROM despesas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria`
+    );
+    res.json({ historicoRec, historicoDes, despesas, categorias: cats.map(c => c.categoria) });
+  } catch (e) { res.json({ historicoRec: [], historicoDes: [], despesas: [], categorias: [] }); }
+});
+
+// ── DESPESAS CRUD ──
+app.get('/api/despesas', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query(`SELECT * FROM despesas ORDER BY FIELD(status,'pendente','pago'), data_vencimento ASC`);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/despesas', auth, adminOnly, async (req, res) => {
+  try {
+    const { descricao, valor, data_vencimento, categoria, metodo, obs } = req.body;
+    if (!descricao || !valor || !data_vencimento) return res.status(400).json({ error: 'Preencha descrição, valor e vencimento' });
+    const [result] = await db.query(
+      'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs) VALUES (?,?,?,?,?,?,?)',
+      [descricao, valor, data_vencimento, 'pendente', categoria||null, metodo||'pix', obs||null]
+    );
+    res.json({ id: result.insertId });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { descricao, valor, data_vencimento, data_pagamento, status, categoria, metodo, obs } = req.body;
+    await db.query(
+      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=? WHERE id=?',
+      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, req.params.id]
+    );
+    res.json({ message: 'Despesa atualizada!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/despesas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM despesas WHERE id=?', [req.params.id]);
+    res.json({ message: 'Despesa removida!' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // START

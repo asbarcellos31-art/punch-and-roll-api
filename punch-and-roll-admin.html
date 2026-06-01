@@ -404,6 +404,7 @@ function navTo(page) {
     'mkt-campanhas': '<button class="btn btn-r btn-sm" onclick="mktNovaCampanha()">+ Campanha</button>',
     alunos:'<button class="btn btn-r btn-sm" onclick="abrirModalAluno()">+ Aluno</button>',
     agenda:'<button class="btn btn-r btn-sm" onclick="abrirModalAula()">+ Aula</button>',
+    financeiro:'<button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>',
     recados:'<button class="btn btn-r btn-sm" onclick="abrirModalRecado()">+ Recado</button>',
     equipe: _meuNivel==='master'?'<button class="btn btn-r btn-sm" onclick="abrirModalEquipe()">+ Membro</button>':'',
   };
@@ -437,6 +438,7 @@ function closeSB() {
 function fabAction() {
   if(currentPage==='alunos'||currentPage==='dashboard') abrirModalAluno();
   else if(currentPage==='agenda') abrirModalAula();
+  else if(currentPage==='financeiro') abrirModalDespesa();
   else if(currentPage==='recados') abrirModalRecado();
   else if(currentPage==='equipe') abrirModalEquipe();
 }
@@ -741,17 +743,17 @@ async function renderCheckins() {
   } catch(e) { document.getElementById('checkins-lista').innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
 }
 
-let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null;
+let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente';
 
 async function renderFinanceiro() {
   finResumo=null;
   const pg=document.getElementById('page-financeiro');
   pg.innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
-  try{finResumo=await GET('/api/financeiro/resumo');}catch(e){finResumo={historico:[]};}
+  try{finResumo=await GET('/api/financeiro/resumo');}catch(e){finResumo={historicoRec:[],historicoDes:[],despesas:[],categorias:[]};}
   pg.innerHTML=`
     <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
-      ${[['geral','📊 Geral'],['historico','📋 Histórico'],['inadimplencia','🔴 Inadimplência']].map(([id,lbl])=>
-        `<button onclick="finNavTo('${id}')" id="fin-tab-${id}" style="flex:1;padding:7px 6px;border-radius:5px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;white-space:nowrap;transition:all .15s;background:${finTab===id?'var(--red)':'transparent'};color:${finTab===id?'#fff':'var(--muted)'}">${lbl}</button>`
+      ${[['geral','📊 Geral'],['dre','📋 DRE'],['contas','💸 Contas'],['inadimplencia','🔴 Inadimpl.']].map(([id,lbl])=>
+        `<button onclick="finNavTo('${id}')" id="fin-tab-${id}" style="flex:1;padding:7px 4px;border-radius:5px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;white-space:nowrap;transition:all .15s;background:${finTab===id?'var(--red)':'transparent'};color:${finTab===id?'#fff':'var(--muted)'}">${lbl}</button>`
       ).join('')}
     </div>
     <div id="fin-content"></div>`;
@@ -760,7 +762,7 @@ async function renderFinanceiro() {
 
 function finNavTo(tab){
   finTab=tab;
-  ['geral','historico','inadimplencia'].forEach(id=>{
+  ['geral','dre','contas','inadimplencia'].forEach(id=>{
     const b=document.getElementById('fin-tab-'+id);
     if(b){b.style.background=id===tab?'var(--red)':'transparent';b.style.color=id===tab?'#fff':'var(--muted)';}
   });
@@ -771,7 +773,8 @@ function finNavTo(tab){
 
 function renderFinTab(){
   if(finTab==='geral')renderFinGeral();
-  else if(finTab==='historico')renderFinHistorico();
+  else if(finTab==='dre')renderFinDRE();
+  else if(finTab==='contas')renderFinContas();
   else if(finTab==='inadimplencia')renderFinInadimplencia();
 }
 
@@ -780,40 +783,28 @@ function renderFinGeral(){
   const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
   const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
   const nAtivos=ativos.length;
-  const valorAberto=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const ticketMedio=nAtivos>0?ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0)/nAtivos:0;
-  const recPotencial=cache.alunos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-  const taxaAdim=cache.alunos.length>0?Math.round(nAtivos/cache.alunos.length*100):0;
   const agora=new Date();
   const mesCur=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
-  const mesAntDt=new Date(agora.getFullYear(),agora.getMonth()-1,1);
-  const mesAntKey=`${mesAntDt.getFullYear()}-${String(mesAntDt.getMonth()+1).padStart(2,'0')}`;
-  const recMesAtual=parseFloat(finResumo?.historico?.find(h=>h.mes===mesCur)?.total||0);
-  const recMesAnt=parseFloat(finResumo?.historico?.find(h=>h.mes===mesAntKey)?.total||0);
-  const variacao=recMesAnt>0?((recMesAtual-recMesAnt)/recMesAnt*100).toFixed(1):null;
-  const pctMeta=recPotencial>0?Math.min(100,Math.round(recMesAtual/recPotencial*100)):0;
+  const recMes=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mesCur)?.total||0);
+  const desMes=parseFloat(finResumo?.historicoDes?.find(h=>h.mes===mesCur)?.total||0);
+  const resultado=recMes-desMes;
   const nomeMes=agora.toLocaleDateString('pt-BR',{month:'long'});
+  const despPendentes=(finResumo?.despesas||[]).filter(d=>d.status==='pendente');
+  const despVencidas=despPendentes.filter(d=>d.data_vencimento<todayStr);
+  if(_finChart){try{_finChart.destroy();}catch(e){}_finChart=null;}
+  if(_finChartDoughnut){try{_finChartDoughnut.destroy();}catch(e){}_finChartDoughnut=null;}
   document.getElementById('fin-content').innerHTML=`
     <div class="grid4">
-      <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMesAtual)}</div>${variacao!==null?`<div class="kpi-sub" style="color:${parseFloat(variacao)>=0?'var(--green)':'#f87171'}">${parseFloat(variacao)>=0?'▲':'▼'} ${Math.abs(variacao)}% vs anterior</div>`:'<div class="kpi-sub">este mês</div>'}</div>
-      <div class="kpi kb"><div class="kpi-label">Alunos Ativos</div><div class="kpi-val">${nAtivos}</div><div class="kpi-sub">${taxaAdim}% adimplência</div></div>
-      <div class="kpi kr"><div class="kpi-label">Em Aberto</div><div class="kpi-val" style="font-size:18px">${fmtR(valorAberto)}</div><div class="kpi-sub">${atrasados.length} inadimplente(s)</div></div>
+      <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">${nAtivos} alunos ativos</div></div>
+      <div class="kpi kr"><div class="kpi-label">Despesas ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(desMes)}</div><div class="kpi-sub">${despPendentes.length} pendente(s)</div></div>
+      <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="font-size:18px;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</div><div class="kpi-sub">${nomeMes}</div></div>
       <div class="kpi ky"><div class="kpi-label">Ticket Médio</div><div class="kpi-val" style="font-size:18px">${fmtR(ticketMedio)}</div><div class="kpi-sub">por aluno ativo</div></div>
     </div>
+    ${despVencidas.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="contasFilter='vencida';finNavTo('contas')">⚠️ ${despVencidas.length} conta(s) vencida(s) — clique para ver</div>`:''}
+    ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
     <div class="card">
-      <div class="card-title">📈 Cobrança vs Potencial</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:11px;color:var(--muted)">Cobrado em ${nomeMes}</span>
-        <span style="font-size:12px;font-weight:600">${fmtR(recMesAtual)}<span style="color:var(--muted);font-weight:400"> / ${fmtR(recPotencial)}</span></span>
-      </div>
-      <div style="height:10px;background:var(--border);border-radius:10px;overflow:hidden"><div style="height:100%;width:${pctMeta}%;background:${pctMeta>=80?'var(--green)':pctMeta>=50?'var(--yellow)':'var(--red)'};border-radius:10px"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:5px">
-        <span style="font-size:10px;color:var(--muted)">${pctMeta}% do potencial cobrado</span>
-        ${vencendo.length>0?`<span style="font-size:10px;color:var(--yellow)">⚠️ ${vencendo.length} vencendo</span>`:''}
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">📊 Evolução — Últimos 6 Meses</div>
+      <div class="card-title">📊 Receitas vs Despesas — 6 Meses</div>
       <div style="position:relative;height:160px"><canvas id="fin-chart-bar"></canvas></div>
     </div>
     <div class="card">
@@ -830,23 +821,20 @@ function renderFinGeral(){
           }).join('')}
         </div>
       </div>
-    </div>
-    ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
-    ${vencendo.length>0?`<div class="alert alert-y">⚠️ ${vencendo.length} aluno(s) vencendo em breve</div>`:''}
-    ${atrasados.length===0&&vencendo.length===0?'<div class="alert alert-g">✅ Todos os alunos estão em dia!</div>':''}`;
+    </div>`;
   setTimeout(()=>{
     const ctxBar=document.getElementById('fin-chart-bar');
     if(ctxBar){
-      const labels=[],valores=[];
+      const labels=[],recs=[],des=[];
       const ag=new Date();
       for(let i=5;i>=0;i--){
         const dt=new Date(ag.getFullYear(),ag.getMonth()-i,1);
         const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
         labels.push(dt.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''));
-        const f=finResumo?.historico?.find(h=>h.mes===key);
-        valores.push(f?parseFloat(f.total):0);
+        recs.push(parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0));
+        des.push(parseFloat(finResumo?.historicoDes?.find(h=>h.mes===key)?.total||0));
       }
-      _finChart=new Chart(ctxBar,{type:'bar',data:{labels,datasets:[{data:valores,backgroundColor:labels.map((_,i)=>i===5?'rgba(212,17,28,0.85)':'rgba(212,17,28,0.3)'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#666',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#666',font:{size:10},callback:v=>'R$'+v}}}}});
+      _finChart=new Chart(ctxBar,{type:'bar',data:{labels,datasets:[{label:'Receitas',data:recs,backgroundColor:'rgba(34,197,94,0.7)',borderRadius:3},{label:'Despesas',data:des,backgroundColor:'rgba(212,17,28,0.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#666',font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.02)'},ticks:{color:'#666',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{size:10},callback:v=>'R$'+v}}}}});
     }
     const ctxDt=document.getElementById('fin-chart-modal');
     const boxe=cache.alunos.filter(a=>a.status==='ativo'&&a.modalidade==='boxe').length;
@@ -858,39 +846,163 @@ function renderFinGeral(){
   },60);
 }
 
-function renderFinHistorico(){
-  const byMonth={};
-  mensHistorico.forEach(p=>{
-    const mes=(p.data||'').slice(0,7);
-    if(!mes)return;
-    if(!byMonth[mes]){byMonth[mes]={total:0,qtd:0,itens:[]};}
-    byMonth[mes].total+=parseFloat(p.valor||0);
-    byMonth[mes].qtd++;
-    byMonth[mes].itens.push(p);
-  });
-  const meses=Object.keys(byMonth).sort().reverse();
+function renderFinDRE(){
+  if(_finChart){try{_finChart.destroy();}catch(e){}_finChart=null;}
+  const agora=new Date();
+  const meses=[];
+  for(let i=5;i>=0;i--){
+    const dt=new Date(agora.getFullYear(),agora.getMonth()-i,1);
+    const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    const lbl=dt.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','');
+    const rec=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0);
+    const des=parseFloat(finResumo?.historicoDes?.find(h=>h.mes===key)?.total||0);
+    meses.push({key,lbl,rec,des,res:rec-des});
+  }
+  const tRec=meses.reduce((s,m)=>s+m.rec,0);
+  const tDes=meses.reduce((s,m)=>s+m.des,0);
+  const tRes=tRec-tDes;
   document.getElementById('fin-content').innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:13px;color:var(--muted)">${mensHistorico.length} pagamento(s)</div>
-      <button class="btn btn-r btn-sm" onclick="navTo('pagamentos');setTimeout(()=>mensNavTo('historico'),50)">📋 Todos</button>
+    <div class="card">
+      <div class="card-title">📋 DRE — Últimos 6 Meses</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:320px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:500;font-size:10px">Mês</th>
+            <th style="text-align:right;padding:8px 4px;color:var(--green);font-weight:500;font-size:10px">Receitas</th>
+            <th style="text-align:right;padding:8px 4px;color:#f87171;font-weight:500;font-size:10px">Despesas</th>
+            <th style="text-align:right;padding:8px 4px;color:var(--muted);font-weight:500;font-size:10px">Resultado</th>
+          </tr></thead>
+          <tbody>
+            ${meses.map(m=>`<tr style="border-bottom:1px solid #1a1a1a">
+              <td style="padding:9px 6px;font-weight:500;text-transform:capitalize">${m.lbl}</td>
+              <td style="padding:9px 4px;text-align:right;color:var(--green)">${fmtR(m.rec)}</td>
+              <td style="padding:9px 4px;text-align:right;color:${m.des>0?'#f87171':'var(--muted)'}">${fmtR(m.des)}</td>
+              <td style="padding:9px 4px;text-align:right;font-weight:600;color:${m.res>=0?'var(--green)':'#f87171'}">${m.res>=0?'+':''}${fmtR(m.res)}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr style="border-top:2px solid var(--border)">
+            <td style="padding:9px 6px;font-weight:700;font-size:11px">TOTAL</td>
+            <td style="padding:9px 4px;text-align:right;color:var(--green);font-weight:700">${fmtR(tRec)}</td>
+            <td style="padding:9px 4px;text-align:right;color:#f87171;font-weight:700">${fmtR(tDes)}</td>
+            <td style="padding:9px 4px;text-align:right;font-weight:700;color:${tRes>=0?'var(--green)':'#f87171'}">${tRes>=0?'+':''}${fmtR(tRes)}</td>
+          </tr></tfoot>
+        </table>
+      </div>
     </div>
-    ${meses.length===0?'<div class="loading">Nenhum pagamento registrado</div>':
-      meses.map(mes=>{
-        const m=byMonth[mes];
-        const dt=new Date(mes+'-02');
-        const label=dt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-        return `<div class="card" style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;text-transform:capitalize">${label}</div>
-            <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(m.total)}</div><div style="font-size:10px;color:var(--muted)">${m.qtd} pgt(s)</div></div>
+    <div class="card">
+      <div class="card-title">📊 Receitas vs Despesas</div>
+      <div style="position:relative;height:160px"><canvas id="fin-chart-dre"></canvas></div>
+    </div>`;
+  setTimeout(()=>{
+    const ctx=document.getElementById('fin-chart-dre');
+    if(!ctx)return;
+    _finChart=new Chart(ctx,{type:'bar',data:{labels:meses.map(m=>m.lbl),datasets:[{label:'Receitas',data:meses.map(m=>m.rec),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:3},{label:'Despesas',data:meses.map(m=>m.des),backgroundColor:'rgba(212,17,28,0.6)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#666',font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.02)'},ticks:{color:'#666',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{size:10},callback:v=>'R$'+v}}}}});
+  },60);
+}
+
+function renderFinContas(){
+  const todas=finResumo?.despesas||[];
+  const filtradas=contasFilter==='todas'?todas:contasFilter==='pago'?todas.filter(d=>d.status==='pago'):contasFilter==='vencida'?todas.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):todas.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+  const totalPend=todas.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const qtdVenc=todas.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
+  document.getElementById('fin-content').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--muted)">${todas.filter(d=>d.status==='pendente').length} pendente(s) · ${fmtR(totalPend)}</div>
+      <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
+    </div>
+    ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
+    <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
+      ${[['pendente','Pendentes'],['vencida','Vencidas'],['pago','Pagas'],['todas','Todas']].map(([v,l])=>
+        `<button onclick="contasFilter='${v}';renderFinContas()" style="padding:6px 10px;border-radius:5px;border:1px solid var(--border);background:${contasFilter===v?'var(--red)':'var(--panel2)'};color:${contasFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
+      ).join('')}
+    </div>
+    ${filtradas.length===0?'<div class="loading">Nenhuma conta nesta categoria</div>':
+      filtradas.map(d=>{
+        const vencida=d.status==='pendente'&&d.data_vencimento<todayStr;
+        const cor=d.status==='pago'?'var(--green)':vencida?'#f87171':'var(--yellow)';
+        return `<div class="item">
+          <div class="item-top">
+            <div style="flex:1;min-width:0">
+              <div class="item-name">${d.descricao}</div>
+              <div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">
+                ${d.categoria?`<span style="font-size:10px;background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25);padding:2px 6px;border-radius:3px">${d.categoria}</span>`:''}
+                <span style="font-size:10px;color:var(--muted)">Venc: ${fmtD(d.data_vencimento)}</span>
+                ${d.status==='pago'?`<span style="font-size:10px;color:var(--muted)">Pago: ${fmtD(d.data_pagamento)}</span>`:''}
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${cor}">${fmtR(d.valor)}</div>
+              <span class="badge" style="background:${d.status==='pago'?'rgba(34,197,94,.15)':vencida?'rgba(212,17,28,.15)':'rgba(245,158,11,.15)'};color:${cor}">${d.status==='pago'?'✓ Pago':vencida?'Vencida':'Pendente'}</span>
+            </div>
           </div>
-          ${m.itens.slice(0,5).map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--border)">
-            <div><div style="font-size:12px;font-weight:500">${p.alunoNome||'—'}</div><div style="font-size:10px;color:var(--muted)">${fmtD(p.data)} · ${p.metodo||'—'}</div></div>
-            <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--green)">${fmtR(p.valor)}</span>
-          </div>`).join('')}
-          ${m.itens.length>5?`<div style="font-size:11px;color:var(--muted);text-align:center;padding:5px">+${m.itens.length-5} mais</div>`:''}
+          <div class="item-acts">
+            ${d.status!=='pago'?`<button class="btn btn-g btn-sm" style="flex:1" onclick="pagarDespesa(${d.id})">✓ Pagar</button>`:''}
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="abrirModalDespesa(${d.id})">✏️ Editar</button>
+            <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirDespesa(${d.id})">🗑</button>
+          </div>
         </div>`;
       }).join('')}`;
+}
+
+function abrirModalDespesa(id){
+  const d=id?(finResumo?.despesas||[]).find(x=>x.id===id):null;
+  const cats=finResumo?.categorias||[];
+  const box=criarModal('modal-despesa',d?'✏️ Editar Despesa':'+ Nova Despesa');
+  box.innerHTML+=`
+    <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="dp-desc" value="${d?.descricao||''}" placeholder="Ex: Aluguel, Energia, Professor..."></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" step="0.01" id="dp-valor" value="${d?.valor||''}" placeholder="0,00"></div>
+      <div class="fg"><label class="fl">Vencimento *</label><input class="fi" type="date" id="dp-venc" value="${d?.data_vencimento||todayStr}"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Categoria</label>
+        <input class="fi" id="dp-cat" value="${d?.categoria||''}" placeholder="Ex: Aluguel" list="dp-cats-list">
+        <datalist id="dp-cats-list">${cats.map(c=>`<option value="${c}">`).join('')}</datalist>
+      </div>
+      <div class="fg"><label class="fl">Método</label>
+        <select class="fi" id="dp-metodo">
+          ${['pix','dinheiro','cartao','debito','boleto','transferencia'].map(m=>`<option value="${m}"${(d?.metodo||'pix')===m?' selected':''}>${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Observações</label><textarea class="fi" id="dp-obs" rows="2" placeholder="...">${d?.obs||''}</textarea></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-despesa').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="salvarDespesa(${id||'null'})">💾 Salvar</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
+}
+
+async function salvarDespesa(id){
+  const desc=document.getElementById('dp-desc').value.trim();
+  const valor=parseFloat(document.getElementById('dp-valor').value)||0;
+  const venc=document.getElementById('dp-venc').value;
+  if(!desc||!valor||!venc){alert('Preencha descrição, valor e vencimento!');return;}
+  const dados={descricao:desc,valor,data_vencimento:venc,categoria:document.getElementById('dp-cat').value.trim()||null,metodo:document.getElementById('dp-metodo').value,obs:document.getElementById('dp-obs').value.trim()||null};
+  try{
+    if(id&&id!=='null')await PUT('/api/despesas/'+id,dados);
+    else await POST('/api/despesas',dados);
+    document.getElementById('modal-despesa').remove();
+    finResumo=null; renderFinanceiro();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function pagarDespesa(id){
+  const d=(finResumo?.despesas||[]).find(x=>x.id===id);
+  if(!d||!confirm('Marcar "'+d.descricao+'" como pago?'))return;
+  try{
+    await PUT('/api/despesas/'+id,{...d,status:'pago',data_pagamento:todayStr});
+    finResumo=null; renderFinanceiro();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function excluirDespesa(id){
+  const d=(finResumo?.despesas||[]).find(x=>x.id===id);
+  if(!d||!confirm('Excluir "'+d.descricao+'"?'))return;
+  try{
+    await DEL('/api/despesas/'+id);
+    finResumo=null; renderFinanceiro();
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 function renderFinInadimplencia(){
