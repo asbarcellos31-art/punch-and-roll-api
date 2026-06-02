@@ -214,7 +214,45 @@ async function setupDB() {
         categoria VARCHAR(100),
         metodo VARCHAR(20) DEFAULT 'pix',
         obs TEXT,
+        parcelas INT DEFAULT 1,
+        parcela_atual INT DEFAULT 1,
+        recorrente TINYINT DEFAULT 0,
+        grupo_parcelas VARCHAR(36),
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    // Migração segura: adiciona colunas se ainda não existirem
+    for (const sql of [
+      "ALTER TABLE despesas ADD COLUMN parcelas INT DEFAULT 1",
+      "ALTER TABLE despesas ADD COLUMN parcela_atual INT DEFAULT 1",
+      "ALTER TABLE despesas ADD COLUMN recorrente TINYINT DEFAULT 0",
+      "ALTER TABLE despesas ADD COLUMN grupo_parcelas VARCHAR(36)",
+    ]) { try { await conn.query(sql); } catch(e) {} }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS estoque (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        codigo VARCHAR(50) UNIQUE,
+        nome VARCHAR(200) NOT NULL,
+        categoria VARCHAR(100),
+        quantidade DECIMAL(10,2) DEFAULT 0,
+        unidade VARCHAR(20) DEFAULT 'un',
+        valor_unitario DECIMAL(10,2),
+        fornecedor VARCHAR(200),
+        obs TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS estoque_movimentacoes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        produto_id INT NOT NULL,
+        tipo VARCHAR(10) NOT NULL,
+        quantidade DECIMAL(10,2) NOT NULL,
+        motivo VARCHAR(200),
+        data DATE,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (produto_id) REFERENCES estoque(id) ON DELETE CASCADE
       )
     `);
 
@@ -870,31 +908,135 @@ app.get('/api/despesas', auth, adminOnly, async (req, res) => {
 
 app.post('/api/despesas', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, data_vencimento, categoria, metodo, obs } = req.body;
+    const { descricao, valor, data_vencimento, categoria, metodo, obs, parcelas = 1, recorrente = false } = req.body;
     if (!descricao || !valor || !data_vencimento) return res.status(400).json({ error: 'Preencha descrição, valor e vencimento' });
-    const [result] = await db.query(
-      'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs) VALUES (?,?,?,?,?,?,?)',
-      [descricao, valor, data_vencimento, 'pendente', categoria||null, metodo||'pix', obs||null]
-    );
-    res.json({ id: result.insertId });
+    const n = Math.min(Math.max(parseInt(parcelas) || 1, 1), 60);
+    const grupo = n > 1 || recorrente ? require('crypto').randomUUID() : null;
+    const ids = [];
+    for (let i = 0; i < n; i++) {
+      const [y, m, d] = data_vencimento.split('-').map(Number);
+      const dt = new Date(y, m - 1 + i, d);
+      const venc = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      const desc = n > 1 ? `${descricao} (${i+1}/${n})` : descricao;
+      const [r] = await db.query(
+        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo]
+      );
+      ids.push(r.insertId);
+    }
+    res.json({ ids, id: ids[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, data_vencimento, data_pagamento, status, categoria, metodo, obs } = req.body;
+    const { descricao, valor, data_vencimento, data_pagamento, status, categoria, metodo, obs, recorrente } = req.body;
     await db.query(
-      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=? WHERE id=?',
-      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, req.params.id]
+      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=? WHERE id=?',
+      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, req.params.id]
     );
-    res.json({ message: 'Despesa atualizada!' });
+    // Recorrente: ao pagar, cria automaticamente a próxima mensal
+    let recorrente_criado = false;
+    if (status === 'pago' && recorrente) {
+      const [[atual]] = await db.query('SELECT * FROM despesas WHERE id=?', [req.params.id]);
+      if (atual?.data_vencimento) {
+        const vencStr = atual.data_vencimento instanceof Date
+          ? atual.data_vencimento.toISOString().split('T')[0]
+          : String(atual.data_vencimento).split('T')[0];
+        const [vy, vm, vd] = vencStr.split('-').map(Number);
+        const prox = new Date(vy, vm, vd);
+        const proxVenc = `${prox.getFullYear()}-${String(prox.getMonth()+1).padStart(2,'0')}-${String(prox.getDate()).padStart(2,'0')}`;
+        const [existente] = await db.query(
+          'SELECT id FROM despesas WHERE descricao=? AND data_vencimento=? AND status="pendente" LIMIT 1',
+          [atual.descricao, proxVenc]
+        );
+        if (!existente.length) {
+          await db.query(
+            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente) VALUES (?,?,?,?,?,?,?)',
+            [atual.descricao, atual.valor, proxVenc, 'pendente', atual.categoria, atual.metodo, 1]
+          );
+          recorrente_criado = true;
+        }
+      }
+    }
+    res.json({ ok: true, recorrente_criado });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/despesas/:id', auth, adminOnly, async (req, res) => {
   try {
     await db.query('DELETE FROM despesas WHERE id=?', [req.params.id]);
-    res.json({ message: 'Despesa removida!' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── ESTOQUE CRUD ──
+app.get('/api/estoque', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM estoque ORDER BY nome');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/estoque', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, categoria, quantidade = 0, unidade = 'un', valor_unitario, fornecedor, obs } = req.body;
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+    const [[last]] = await db.query('SELECT codigo FROM estoque ORDER BY id DESC LIMIT 1');
+    const num = last?.codigo ? parseInt(last.codigo.replace('EST-',''))||0 : 0;
+    const codigo = `EST-${String(num+1).padStart(3,'0')}`;
+    const [r] = await db.query(
+      'INSERT INTO estoque (codigo,nome,categoria,quantidade,unidade,valor_unitario,fornecedor,obs) VALUES (?,?,?,?,?,?,?,?)',
+      [codigo, nome, categoria||null, quantidade, unidade, valor_unitario||null, fornecedor||null, obs||null]
+    );
+    res.json({ id: r.insertId, codigo });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/estoque/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, categoria, unidade, valor_unitario, fornecedor, obs } = req.body;
+    await db.query(
+      'UPDATE estoque SET nome=?,categoria=?,unidade=?,valor_unitario=?,fornecedor=?,obs=? WHERE id=?',
+      [nome, categoria||null, unidade||'un', valor_unitario||null, fornecedor||null, obs||null, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/estoque/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM estoque WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/estoque/:id/movimentar', auth, adminOnly, async (req, res) => {
+  try {
+    const { tipo, quantidade, motivo } = req.body;
+    if (!tipo || !quantidade) return res.status(400).json({ error: 'tipo e quantidade obrigatórios' });
+    const [[prod]] = await db.query('SELECT * FROM estoque WHERE id=?', [req.params.id]);
+    if (!prod) return res.status(404).json({ error: 'Produto não encontrado' });
+    const novaQtd = tipo === 'entrada'
+      ? parseFloat(prod.quantidade) + parseFloat(quantidade)
+      : parseFloat(prod.quantidade) - parseFloat(quantidade);
+    if (novaQtd < 0) return res.status(400).json({ error: 'Quantidade insuficiente em estoque' });
+    await db.query('UPDATE estoque SET quantidade=? WHERE id=?', [novaQtd, req.params.id]);
+    await db.query(
+      'INSERT INTO estoque_movimentacoes (produto_id,tipo,quantidade,motivo,data) VALUES (?,?,?,?,CURDATE())',
+      [req.params.id, tipo, quantidade, motivo||null]
+    );
+    res.json({ ok: true, quantidade: novaQtd });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/estoque/:id/movimentacoes', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM estoque_movimentacoes WHERE produto_id=? ORDER BY criado_em DESC LIMIT 50',
+      [req.params.id]
+    );
+    res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

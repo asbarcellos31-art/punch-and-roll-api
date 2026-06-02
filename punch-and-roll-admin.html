@@ -137,6 +137,7 @@ textarea.fi{resize:none}
     <div class="sb-item" id="sb-checkins" onclick="navTo('checkins')"><span class="ico">✅</span>Check-ins</div>
     <div class="sb-sec">Financeiro</div>
     <div class="sb-item" id="sb-financeiro" onclick="navTo('financeiro')"><span class="ico">💰</span>Financeiro</div>
+    <div class="sb-item" id="sb-estoque" onclick="navTo('estoque')"><span class="ico">📦</span>Estoque</div>
     <div class="sb-item" id="sb-pagamentos" onclick="navTo('pagamentos')"><span class="ico">💳</span>Mensalidades</div>
     <div class="sb-sec">Relatórios</div>
     <div class="sb-item" onclick="window.location.href='/punch-and-roll-relatorio.html'"><span class="ico">📋</span>Relatório Executivo</div>
@@ -169,6 +170,7 @@ textarea.fi{resize:none}
   <div class="page" id="page-agenda"></div>
   <div class="page" id="page-checkins"></div>
   <div class="page" id="page-financeiro"></div>
+  <div class="page" id="page-estoque"></div>
   <div class="page" id="page-pagamentos"></div>
   <div class="page" id="page-recados"></div>
   <div class="page" id="page-documentos"></div>
@@ -396,7 +398,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\'wa\')">+ Mensagem</button>',
@@ -405,6 +407,7 @@ function navTo(page) {
     alunos:'<button class="btn btn-r btn-sm" onclick="abrirModalAluno()">+ Aluno</button>',
     agenda:'<button class="btn btn-r btn-sm" onclick="abrirModalAula()">+ Aula</button>',
     financeiro:'<button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>',
+    estoque:'<button class="btn btn-r btn-sm" onclick="abrirModalProduto()">+ Produto</button>',
     recados:'<button class="btn btn-r btn-sm" onclick="abrirModalRecado()">+ Recado</button>',
     equipe: _meuNivel==='master'?'<button class="btn btn-r btn-sm" onclick="abrirModalEquipe()">+ Membro</button>':'',
   };
@@ -415,6 +418,7 @@ function navTo(page) {
   if(page==='agenda') renderAgenda();
   if(page==='checkins') renderCheckins();
   if(page==='financeiro') renderFinanceiro();
+  if(page==='estoque') renderEstoque();
   if(page==='pagamentos') renderPagamentos();
   if(page==='recados') renderRecados();
   if(page==='documentos') renderDocumentos();
@@ -439,6 +443,7 @@ function fabAction() {
   if(currentPage==='alunos'||currentPage==='dashboard') abrirModalAluno();
   else if(currentPage==='agenda') abrirModalAula();
   else if(currentPage==='financeiro') abrirModalDespesa();
+  else if(currentPage==='estoque') abrirModalProduto();
   else if(currentPage==='recados') abrirModalRecado();
   else if(currentPage==='equipe') abrirModalEquipe();
 }
@@ -972,8 +977,19 @@ function abrirModalDespesa(id){
     <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="dp-desc" value="${d?.descricao||''}" placeholder="Ex: Aluguel, Energia, Professor..."></div>
     <div class="frow">
       <div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" step="0.01" id="dp-valor" value="${d?.valor||''}" placeholder="0,00"></div>
-      <div class="fg"><label class="fl">Vencimento *</label><input class="fi" type="date" id="dp-venc" value="${d?.data_vencimento||todayStr}"></div>
+      <div class="fg"><label class="fl">1º Vencimento *</label><input class="fi" type="date" id="dp-venc" value="${d?.data_vencimento||todayStr}"></div>
     </div>
+    ${!id?`<div class="frow">
+      <div class="fg"><label class="fl">Parcelas</label>
+        <select class="fi" id="dp-parcelas">
+          ${[1,2,3,4,5,6,7,8,9,10,11,12,18,24,36,48,60].map(n=>`<option value="${n}">${n===1?'À vista':n+'x'}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:6px;gap:8px">
+        <input type="checkbox" id="dp-recorrente" style="width:16px;height:16px;accent-color:var(--red)">
+        <label for="dp-recorrente" style="font-size:12px;color:var(--muted);cursor:pointer">Recorrente (mensal)</label>
+      </div>
+    </div>`:`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${d?.parcelas>1?`Parcela ${d.parcela_atual}/${d.parcelas}`:''}${d?.recorrente?'🔄 Recorrente':''}</div>`}
     <div class="frow">
       <div class="fg"><label class="fl">Categoria</label>
         <input class="fi" id="dp-cat" value="${d?.categoria||''}" placeholder="Ex: Aluguel" list="dp-cats-list">
@@ -999,6 +1015,11 @@ async function salvarDespesa(id){
   const venc=document.getElementById('dp-venc').value;
   if(!desc||!valor||!venc){alert('Preencha descrição, valor e vencimento!');return;}
   const dados={descricao:desc,valor,data_vencimento:venc,categoria:document.getElementById('dp-cat').value.trim()||null,metodo:document.getElementById('dp-metodo').value,obs:document.getElementById('dp-obs').value.trim()||null};
+  if(!id||id==='null'){
+    const parcelas=parseInt(document.getElementById('dp-parcelas')?.value||1);
+    const recorrente=document.getElementById('dp-recorrente')?.checked||false;
+    dados.parcelas=parcelas; dados.recorrente=recorrente;
+  }
   try{
     if(id&&id!=='null')await PUT('/api/despesas/'+id,dados);
     else await POST('/api/despesas',dados);
@@ -1011,8 +1032,9 @@ async function pagarDespesa(id){
   const d=(finResumo?.despesas||[]).find(x=>x.id===id);
   if(!d||!confirm('Marcar "'+d.descricao+'" como pago?'))return;
   try{
-    await PUT('/api/despesas/'+id,{...d,status:'pago',data_pagamento:todayStr});
+    const r=await PUT('/api/despesas/'+id,{...d,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente});
     finResumo=null; renderFinanceiro();
+    if(r?.recorrente_criado) setTimeout(()=>alert('🔄 Próximo mês criado automaticamente!'),400);
   }catch(e){alert('Erro: '+e.message);}
 }
 
@@ -1022,6 +1044,122 @@ async function excluirDespesa(id){
   try{
     await DEL('/api/despesas/'+id);
     finResumo=null; renderFinanceiro();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ══════════════════════════════════════
+// ESTOQUE
+// ══════════════════════════════════════
+let cacheEstoque=[];
+async function renderEstoque(){
+  const pg=document.getElementById('page-estoque');
+  pg.innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
+  try{cacheEstoque=await GET('/api/estoque');}catch(e){cacheEstoque=[];}
+  const semEstoque=cacheEstoque.filter(p=>parseFloat(p.quantidade)===0);
+  const valorTotal=cacheEstoque.reduce((s,p)=>s+parseFloat(p.quantidade||0)*parseFloat(p.valor_unitario||0),0);
+  pg.innerHTML=`
+    <div class="grid2" style="margin-bottom:10px">
+      <div class="kpi kb"><div class="kpi-label">Itens cadastrados</div><div class="kpi-val">${cacheEstoque.length}</div><div class="kpi-sub">${semEstoque.length} zerado(s)</div></div>
+      <div class="kpi kg"><div class="kpi-label">Valor em estoque</div><div class="kpi-val" style="font-size:18px">${fmtR(valorTotal)}</div><div class="kpi-sub">custo total</div></div>
+    </div>
+    ${semEstoque.length>0?`<div class="alert alert-y">⚠️ ${semEstoque.length} item(ns) com estoque zerado</div>`:''}
+    ${cacheEstoque.length===0?'<div class="loading">Nenhum produto. Clique em + Produto para começar.</div>':
+      cacheEstoque.map(p=>{
+        const qtd=parseFloat(p.quantidade||0);
+        const cor=qtd===0?'#f87171':qtd<=5?'var(--yellow)':'var(--green)';
+        return `<div class="item">
+          <div class="item-top">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <span style="font-size:10px;font-family:monospace;background:var(--panel2);padding:2px 5px;border-radius:3px;color:var(--muted)">${p.codigo}</span>
+                ${p.categoria?`<span style="font-size:10px;background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25);padding:2px 6px;border-radius:3px">${p.categoria}</span>`:''}
+              </div>
+              <div class="item-name">${p.nome}</div>
+              ${p.fornecedor?`<div style="font-size:11px;color:var(--muted);margin-top:2px">📦 ${p.fornecedor}</div>`:''}
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${cor}">${qtd} <span style="font-size:14px">${p.unidade||'un'}</span></div>
+              ${p.valor_unitario?`<div style="font-size:11px;color:var(--muted)">${fmtR(p.valor_unitario)}/un</div>`:''}
+            </div>
+          </div>
+          <div class="item-acts">
+            <button class="btn btn-g btn-sm" style="flex:1" onclick="movimentarEstoque(${p.id},'entrada')">+ Entrada</button>
+            <button class="btn btn-sm" style="flex:1;background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.25)" onclick="movimentarEstoque(${p.id},'saida')">- Saída</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="abrirModalProduto(${p.id})">✏️ Editar</button>
+            <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirProduto(${p.id})">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}`;
+}
+
+function abrirModalProduto(id){
+  const p=id?cacheEstoque.find(x=>x.id===id):null;
+  const box=criarModal('modal-produto',p?'✏️ Editar Produto':'+ Novo Produto');
+  box.innerHTML+=`
+    <div class="fg"><label class="fl">Nome *</label><input class="fi" id="es-nome" value="${p?.nome||''}" placeholder="Ex: Bandagem elástica, Luva de boxe..."></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Categoria</label><input class="fi" id="es-cat" value="${p?.categoria||''}" placeholder="Ex: EPI, Limpeza..."></div>
+      <div class="fg"><label class="fl">Unidade</label>
+        <select class="fi" id="es-unidade">
+          ${['un','par','kg','g','l','ml','m','cx','pct','rolo'].map(u=>`<option value="${u}"${(p?.unidade||'un')===u?' selected':''}>${u}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      ${!id?`<div class="fg"><label class="fl">Qtd inicial</label><input class="fi" type="number" step="0.01" id="es-qtd" value="0" placeholder="0"></div>`:''}
+      <div class="fg"><label class="fl">Valor unitário</label><input class="fi" type="number" step="0.01" id="es-valor" value="${p?.valor_unitario||''}" placeholder="0,00"></div>
+    </div>
+    <div class="fg"><label class="fl">Fornecedor</label><input class="fi" id="es-forn" value="${p?.fornecedor||''}" placeholder="Nome do fornecedor..."></div>
+    <div class="fg"><label class="fl">Observações</label><textarea class="fi" id="es-obs" rows="2">${p?.obs||''}</textarea></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-produto').remove()">Cancelar</button>
+      <button class="btn btn-r" style="flex:1" onclick="salvarProduto(${id||'null'})">💾 Salvar</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
+}
+
+async function salvarProduto(id){
+  const nome=document.getElementById('es-nome').value.trim();
+  if(!nome){alert('Nome obrigatório!');return;}
+  const dados={nome,categoria:document.getElementById('es-cat').value.trim()||null,unidade:document.getElementById('es-unidade').value,valor_unitario:parseFloat(document.getElementById('es-valor').value)||null,fornecedor:document.getElementById('es-forn').value.trim()||null,obs:document.getElementById('es-obs').value.trim()||null};
+  if(!id||id==='null') dados.quantidade=parseFloat(document.getElementById('es-qtd').value)||0;
+  try{
+    if(id&&id!=='null')await PUT('/api/estoque/'+id,dados);
+    else await POST('/api/estoque',dados);
+    document.getElementById('modal-produto').remove();
+    renderEstoque();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function excluirProduto(id){
+  const p=cacheEstoque.find(x=>x.id===id);
+  if(!p||!confirm('Excluir "'+p.nome+'"?'))return;
+  try{await DEL('/api/estoque/'+id);renderEstoque();}catch(e){alert('Erro: '+e.message);}
+}
+
+function movimentarEstoque(id,tipo){
+  const p=cacheEstoque.find(x=>x.id===id);
+  if(!p)return;
+  const box=criarModal('modal-mov',(tipo==='entrada'?'➕ Entrada':'➖ Saída')+' — '+p.nome);
+  box.innerHTML+=`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Estoque atual: <strong style="color:${parseFloat(p.quantidade)===0?'#f87171':'var(--green)'}">${p.quantidade} ${p.unidade||'un'}</strong></div>
+    <div class="fg"><label class="fl">Quantidade *</label><input class="fi" type="number" step="0.01" id="mv-qtd" placeholder="0" autofocus></div>
+    <div class="fg"><label class="fl">Motivo</label><input class="fi" id="mv-motivo" placeholder="Ex: Compra, Uso, Perda..."></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-mov').remove()">Cancelar</button>
+      <button class="btn ${tipo==='entrada'?'btn-g':'btn-y'}" style="flex:1" onclick="confirmarMovimento(${id},'${tipo}')">Confirmar</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
+}
+
+async function confirmarMovimento(id,tipo){
+  const qtd=parseFloat(document.getElementById('mv-qtd').value)||0;
+  const motivo=document.getElementById('mv-motivo').value.trim();
+  if(!qtd||qtd<=0){alert('Informe a quantidade!');return;}
+  try{
+    await POST('/api/estoque/'+id+'/movimentar',{tipo,quantidade:qtd,motivo:motivo||null});
+    document.getElementById('modal-mov').remove();
+    renderEstoque();
   }catch(e){alert('Erro: '+e.message);}
 }
 
