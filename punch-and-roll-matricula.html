@@ -121,8 +121,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <div class="hero-line"></div>
   <div style="position:relative;z-index:1;width:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column;align-items:center">
     <div class="logo-wrap">
-      <div class="logo-ring">🥊</div>
-      <h1>PUNCH AND<br><span>ROLL</span> FIGHT TEAM</h1>
+      <a href="/" style="text-decoration:none;display:flex;flex-direction:column;align-items:center" title="Voltar ao início">
+        <div class="logo-ring">🥊</div>
+        <h1>PUNCH AND<br><span>ROLL</span> FIGHT TEAM</h1>
+      </a>
       <div class="hero-sub">Boxe &amp; Jiu-Jitsu · São José, SC</div>
     </div>
     <a href="#matricula" class="btn-cta">MATRICULE-SE AGORA</a>
@@ -265,10 +267,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--muted)">🔒 Pagamento seguro via Mercado Pago</div>
     </div>
 
+    <!-- BANNER MODO TESTE -->
+    <div id="banner-teste" style="display:none;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.35);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#fbbf24;line-height:1.5">
+      ⚠️ <strong>MODO SIMULAÇÃO</strong> — Nenhum pagamento será cobrado. O aluno será criado no banco de dados normalmente para teste.
+    </div>
+
     <div style="height:20px"></div>
     <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">GERAR PIX</button>
     <button class="btn-back" id="btn-voltar" onclick="setStep(2)">← Voltar</button>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados · Mercado Pago</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)" id="rodape-pag">🔒 SSL · Dados criptografados · Mercado Pago</div>
   </div>
 
   <!-- VIEW 4 — Confirmação -->
@@ -345,6 +352,7 @@ const BENEFICIOS={
 
 const fmtR=v=>'R$ '+Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 const todayStr=new Date().toISOString().slice(0,10);
+const MODO_TESTE = new URLSearchParams(location.search).get('teste')==='1';
 let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null};
 
 function setStep(n){
@@ -354,6 +362,15 @@ function setStep(n){
     s.classList.remove('active','done');
     if(i<n)s.classList.add('done');
     else if(i===n)s.classList.add('active');
+  }
+  if(n===3&&MODO_TESTE){
+    const banner=document.getElementById('banner-teste');
+    const btn=document.getElementById('btn-pagar');
+    const rodape=document.getElementById('rodape-pag');
+    if(banner) banner.style.display='block';
+    if(btn){btn.innerHTML='🧪 SIMULAR MATRÍCULA';btn.onclick=simularMatricula;btn.style.background='#b45309';}
+    if(rodape) rodape.style.display='none';
+    document.querySelectorAll('.pay-tabs,.pix-box,.credit-box').forEach(el=>el.style.display='none');
   }
   window.scrollTo({top:document.getElementById('matricula').offsetTop-20,behavior:'smooth'});
 }
@@ -587,6 +604,35 @@ function copiarPIX(){
 }
 
 function calcVenc(inicio,meses){const d=new Date(inicio);d.setMonth(d.getMonth()+meses);return d.toISOString().slice(0,10);}
+
+async function simularMatricula(){
+  const btn=document.getElementById('btn-pagar');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>SIMULANDO...';
+  try{
+    const apiRes=await fetch(API_URL+'/api/alunos/publico',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
+        tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
+        cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
+        parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
+        nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
+        plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
+        inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
+        payMethod:'teste',obs:'SIMULAÇÃO DE TESTE',origem:'auto-cadastro'
+      })
+    });
+    if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
+    const alunoData=await apiRes.json();
+    S.alunoId=alunoData.id;
+    fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
+    document.getElementById('success-msg').textContent='Simulação concluída, '+S.dados.nome.split(' ')[0]+'! Aluno criado no banco. Nenhum pagamento foi cobrado.';
+    setStep(4);
+  }catch(err){
+    alert('Erro: '+err.message);
+    btn.disabled=false;btn.innerHTML='SIMULAR MATRÍCULA';
+  }
+}
 
 async function processarPagamento(){
   const btn=document.getElementById('btn-pagar');
