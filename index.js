@@ -747,50 +747,7 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
 });
 
 // ══════════════════════════════════════
-// DOCUMENTOS
-// ══════════════════════════════════════
-app.get('/api/documentos', auth, async (req, res) => {
-  try {
-    const isAdmin = req.user.tipo === 'admin';
-    let q = 'SELECT * FROM documentos';
-    if (!isAdmin) q += " WHERE visivel=1 AND (disponivel_para='todos' OR disponivel_para=?)";
-    const [aluno] = isAdmin ? [[]] : await db.query('SELECT modalidade FROM alunos WHERE id=?',[req.user.id]);
-    const params = isAdmin ? [] : [aluno[0]?.modalidade || 'todos'];
-    const [rows] = await db.query(q + ' ORDER BY criado_em DESC', params);
-    res.json(rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/documentos', auth, adminOnly, async (req, res) => {
-  try {
-    const { nome, descricao, tipo, extensao, tamanho, url, visivel, disponivel_para } = req.body;
-    const [result] = await db.query('INSERT INTO documentos (nome,descricao,tipo,extensao,tamanho,url,visivel,disponivel_para) VALUES (?,?,?,?,?,?,?,?)',[nome,descricao,tipo,extensao,tamanho,url,visivel?1:0,disponivel_para]);
-    res.json({ id: result.insertId });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.put('/api/documentos/:id', auth, adminOnly, async (req, res) => {
-  try {
-    const { nome, descricao, tipo, visivel, disponivel_para } = req.body;
-    await db.query('UPDATE documentos SET nome=?,descricao=?,tipo=?,visivel=?,disponivel_para=? WHERE id=?',[nome,descricao,tipo,visivel?1:0,disponivel_para,req.params.id]);
-    res.json({ message: 'Documento atualizado!' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/documentos/:id/download', auth, async (req, res) => {
-  try {
-    await db.query('UPDATE documentos SET downloads=downloads+1 WHERE id=?',[req.params.id]);
-    const [rows] = await db.query('SELECT url FROM documentos WHERE id=?',[req.params.id]);
-    res.json({ url: rows[0]?.url });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/documentos/:id', auth, adminOnly, async (req, res) => {
-  try {
-    await db.query('DELETE FROM documentos WHERE id=?',[req.params.id]);
-    res.json({ message: 'Documento removido!' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// DOCUMENTOS — substituído abaixo com suporte a upload de arquivo
 
 // ══════════════════════════════════════
 // DASHBOARD
@@ -1214,9 +1171,10 @@ app.get('/api/contratos/html/:token', async (req, res) => {
 // ══════════════════════════════════════
 // DOCUMENTOS
 // ══════════════════════════════════════
-app.post('/api/documentos', auth, upload.single('arquivo'), async (req, res) => {
+app.post('/api/documentos', auth, async (req, res) => {
+  if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
+  await new Promise((resolve, reject) => upload.single('arquivo')(req, res, e => e ? reject(e) : resolve()));
   try {
-    if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
     const { nome, categoria } = req.body;
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'Arquivo obrigatório' });
