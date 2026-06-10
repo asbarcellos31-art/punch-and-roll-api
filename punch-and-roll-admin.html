@@ -148,6 +148,7 @@ textarea.fi{resize:none}
     <div class="sb-item" id="sb-documentos" onclick="navTo('documentos')"><span class="ico">📁</span>Documentos</div>
     <div class="sb-item" id="sb-portal-config" onclick="navTo('portal-config')"><span class="ico">⚙️</span>Config. Portal</div>
     <div class="sb-sec">Marketing</div>
+    <div class="sb-item" id="sb-avisos" onclick="navTo('avisos')"><span class="ico">🔔</span>Avisos Vencimento</div>
     <div class="sb-item" id="sb-mkt-wa" onclick="navTo('mkt-wa')"><span class="ico">💬</span>WhatsApp</div>
     <div class="sb-item" id="sb-mkt-email" onclick="navTo('mkt-email')"><span class="ico">📧</span>E-mail</div>
     <div class="sb-item" id="sb-mkt-campanhas" onclick="navTo('mkt-campanhas')"><span class="ico">📣</span>Campanhas</div>
@@ -177,6 +178,7 @@ textarea.fi{resize:none}
   <div class="page" id="page-recados"></div>
   <div class="page" id="page-documentos"></div>
   <div class="page" id="page-marketing"></div>
+  <div class="page" id="page-avisos"></div>
   <div class="page" id="page-portal-config"></div>
   <div class="page" id="page-mkt-wa"></div>
   <div class="page" id="page-mkt-email"></div>
@@ -400,7 +402,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\'wa\')">+ Mensagem</button>',
@@ -425,6 +427,7 @@ function navTo(page) {
   if(page==='recados') renderRecados();
   if(page==='documentos') renderDocumentos();
   if(page==='marketing') renderMarketing();
+  if(page==='avisos') renderAvisos();
   if(page==='portal-config') renderPortalConfig();
   if(page==='mkt-wa') renderMktWA();
   if(page==='mkt-email') renderMktEmail();
@@ -1691,6 +1694,86 @@ function verDocumento(id, nome){
 }
 
 function renderMarketing(){renderMktWA();}
+
+async function renderAvisos() {
+  const pg = document.getElementById('page-avisos');
+  pg.innerHTML = `<div class="card"><div style="font-size:13px;color:var(--muted);text-align:center;padding:20px">Carregando avisos...</div></div>`;
+  let grupos;
+  try { grupos = await GET('/api/avisos/vencimento'); }
+  catch(e) { pg.innerHTML=`<div class="alert alert-r">Erro ao carregar: ${e.message}</div>`; return; }
+
+  const cfgs = [
+    { dias:10, icon:'🗓️', cor:'var(--blue)', bg:'rgba(59,130,246,.1)', borda:'rgba(59,130,246,.3)', label:'Vencem em 10 dias' },
+    { dias:5,  icon:'⚠️', cor:'var(--yellow)', bg:'rgba(245,158,11,.08)', borda:'rgba(245,158,11,.25)', label:'Vencem em 5 dias' },
+    { dias:0,  icon:'🔔', cor:'#f87171', bg:'rgba(212,17,28,.1)', borda:'rgba(212,17,28,.25)', label:'Vencem HOJE' }
+  ];
+
+  const html = cfgs.map(cfg => {
+    const lista = grupos[cfg.dias] || [];
+    const preview = lista[0]?.preview_wa || gerarPreviewWA(cfg.dias);
+    return `
+    <div class="card" style="border:1px solid ${cfg.borda}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:${cfg.cor}">${cfg.icon} ${cfg.label}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${lista.length} aluno(s) afetado(s)</div>
+        </div>
+        ${lista.length>0?`<button class="btn btn-sm" style="background:${cfg.bg};color:${cfg.cor};border:1px solid ${cfg.borda}" onclick="enviarAvisoGrupo(${cfg.dias})">🚀 Enviar para todos</button>`:''}
+      </div>
+
+      <div style="background:#0d0d0d;border:1px solid #222;border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Preview da mensagem (WhatsApp)</div>
+        <div style="font-size:12px;color:#ccc;line-height:1.7;white-space:pre-wrap">${escHtml(preview)}</div>
+      </div>
+
+      ${lista.length===0
+        ? `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">Nenhum aluno para este grupo hoje</div>`
+        : `<div style="display:flex;flex-direction:column;gap:6px">
+            ${lista.map(a=>`
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #1e1e1e;border-radius:6px">
+                <div>
+                  <div style="font-size:13px;font-weight:500">${a.nome}</div>
+                  <div style="font-size:11px;color:var(--muted)">${a.tel||'—'} · Venc. ${a.vencimento?new Date(a.vencimento).toLocaleDateString('pt-BR'):'—'}</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-sm" onclick="enviarAvisoIndividual(${a.id},${cfg.dias},'wa')" title="WhatsApp">💬</button>
+                  <button class="btn btn-ghost btn-sm" onclick="enviarAvisoIndividual(${a.id},${cfg.dias},'email')" title="E-mail">📧</button>
+                </div>
+              </div>`).join('')}
+          </div>`}
+    </div>`;
+  }).join('');
+
+  pg.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted)">Avisos automáticos são enviados diariamente às 08:00 via cron</div>
+      <button class="btn btn-ghost btn-sm" onclick="renderAvisos()">🔄 Atualizar</button>
+    </div>
+    ${html}`;
+}
+
+function escHtml(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function gerarPreviewWA(dias) {
+  if (dias===10) return 'Olá, *[Nome]*! 🥊\n\nSua mensalidade na *Punch and Roll Fight Team* vence em *10 dias*, no dia *DD/MM/AAAA*.\n\n💳 Plano: [Plano] | R$ XX,00/mês\n\nPara renovar, entre em contato:\n📱 (48) 98463-9257\n\nBora continuar treinando! 💪';
+  if (dias===5)  return 'Olá, *[Nome]*! ⚠️\n\nSua mensalidade na *Punch and Roll* vence em *5 dias* (dia *DD/MM/AAAA*).\n\nNão perca o acesso aos treinos! Renove agora:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team 🥊';
+  return 'Olá, *[Nome]*! 🔔\n\nSua mensalidade na *Punch and Roll Fight Team* vence *hoje* (DD/MM/AAAA).\n\nPara manter seu acesso ao check-in e treinos, regularize sua mensalidade:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team 🥊';
+}
+
+async function enviarAvisoGrupo(dias) {
+  if (!confirm(`Enviar aviso de vencimento para todos os alunos do grupo "${dias===0?'HOJE':dias+' dias'}"?`)) return;
+  try {
+    const r = await POST('/api/avisos/enviar', { dias, tipo: 'ambos' });
+    alert(`✅ ${r.enviados} aviso(s) enviado(s)!`);
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+async function enviarAvisoIndividual(alunoId, dias, tipo) {
+  try {
+    const r = await POST('/api/avisos/enviar', { aluno_ids: [alunoId], dias, tipo });
+    alert(`✅ Aviso enviado via ${tipo==='wa'?'WhatsApp':'E-mail'}!`);
+  } catch(e) { alert('Erro: '+e.message); }
+}
 
 function renderPortalConfig(){
   document.getElementById('page-portal-config').innerHTML=`

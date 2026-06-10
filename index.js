@@ -165,6 +165,17 @@ async function setupDB() {
     try { await conn.query("ALTER TABLE documentos ADD COLUMN aluno_id INT NULL"); } catch(e){}
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS avisos_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NOT NULL,
+        tipo VARCHAR(20),
+        dias INT,
+        enviado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX (aluno_id, dias, enviado_em)
+      )
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS pagamentos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         aluno_id INT NOT NULL,
@@ -1234,6 +1245,128 @@ app.delete('/api/documentos/:id', auth, async (req, res) => {
     if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
     await db.query('UPDATE documentos SET visivel=0 WHERE id=?', [req.params.id]);
     res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════
+// AVISOS DE VENCIMENTO
+// ══════════════════════════════════════
+function gerarMsgVencimento(a, dias) {
+  const nome = a.nome.split(' ')[0];
+  const dt = a.vencimento ? new Date(a.vencimento).toLocaleDateString('pt-BR') : '—';
+  const valor = a.valor ? `R$ ${Number(a.valor).toFixed(2).replace('.', ',')}` : '';
+  const plano = a.plano || 'Mensal';
+  let wa, assunto, urgencia;
+
+  if (dias === 10) {
+    urgencia = '10 dias';
+    wa = `Olá, *${nome}*! 🥊\n\nSua mensalidade na *Punch and Roll Fight Team* vence em *10 dias*, no dia *${dt}*.\n\n💳 Plano: ${plano}${valor ? ' | ' + valor + '/mês' : ''}\n\nPara renovar, entre em contato:\n📱 (48) 98463-9257\n\nBora continuar treinando! 💪`;
+    assunto = '🥊 Sua mensalidade vence em 10 dias — Punch and Roll';
+  } else if (dias === 5) {
+    urgencia = '5 dias';
+    wa = `Olá, *${nome}*! ⚠️\n\nSua mensalidade na *Punch and Roll* vence em *5 dias* (dia *${dt}*).\n\nNão perca o acesso aos treinos! Renove agora:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team 🥊`;
+    assunto = '⚠️ Sua mensalidade vence em 5 dias — Punch and Roll';
+  } else {
+    urgencia = 'hoje';
+    wa = `Olá, *${nome}*! 🔔\n\nSua mensalidade na *Punch and Roll Fight Team* vence *hoje* (${dt}).\n\nPara manter seu acesso ao check-in e treinos, regularize sua mensalidade:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team 🥊`;
+    assunto = '🔔 Sua mensalidade vence hoje — Punch and Roll';
+  }
+
+  const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#0f0f0f;color:#f2f2f2;border-radius:12px;overflow:hidden">
+    <div style="background:#d4111c;padding:20px;text-align:center">
+      <div style="font-size:22px;font-weight:900;letter-spacing:3px">PUNCH AND ROLL</div>
+      <div style="font-size:12px;opacity:.8;margin-top:4px">FIGHT TEAM</div>
+    </div>
+    <div style="padding:24px">
+      <p style="font-size:16px;margin:0 0 16px">Olá, <strong>${nome}</strong>!</p>
+      <div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
+        <div style="font-size:13px;color:#999;margin-bottom:6px">SUA MENSALIDADE VENCE EM</div>
+        <div style="font-size:28px;font-weight:900;color:${dias===0?'#f87171':dias===5?'#facc15':'#d4111c'}">${urgencia.toUpperCase()}</div>
+        <div style="font-size:14px;color:#ccc;margin-top:4px">${dt}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <tr><td style="padding:7px 0;font-size:13px;color:#999;border-bottom:1px solid #1e1e1e">Plano</td><td style="padding:7px 0;font-size:13px;font-weight:600;text-align:right;border-bottom:1px solid #1e1e1e">${plano}</td></tr>
+        ${valor?`<tr><td style="padding:7px 0;font-size:13px;color:#999">Valor</td><td style="padding:7px 0;font-size:13px;font-weight:600;text-align:right;color:#22c55e">${valor}/mês</td></tr>`:''}
+      </table>
+      <p style="font-size:13px;color:#ccc;line-height:1.6">Para renovar e manter seu acesso aos treinos, entre em contato com a academia:</p>
+      <div style="text-align:center;margin:16px 0">
+        <a href="https://wa.me/5548984639257" style="display:inline-block;background:#d4111c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">📱 (48) 98463-9257</a>
+      </div>
+    </div>
+    <div style="background:#080808;padding:12px;text-align:center;font-size:11px;color:#555">Punch and Roll Fight Team · São José, SC</div>
+  </div>`;
+
+  return { wa, assunto, html };
+}
+
+app.get('/api/avisos/vencimento', auth, async (req, res) => {
+  try {
+    const grupos = {};
+    for (const dias of [10, 5, 0]) {
+      const [rows] = await db.query(
+        `SELECT id, nome, tel, email, plano, valor, vencimento FROM alunos
+         WHERE status IN ('ativo','vencendo','atrasado') AND DATE(vencimento) = DATE_ADD(CURDATE(), INTERVAL ? DAY)`,
+        [dias]
+      );
+      grupos[dias] = rows.map(a => ({ ...a, preview_wa: gerarMsgVencimento(a, dias).wa }));
+    }
+    res.json(grupos);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/avisos/enviar', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
+    const { aluno_ids, dias, tipo = 'wa' } = req.body;
+    let alunos;
+    if (aluno_ids && aluno_ids.length > 0) {
+      const ph = aluno_ids.map(() => '?').join(',');
+      [alunos] = await db.query(`SELECT id, nome, tel, email, plano, valor, vencimento FROM alunos WHERE id IN (${ph})`, aluno_ids);
+    } else {
+      [alunos] = await db.query(
+        `SELECT id, nome, tel, email, plano, valor, vencimento FROM alunos
+         WHERE status IN ('ativo','vencendo','atrasado') AND DATE(vencimento) = DATE_ADD(CURDATE(), INTERVAL ? DAY)`,
+        [dias]
+      );
+    }
+    const diasEfetivo = dias !== undefined ? dias : 0;
+    let enviados = 0;
+    for (const a of alunos) {
+      const msg = gerarMsgVencimento(a, diasEfetivo);
+      if (tipo === 'wa' || tipo === 'ambos') await notificarWA(a.tel, msg.wa);
+      if (tipo === 'email' || tipo === 'ambos') await enviarEmailAluno(a.email, a.nome, msg.assunto, msg.html);
+      await db.query('INSERT INTO avisos_log (aluno_id, tipo, dias) VALUES (?,?,?)', [a.id, tipo, diasEfetivo]);
+      enviados++;
+    }
+    res.json({ ok: true, enviados });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/cron/avisos-vencimento', async (req, res) => {
+  const secret = (req.headers['authorization'] || '').replace('Bearer ', '');
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) return res.status(401).json({ error: 'Não autorizado' });
+  try {
+    let total = 0;
+    for (const dias of [10, 5, 0]) {
+      const [alunos] = await db.query(
+        `SELECT id, nome, tel, email, plano, valor, vencimento FROM alunos
+         WHERE status IN ('ativo','vencendo','atrasado') AND DATE(vencimento) = DATE_ADD(CURDATE(), INTERVAL ? DAY)`,
+        [dias]
+      );
+      for (const a of alunos) {
+        const [jaEnviou] = await db.query(
+          `SELECT id FROM avisos_log WHERE aluno_id=? AND dias=? AND DATE(enviado_em)=CURDATE()`,
+          [a.id, dias]
+        );
+        if (jaEnviou.length > 0) continue;
+        const msg = gerarMsgVencimento(a, dias);
+        await notificarWA(a.tel, msg.wa);
+        await enviarEmailAluno(a.email, a.nome, msg.assunto, msg.html);
+        await db.query('INSERT INTO avisos_log (aluno_id, tipo, dias) VALUES (?,?,?)', [a.id, 'ambos', dias]);
+        total++;
+      }
+    }
+    res.json({ ok: true, enviados: total, ts: new Date().toISOString() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
