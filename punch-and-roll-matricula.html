@@ -142,9 +142,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <div class="steps" id="steps">
     <div class="step active" id="step-1"><div class="step-dot">1</div><div class="step-label">Plano</div></div>
     <div class="step" id="step-2"><div class="step-dot">2</div><div class="step-label">Dados</div></div>
-    <div class="step" id="step-3"><div class="step-dot">3</div><div class="step-label">Contrato</div></div>
-    <div class="step" id="step-4"><div class="step-dot">4</div><div class="step-label">Pagamento</div></div>
-    <div class="step" id="step-5"><div class="step-dot">✓</div><div class="step-label">Confirmação</div></div>
+    <div class="step" id="step-3"><div class="step-dot">3</div><div class="step-label">Pagamento</div></div>
+    <div class="step" id="step-4"><div class="step-dot">✓</div><div class="step-label">Confirmação</div></div>
   </div>
 
   <!-- VIEW 1 -->
@@ -217,35 +216,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
         Declaro que as informações são verdadeiras e estou ciente dos riscos inerentes à prática de artes marciais.
       </label>
     </div>
-    <button class="btn-submit" onclick="irParaContrato()">CONTINUAR →</button>
+    <button class="btn-submit" onclick="irParaPagamento()">CONTINUAR →</button>
     <button class="btn-back" onclick="setStep(1)">← Voltar</button>
   </div>
 
-  <!-- VIEW 3 — Contrato -->
+  <!-- VIEW 3 — Pagamento -->
   <div class="view" id="view-3">
-    <div class="resumo-box" id="resumo-contrato"></div>
-    <div class="form-sec">📋 Contrato de Prestação de Serviços</div>
-    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;max-height:420px;overflow-y:auto;padding:20px;margin-bottom:16px;font-size:12px;line-height:1.7;color:var(--white)" id="contrato-box">
-      <div id="contrato-conteudo"></div>
-    </div>
-    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px">
-      <label style="display:flex;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;color:var(--white)">
-        <input type="checkbox" id="cb-contrato" style="accent-color:var(--red);flex-shrink:0;margin-top:3px">
-        Li e aceito todos os termos do <strong>&nbsp;Contrato de Prestação de Serviços</strong> acima.
-      </label>
-    </div>
-    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:20px">
-      <label style="display:flex;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;color:var(--white)">
-        <input type="checkbox" id="cb-manual" style="accent-color:var(--red);flex-shrink:0;margin-top:3px">
-        Li e aceito o <strong>&nbsp;Manual de Conduta Punch and Roll 2026</strong>, comprometendo-me a cumprir todas as normas.
-      </label>
-    </div>
-    <button class="btn-submit" onclick="assinarContrato()">✍️ ASSINAR E PROSSEGUIR</button>
-    <button class="btn-back" onclick="setStep(2)">← Voltar</button>
-  </div>
-
-  <!-- VIEW 4 — Pagamento -->
-  <div class="view" id="view-4">
     <div class="resumo-box" id="resumo-pagamento"></div>
     <div class="form-sec">💳 Forma de Pagamento</div>
     <div class="pay-tabs">
@@ -291,19 +267,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 
     <div style="height:20px"></div>
     <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">GERAR PIX</button>
-    <button class="btn-back" id="btn-voltar" onclick="setStep(3)">← Voltar</button>
+    <button class="btn-back" id="btn-voltar" onclick="setStep(2)">← Voltar</button>
     <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados · Mercado Pago</div>
   </div>
 
-  <!-- VIEW 5 — Confirmação -->
-  <div class="view" id="view-5">
+  <!-- VIEW 4 — Confirmação -->
+  <div class="view" id="view-4">
     <div class="success-screen">
       <div class="success-icon">✓</div>
       <div class="success-title">MATRÍCULA CONFIRMADA!</div>
       <div class="success-sub" id="success-msg">Parabéns! Pagamento confirmado. Você já faz parte da Punch and Roll Fight Team!</div>
       <div class="success-steps">
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Próximos passos:</div>
-        <div class="success-step"><div class="success-step-n">1</div><div>Você receberá um e-mail de confirmação em breve.</div></div>
+        <div class="success-step"><div class="success-step-n">1</div><div>Você receberá um e-mail com o <strong>contrato para assinar digitalmente</strong>.</div></div>
         <div class="success-step"><div class="success-step-n">2</div><div>Acesse o portal do aluno para ver a agenda e fazer check-in.</div></div>
         <div class="success-step"><div class="success-step-n">3</div><div>Sua senha inicial é <strong>123</strong> — altere após o primeiro acesso.</div></div>
       </div>
@@ -373,7 +349,7 @@ let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados
 
 function setStep(n){
   document.querySelectorAll('.view').forEach((v,i)=>v.classList.toggle('active',i===n-1));
-  for(let i=1;i<=5;i++){
+  for(let i=1;i<=4;i++){
     const s=document.getElementById('step-'+i);
     s.classList.remove('active','done');
     if(i<n)s.classList.add('done');
@@ -424,7 +400,7 @@ function irParaDados(){
   setStep(2);
 }
 
-function irParaContrato(){
+function irParaPagamento(){
   const campos=[
     {id:'f-nome',msg:'Informe seu nome completo'},
     {id:'f-cpf',msg:'Informe seu CPF'},
@@ -459,15 +435,6 @@ function irParaContrato(){
     nivel:document.getElementById('f-nivel').value,
   };
   setStep(3);
-  renderResumo('resumo-contrato');
-  document.getElementById('contrato-conteudo').innerHTML=gerarContratoHTML();
-}
-
-function assinarContrato(){
-  if(!document.getElementById('cb-contrato').checked){alert('Você precisa aceitar os termos do contrato para continuar.');return;}
-  if(!document.getElementById('cb-manual').checked){alert('Você precisa aceitar o Manual de Conduta para continuar.');return;}
-  S.contratoHtml=document.getElementById('contrato-box').innerHTML;
-  setStep(4);
   renderResumoPagamento();
   atualizarParcelamento();
   document.getElementById('pix-valor-display').textContent=fmtR(S.plano.valor*S.plano.meses);
@@ -644,7 +611,7 @@ async function processarPagamento(){
       if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
       const alunoData=await apiRes.json();
       S.alunoId=alunoData.id;
-      if(S.contratoHtml){await fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:S.contratoHtml})}).catch(()=>{});}
+      fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
 
       // 2. Gera PIX
       const pixRes=await fetch(API_URL+'/api/pagamentos/pix',{
@@ -685,7 +652,7 @@ async function processarPagamento(){
             clearInterval(S.pixInterval);
             document.getElementById('success-msg').textContent=
               'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento PIX confirmado! Você já faz parte da Punch and Roll. 🥊';
-            setStep(5);
+            setStep(4);
           }
         }catch(e){}
       },5000);
@@ -723,7 +690,7 @@ async function processarPagamento(){
         })
       });
       const alunoData=await apiRes.json();
-      if(S.contratoHtml){await fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:S.contratoHtml})}).catch(()=>{});}
+      fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
 
       const cardRes=await fetch(API_URL+'/api/pagamentos/cartao',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -742,7 +709,7 @@ async function processarPagamento(){
       if(cardData.status==='approved'){
         document.getElementById('success-msg').textContent=
           'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento aprovado! Você já faz parte da Punch and Roll. 🥊';
-        setStep(5);
+        setStep(4);
       }else{
         throw new Error('Pagamento não aprovado. Verifique os dados do cartão.');
       }

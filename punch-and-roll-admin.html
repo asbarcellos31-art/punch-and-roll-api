@@ -626,7 +626,7 @@ async function excluirAluno(id, nome) {
   catch(e) { alert('Erro: '+e.message); }
 }
 
-function fichaAluno(id) {
+async function fichaAluno(id) {
   const a = cache.alunos.find(x=>x.id===id); if(!a) return;
   const fmtMod = m=>({boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'})[m]||m||'—';
   const m = document.createElement('div');
@@ -634,6 +634,9 @@ function fichaAluno(id) {
   const box = document.createElement('div');
   box.style.cssText='background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px;width:100%;max-height:90vh;overflow-y:auto';
   const row=(l,v,c)=>v?`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1e1e1e"><span style="font-size:12px;color:var(--muted)">${l}</span><span style="font-size:12px;font-weight:500;color:${c||'var(--white)'}">${v}</span></div>`:'';
+
+  // Load contracts
+  let contratosHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0">Carregando...</div>';
   box.innerHTML=`<div style="width:36px;height:4px;background:var(--muted2);border-radius:2px;margin:0 auto 14px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -645,11 +648,44 @@ function fichaAluno(id) {
     <div class="sec-title">📞 Contato</div>${row('WhatsApp',a.tel)}${row('E-mail',a.email)}${row('Cidade',a.cidade)}
     <div class="sec-title">💳 Plano</div>${row('Plano',a.plano)}${row('Valor','R$ '+(a.valor||0)+'/mês')}${row('Vencimento',fmtD(a.venc),a.status==='atrasado'?'#f87171':a.status==='vencendo'?'var(--yellow)':'')}
     ${(a.saude||a.alergia)?`<div class="sec-title">🏥 Saúde</div>${row('Condições',a.saude)}${row('Alergias',a.alergia,'#f87171')}`:''}
+    <div class="sec-title">📋 Contratos</div>
+    <div id="contratos-${a.id}">${contratosHTML}</div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button onclick="this.closest('div[style*=fixed]').remove()" class="btn btn-ghost" style="flex:1">Fechar</button>
       <button onclick="this.closest('div[style*=fixed]').remove();editarAluno(${a.id})" class="btn btn-r" style="flex:1">✏️ Editar</button>
     </div>`;
   m.appendChild(box); m.addEventListener('click',e=>{if(e.target===m)m.remove()}); document.body.appendChild(m);
+
+  // Fetch contracts async
+  try {
+    const contratos = await GET('/api/contratos/aluno/'+a.id);
+    const el = document.getElementById('contratos-'+a.id);
+    if(!el) return;
+    if(!contratos||contratos.length===0){
+      el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">Nenhum contrato enviado</div>';
+      return;
+    }
+    el.innerHTML = contratos.map(c=>{
+      const assinado = c.assinado || !!c.assinado_em;
+      const badge = assinado
+        ? `<span style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 8px;font-size:10px;letter-spacing:.5px">✅ ASSINADO</span>`
+        : `<span style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:4px;padding:2px 8px;font-size:10px;letter-spacing:.5px">⏳ PENDENTE</span>`;
+      const dt = c.assinado_em ? ' · ' + new Date(c.assinado_em).toLocaleDateString('pt-BR') : (c.criado_em ? ' · Enviado ' + new Date(c.criado_em).toLocaleDateString('pt-BR') : '');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e1e1e">
+        <div>
+          <div style="font-size:12px;font-weight:500">${c.plano||c.modalidade||'Contrato'}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${dt}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${badge}
+          <a href="https://punchandroll.com.br/assinar-contrato.html?token=${c.token}" target="_blank" style="color:var(--muted);font-size:18px;text-decoration:none" title="Ver contrato">🔗</a>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const el = document.getElementById('contratos-'+a.id);
+    if(el) el.innerHTML='<div style="font-size:12px;color:#f87171;padding:6px 0">Erro ao carregar contratos</div>';
+  }
 }
 
 function renderAgenda() {

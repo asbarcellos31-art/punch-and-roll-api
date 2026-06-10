@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Assinar Contrato — Punch and Roll</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--red:#d4111c;--black:#080808;--dark:#0f0f0f;--panel:#161616;--border:#222;--white:#f2f2f2;--muted:#666}
+html,body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100%}
+
+.header{background:var(--dark);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px}
+.header-brand span{color:var(--red)}
+.header-badge{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+.container{max-width:860px;margin:0 auto;padding:24px 16px 100px}
+
+.status-bar{border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:13px}
+.status-pending{background:rgba(212,17,28,.1);border:1px solid rgba(212,17,28,.25)}
+.status-signed{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25)}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-pending .status-dot{background:var(--red)}
+.status-signed .status-dot{background:#22c55e}
+
+.contrato-box{background:var(--dark);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+.contrato-scroll{max-height:60vh;overflow-y:auto;padding:24px;line-height:1.7;font-size:13px;color:#ccc}
+.contrato-scroll::-webkit-scrollbar{width:4px}
+.contrato-scroll::-webkit-scrollbar-track{background:#1a1a1a}
+.contrato-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+
+.contrato-scroll h1,.contrato-scroll h2,.contrato-scroll h3{color:var(--white);margin:20px 0 8px;font-family:'Bebas Neue',sans-serif;letter-spacing:1px}
+.contrato-scroll h1{font-size:22px;text-align:center;border-bottom:1px solid var(--border);padding-bottom:12px}
+.contrato-scroll h2{font-size:16px;color:var(--red)}
+.contrato-scroll p{margin-bottom:10px}
+.contrato-scroll ul,ol{padding-left:20px;margin-bottom:10px}
+.contrato-scroll li{margin-bottom:4px}
+.contrato-scroll .clausula{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #1a1a1a}
+
+.scroll-hint{text-align:center;font-size:11px;color:var(--muted);padding:10px 0;border-top:1px solid var(--border);background:var(--dark)}
+
+.sticky-footer{position:fixed;bottom:0;left:0;right:0;background:var(--dark);border-top:1px solid var(--border);padding:16px 20px;z-index:10}
+.sticky-inner{max-width:860px;margin:0 auto}
+
+.confirm-wrap{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer}
+.confirm-wrap input[type="checkbox"]{width:18px;height:18px;accent-color:var(--red);flex-shrink:0;margin-top:1px;cursor:pointer}
+.confirm-label{font-size:12px;color:var(--muted);line-height:1.5;cursor:pointer}
+
+.btn-assinar{width:100%;padding:15px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;cursor:pointer;transition:background .2s;box-shadow:0 4px 20px rgba(212,17,28,.4)}
+.btn-assinar:hover:not(:disabled){background:#e8151f}
+.btn-assinar:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+
+.signed-msg{text-align:center;padding:16px 0}
+.signed-msg .check{font-size:40px;margin-bottom:8px}
+.signed-msg h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:#22c55e;margin-bottom:4px}
+.signed-msg p{font-size:12px;color:var(--muted)}
+
+.loader{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
+.err-msg{background:rgba(212,17,28,.1);border:1px solid rgba(212,17,28,.3);border-radius:8px;padding:20px;text-align:center;color:#f87171;font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-brand">PUNCH AND <span>ROLL</span></div>
+  <div class="header-badge">Contrato Digital</div>
+</div>
+
+<div class="container">
+  <div id="loader" class="loader">Carregando contrato...</div>
+  <div id="err" class="err-msg" style="display:none"></div>
+
+  <div id="content" style="display:none">
+    <div id="status-bar" class="status-bar status-pending">
+      <div class="status-dot"></div>
+      <span id="status-text">Aguardando assinatura</span>
+    </div>
+
+    <div class="contrato-box">
+      <div class="contrato-scroll" id="contrato-html"></div>
+      <div class="scroll-hint">↕ Role para ler o contrato completo</div>
+    </div>
+  </div>
+</div>
+
+<div class="sticky-footer" id="footer-sign" style="display:none">
+  <div class="sticky-inner">
+    <label class="confirm-wrap">
+      <input type="checkbox" id="chk-leu" onchange="checkReady()">
+      <span class="confirm-label">Li e concordo com todos os termos do contrato e do Manual de Conduta acima</span>
+    </label>
+    <button class="btn-assinar" id="btn-assinar" disabled onclick="assinar()">ASSINAR DIGITALMENTE</button>
+  </div>
+</div>
+
+<div class="sticky-footer" id="footer-signed" style="display:none">
+  <div class="sticky-inner">
+    <div class="signed-msg">
+      <div class="check">✅</div>
+      <h3>Contrato Assinado!</h3>
+      <p id="signed-date">Assinado em —</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('token') || '';
+
+let jaAssinado = false;
+
+async function init() {
+  if (!TOKEN) { showErr('Token de contrato inválido ou ausente.'); return; }
+  try {
+    const res = await fetch(`${API_URL}/api/contratos/html/${TOKEN}`);
+    if (!res.ok) { showErr('Contrato não encontrado. O link pode ter expirado.'); return; }
+    const html = await res.text();
+    document.getElementById('contrato-html').innerHTML = html;
+
+    // Check signing status
+    const meta = await fetch(`${API_URL}/api/contratos/meta/${TOKEN}`).catch(() => null);
+    if (meta && meta.ok) {
+      const data = await meta.json();
+      if (data.assinado) {
+        jaAssinado = true;
+        showSigned(data.assinado_em);
+      }
+    }
+
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    if (!jaAssinado) document.getElementById('footer-sign').style.display = 'block';
+  } catch(e) {
+    showErr('Erro ao carregar contrato. Tente novamente.');
+  }
+}
+
+function showErr(msg) {
+  document.getElementById('loader').style.display = 'none';
+  const el = document.getElementById('err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function showSigned(dt) {
+  const sb = document.getElementById('status-bar');
+  sb.className = 'status-bar status-signed';
+  document.getElementById('status-text').textContent = 'Contrato assinado digitalmente';
+  document.getElementById('footer-sign').style.display = 'none';
+  document.getElementById('footer-signed').style.display = 'block';
+  if (dt) {
+    const d = new Date(dt);
+    document.getElementById('signed-date').textContent = 'Assinado em ' + d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+function checkReady() {
+  document.getElementById('btn-assinar').disabled = !document.getElementById('chk-leu').checked;
+}
+
+async function assinar() {
+  const btn = document.getElementById('btn-assinar');
+  btn.disabled = true;
+  btn.textContent = 'ASSINANDO...';
+  try {
+    const res = await fetch(`${API_URL}/api/contratos/assinar/${TOKEN}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Erro ao registrar assinatura');
+    const data = await res.json();
+    showSigned(new Date().toISOString());
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'ASSINAR DIGITALMENTE';
+    alert('Erro ao assinar. Tente novamente.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

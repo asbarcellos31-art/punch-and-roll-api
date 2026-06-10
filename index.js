@@ -267,11 +267,16 @@ async function setupDB() {
         meses INT DEFAULT 1,
         freq VARCHAR(20),
         ip VARCHAR(100),
-        assinado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        assinado BOOLEAN DEFAULT FALSE,
+        assinado_em TIMESTAMP NULL,
         contrato_html LONGTEXT,
         FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
       )
     `);
+    try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado BOOLEAN DEFAULT FALSE"); } catch(e){}
+    try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado_em TIMESTAMP NULL"); } catch(e){}
+    try { await conn.query("ALTER TABLE contratos ADD COLUMN criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); } catch(e){}
 
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
@@ -1062,14 +1067,45 @@ app.get('/api/estoque/:id/movimentacoes', auth, adminOnly, async (req, res) => {
 // ══════════════════════════════════════
 app.post('/api/contratos', async (req, res) => {
   try {
-    const { aluno_id, plano, modalidade, valor, meses, freq, contrato_html } = req.body;
+    const { aluno_id, plano, modalidade, valor, meses, freq, contrato_html, nome, email } = req.body;
     const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'desconhecido';
     const token = require('crypto').randomBytes(32).toString('hex');
     await db.query(
       'INSERT INTO contratos (aluno_id, token, plano, modalidade, valor, meses, freq, ip, contrato_html) VALUES (?,?,?,?,?,?,?,?,?)',
       [aluno_id, token, plano, modalidade, valor || 0, meses || 1, freq, ip, contrato_html || '']
     );
+    const link = `https://punchandroll.com.br/assinar-contrato.html?token=${token}`;
+    enviarEmailAluno(email, nome, '📋 Seu contrato Punch and Roll — assine digitalmente',
+      `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0f0f0f;color:#f2f2f2;border-radius:12px;overflow:hidden">
+        <div style="background:#d4111c;padding:24px;text-align:center">
+          <h1 style="font-family:sans-serif;font-size:24px;letter-spacing:2px;margin:0">PUNCH AND ROLL</h1>
+          <p style="margin:4px 0 0;font-size:13px;opacity:.8">Fight Team · São José, SC</p>
+        </div>
+        <div style="padding:32px 24px">
+          <p style="font-size:16px;margin:0 0 16px">Olá, <strong>${nome || 'aluno'}</strong>!</p>
+          <p style="color:#ccc;line-height:1.6;margin:0 0 24px">Sua matrícula foi confirmada! Agora só falta assinar seu contrato digitalmente. Clique no botão abaixo para visualizar e assinar:</p>
+          <div style="text-align:center;margin:32px 0">
+            <a href="${link}" style="background:#d4111c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:bold;letter-spacing:1px;display:inline-block">ASSINAR CONTRATO</a>
+          </div>
+          <p style="color:#666;font-size:12px;text-align:center;margin:0">Ou acesse: <a href="${link}" style="color:#d4111c">${link}</a></p>
+          <hr style="border:none;border-top:1px solid #222;margin:24px 0">
+          <p style="color:#666;font-size:12px;margin:0">Plano: <strong style="color:#f2f2f2">${plano || modalidade}</strong></p>
+        </div>
+      </div>`
+    ).catch(() => {});
     res.json({ token });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/contratos/assinar/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'desconhecido';
+    const [rows] = await db.query('SELECT id, assinado FROM contratos WHERE token=?', [token]);
+    if (!rows.length) return res.status(404).json({ error: 'Contrato não encontrado' });
+    if (rows[0].assinado) return res.json({ ok: true, already: true });
+    await db.query('UPDATE contratos SET assinado=TRUE, assinado_em=NOW(), ip=? WHERE token=?', [ip, token]);
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1077,7 +1113,7 @@ app.get('/api/contratos/aluno/:aluno_id', auth, async (req, res) => {
   try {
     const id = req.user.tipo === 'aluno' ? req.user.id : req.params.aluno_id;
     const [rows] = await db.query(
-      'SELECT id, token, plano, modalidade, valor, meses, freq, ip, assinado_em FROM contratos WHERE aluno_id=? ORDER BY assinado_em DESC',
+      'SELECT id, token, plano, modalidade, valor, meses, freq, ip, assinado, assinado_em, criado_em FROM contratos WHERE aluno_id=? ORDER BY criado_em DESC',
       [id]
     );
     res.json(rows);
@@ -1090,6 +1126,14 @@ app.get('/api/contratos/html/:token', async (req, res) => {
     if (!rows.length) return res.status(404).send('<h1>Contrato não encontrado</h1>');
     res.type('html').send(rows[0].contrato_html);
   } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
+});
+
+app.get('/api/contratos/meta/:token', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT assinado, assinado_em, plano, modalidade, criado_em FROM contratos WHERE token=?', [req.params.token]);
+    if (!rows.length) return res.status(404).json({ error: 'Não encontrado' });
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // START
