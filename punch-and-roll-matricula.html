@@ -128,10 +128,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
     <a href="#matricula" class="btn-cta">MATRICULE-SE AGORA</a>
     <div class="hero-note">Sem fila · 100% online · Acesso imediato</div>
     <div class="stats-row">
-      <div class="stat"><div class="stat-n">+120</div><div class="stat-l">Alunos</div></div>
-      <div class="stat"><div class="stat-n">8</div><div class="stat-l">Anos</div></div>
       <div class="stat"><div class="stat-n">2</div><div class="stat-l">Modalidades</div></div>
-      <div class="stat"><div class="stat-n">5★</div><div class="stat-l">Avaliação</div></div>
+      <div class="stat"><div class="stat-n">São José</div><div class="stat-l">SC</div></div>
+      <div class="stat"><div class="stat-n">Família</div><div class="stat-l">Fight Team</div></div>
     </div>
   </div>
   <div class="scroll-arrow" onclick="document.getElementById('matricula').scrollIntoView({behavior:'smooth'})">↓</div>
@@ -154,6 +153,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       <button class="mod-tab active" id="mod-boxe" onclick="setMod('boxe')">🥊 Boxe</button>
       <button class="mod-tab" id="mod-jj" onclick="setMod('jiujitsu')">🟦 Jiu-Jitsu</button>
       <button class="mod-tab" id="mod-amb" onclick="setMod('ambos')">🥊🟦 Ambos</button>
+    </div>
+    <div class="form-sec">Frequência semanal</div>
+    <div class="mod-tabs">
+      <button class="mod-tab active" id="freq-3x" onclick="setFreq('3x')">📅 3x por Semana</button>
+      <button class="mod-tab" id="freq-livre" onclick="setFreq('livre')">🔓 Livre (ilimitado)</button>
     </div>
     <div class="form-sec">Escolha seu plano</div>
     <div class="planos-grid" id="planos-grid"></div>
@@ -284,7 +288,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   </div>
 </section>
 
-<footer style="text-align:center;padding:30px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">© 2026 Punch and Roll Fight Team · São José, SC</footer>
+<footer style="text-align:center;padding:30px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">
+  <p>© 2026 Punch and Roll Fight Team · São José, SC</p>
+  <p style="margin-top:6px"><a href="https://wa.me/554898463-9257" style="color:var(--muted);text-decoration:none">💬 (48) 98463-9257</a></p>
+  <p style="margin-top:6px"><a href="https://maps.google.com/?q=Rua+Nossa+Senhora+Aparecida,+746,+loja+05,+Barreiros,+São+José,+SC" target="_blank" style="color:var(--muted);text-decoration:none">📍 R. Nossa Senhora Aparecida, 746 · Loja 05 · Barreiros · São José, SC</a></p>
+</footer>
 
 <script>
 const API_URL = 'https://punch-and-roll-api-production.up.railway.app';
@@ -292,21 +300,42 @@ const MP_PUBLIC_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';
 const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
 
 const PLANOS = {
-  boxe:[
-    {id:'mensal_boxe',nome:'Mensal',desc:'Boxe',valor:200,meses:1,popular:false},
-    {id:'semestral_boxe',nome:'Semestral',desc:'Boxe',valor:190,meses:6,popular:true,economia:'Economize R$ 60'},
-    {id:'anual_boxe',nome:'Anual',desc:'Boxe',valor:180,meses:12,popular:false,economia:'Economize R$ 240'},
-  ],
-  jiujitsu:[
-    {id:'mensal_jj',nome:'Mensal',desc:'Jiu-Jitsu',valor:200,meses:1,popular:false},
-    {id:'semestral_jj',nome:'Semestral',desc:'Jiu-Jitsu',valor:190,meses:6,popular:true,economia:'Economize R$ 60'},
-    {id:'anual_jj',nome:'Anual',desc:'Jiu-Jitsu',valor:180,meses:12,popular:false,economia:'Economize R$ 240'},
-  ],
-  ambos:[
-    {id:'mensal_amb',nome:'Mensal',desc:'Boxe + Jiu-Jitsu',valor:350,meses:1,popular:false},
-    {id:'semestral_amb',nome:'Semestral',desc:'Boxe + Jiu-Jitsu',valor:330,meses:6,popular:true,economia:'Economize R$ 120'},
-    {id:'anual_amb',nome:'Anual',desc:'Boxe + Jiu-Jitsu',valor:310,meses:12,popular:false,economia:'Economize R$ 480'},
-  ],
+  boxe:{
+    '3x':[
+      {id:'mensal_boxe_3x',nome:'Mensal',desc:'Boxe · 3x/sem',valor:159,meses:1,popular:false},
+      {id:'semestral_boxe_3x',nome:'Semestral',desc:'Boxe · 3x/sem',valor:149,meses:6,popular:true,economia:'Economize R$ 60'},
+      {id:'anual_boxe_3x',nome:'Anual',desc:'Boxe · 3x/sem',valor:139,meses:12,popular:false,economia:'Economize R$ 240'},
+    ],
+    livre:[
+      {id:'mensal_boxe_livre',nome:'Mensal',desc:'Boxe · Livre',valor:199,meses:1,popular:false},
+      {id:'semestral_boxe_livre',nome:'Semestral',desc:'Boxe · Livre',valor:189,meses:6,popular:true,economia:'Economize R$ 60'},
+      {id:'anual_boxe_livre',nome:'Anual',desc:'Boxe · Livre',valor:179,meses:12,popular:false,economia:'Economize R$ 240'},
+    ],
+  },
+  jiujitsu:{
+    '3x':[
+      {id:'mensal_jj_3x',nome:'Mensal',desc:'Jiu-Jitsu · 3x/sem',valor:159,meses:1,popular:false},
+      {id:'semestral_jj_3x',nome:'Semestral',desc:'Jiu-Jitsu · 3x/sem',valor:149,meses:6,popular:true,economia:'Economize R$ 60'},
+      {id:'anual_jj_3x',nome:'Anual',desc:'Jiu-Jitsu · 3x/sem',valor:139,meses:12,popular:false,economia:'Economize R$ 240'},
+    ],
+    livre:[
+      {id:'mensal_jj_livre',nome:'Mensal',desc:'Jiu-Jitsu · Livre',valor:199,meses:1,popular:false},
+      {id:'semestral_jj_livre',nome:'Semestral',desc:'Jiu-Jitsu · Livre',valor:189,meses:6,popular:true,economia:'Economize R$ 60'},
+      {id:'anual_jj_livre',nome:'Anual',desc:'Jiu-Jitsu · Livre',valor:179,meses:12,popular:false,economia:'Economize R$ 240'},
+    ],
+  },
+  ambos:{
+    '3x':[
+      {id:'mensal_amb_3x',nome:'Mensal',desc:'Boxe + Jiu-Jitsu · 3x/sem',valor:269,meses:1,popular:false},
+      {id:'semestral_amb_3x',nome:'Semestral',desc:'Boxe + Jiu-Jitsu · 3x/sem',valor:249,meses:6,popular:true,economia:'Economize R$ 120'},
+      {id:'anual_amb_3x',nome:'Anual',desc:'Boxe + Jiu-Jitsu · 3x/sem',valor:229,meses:12,popular:false,economia:'Economize R$ 480'},
+    ],
+    livre:[
+      {id:'mensal_amb_livre',nome:'Mensal',desc:'Boxe + Jiu-Jitsu · Livre',valor:329,meses:1,popular:false},
+      {id:'semestral_amb_livre',nome:'Semestral',desc:'Boxe + Jiu-Jitsu · Livre',valor:309,meses:6,popular:true,economia:'Economize R$ 120'},
+      {id:'anual_amb_livre',nome:'Anual',desc:'Boxe + Jiu-Jitsu · Livre',valor:289,meses:12,popular:false,economia:'Economize R$ 480'},
+    ],
+  },
 };
 const BENEFICIOS={
   boxe:['Todas as aulas de Boxe','Check-in pelo portal do aluno','Sparring supervisionado','Condicionamento físico','Acompanhamento do professor'],
@@ -316,7 +345,7 @@ const BENEFICIOS={
 
 const fmtR=v=>'R$ '+Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 const todayStr=new Date().toISOString().slice(0,10);
-let S={modalidade:'boxe',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null};
+let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null};
 
 function setStep(n){
   document.querySelectorAll('.view').forEach((v,i)=>v.classList.toggle('active',i===n-1));
@@ -330,15 +359,24 @@ function setStep(n){
 }
 
 function setMod(mod){
-  S.modalidade=mod;S.planoId=null;S.plano=null;
+  S.modalidade=mod;S.freq='3x';S.planoId=null;S.plano=null;
   document.querySelectorAll('.mod-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('mod-'+({boxe:'boxe',jiujitsu:'jj',ambos:'amb'}[mod])).classList.add('active');
+  document.getElementById('freq-3x').classList.add('active');
+  document.getElementById('freq-livre').classList.remove('active');
   renderPlanos();renderBeneficios();
+}
+
+function setFreq(f){
+  S.freq=f;S.planoId=null;S.plano=null;
+  document.getElementById('freq-3x').classList.toggle('active',f==='3x');
+  document.getElementById('freq-livre').classList.toggle('active',f==='livre');
+  renderPlanos();
 }
 
 function renderPlanos(){
   const grid=document.getElementById('planos-grid');grid.innerHTML='';
-  PLANOS[S.modalidade].forEach(p=>{
+  PLANOS[S.modalidade][S.freq].forEach(p=>{
     const div=document.createElement('div');
     div.className='plano-card'+(S.planoId===p.id?' selected':'');
     div.onclick=()=>{S.planoId=p.id;S.plano=p;renderPlanos();};
