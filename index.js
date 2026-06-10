@@ -13,7 +13,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Origin','Accept'] }));
 app.options('/{*path}', cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
