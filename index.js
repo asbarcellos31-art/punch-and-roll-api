@@ -874,14 +874,20 @@ async function enviarEmailAdmin(assunto, html) {
 }
 
 async function enviarEmailAluno(email, nome, assunto, html) {
-  if (!process.env.SENDGRID_API_KEY || !email) return;
+  if (!process.env.SENDGRID_API_KEY) { console.log('Email SKIP: SENDGRID_API_KEY não configurado'); return; }
+  if (!email) { console.log('Email SKIP: email destinatário vazio'); return; }
   try {
-    await axios.post('https://api.sendgrid.com/v3/mail/send', {
+    const from = process.env.EMAIL_FROM || 'noreply@punchandroll.com.br';
+    console.log(`Email SEND → ${email} | from: ${from} | assunto: ${assunto}`);
+    const res = await axios.post('https://api.sendgrid.com/v3/mail/send', {
       personalizations: [{ to: [{ email, name: nome }] }],
-      from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Fight Team' },
+      from: { email: from, name: 'Punch and Roll Fight Team' },
       subject: assunto, content: [{ type: 'text/html', value: html }],
     }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
-  } catch (e) { console.log('Email aluno error:', e.message); }
+    console.log(`Email OK → status ${res.status}`);
+  } catch (e) {
+    console.log('Email ERRO:', e.response?.data ? JSON.stringify(e.response.data) : e.message);
+  }
 }
 
 // ══════════════════════════════════════
