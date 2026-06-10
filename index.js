@@ -891,6 +891,27 @@ async function enviarEmailAluno(email, nome, assunto, html) {
 }
 
 // ══════════════════════════════════════
+// TESTE DE EMAIL (debug)
+// ══════════════════════════════════════
+app.get('/api/teste-email/:destino', async (req, res) => {
+  const email = req.params.destino;
+  const key = process.env.SENDGRID_API_KEY;
+  const from = process.env.EMAIL_FROM || 'noreply@punchandroll.com.br';
+  if (!key) return res.json({ ok: false, erro: 'SENDGRID_API_KEY não configurado no Railway' });
+  try {
+    const r = await axios.post('https://api.sendgrid.com/v3/mail/send', {
+      personalizations: [{ to: [{ email }] }],
+      from: { email: from, name: 'Punch and Roll Fight Team' },
+      subject: '🥊 Teste de email — Punch and Roll',
+      content: [{ type: 'text/html', value: '<h2>Funcionou!</h2><p>Email de teste enviado com sucesso.</p>' }],
+    }, { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } });
+    res.json({ ok: true, status: r.status, from, para: email });
+  } catch(e) {
+    res.json({ ok: false, status: e.response?.status, erro: e.response?.data || e.message, from, para: email });
+  }
+});
+
+// ══════════════════════════════════════
 // HEALTH CHECK
 // ══════════════════════════════════════
 app.get('/api/health', async (req, res) => {
