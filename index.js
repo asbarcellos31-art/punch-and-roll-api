@@ -1171,19 +1171,23 @@ app.get('/api/contratos/html/:token', async (req, res) => {
 // ══════════════════════════════════════
 // DOCUMENTOS
 // ══════════════════════════════════════
-app.post('/api/documentos', auth, async (req, res) => {
+app.post('/api/documentos', auth, (req, res) => {
   if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
-  await new Promise((resolve, reject) => upload.single('arquivo')(req, res, e => e ? reject(e) : resolve()));
-  try {
-    const { nome, categoria } = req.body;
-    const file = req.file;
-    if (!file) return res.status(400).json({ error: 'Arquivo obrigatório' });
-    await db.query(
-      'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel) VALUES (?,?,?,?,?,?,1)',
-      [nome, categoria || 'outro', file.originalname.split('.').pop(), file.size, file.mimetype, file.buffer]
-    );
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  upload.single('arquivo')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    try {
+      const nome = req.body?.nome || req.body?.get?.('nome');
+      const categoria = req.body?.categoria || req.body?.get?.('categoria') || 'outro';
+      const file = req.file;
+      if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+      if (!file) return res.status(400).json({ error: 'Arquivo obrigatório' });
+      await db.query(
+        'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel) VALUES (?,?,?,?,?,?,1)',
+        [nome, categoria, file.originalname.split('.').pop(), file.size, file.mimetype, file.buffer]
+      );
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
 });
 
 app.get('/api/documentos', auth, async (req, res) => {
