@@ -1142,10 +1142,24 @@ app.post('/api/contratos/assinar/:token', async (req, res) => {
   try {
     const { token } = req.params;
     const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'desconhecido';
-    const [rows] = await db.query('SELECT id, assinado FROM contratos WHERE token=?', [token]);
+    const [rows] = await db.query('SELECT id, aluno_id, assinado, plano, modalidade, contrato_html FROM contratos WHERE token=?', [token]);
     if (!rows.length) return res.status(404).json({ error: 'Contrato não encontrado' });
     if (rows[0].assinado) return res.json({ ok: true, already: true });
     await db.query('UPDATE contratos SET assinado=TRUE, assinado_em=NOW(), ip=? WHERE token=?', [ip, token]);
+
+    // Salva o contrato assinado como documento vinculado ao aluno
+    const c = rows[0];
+    if (c.aluno_id && c.contrato_html) {
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const nomePlano = c.plano || c.modalidade || 'Contrato';
+      const nomeDoc = `Contrato Assinado - ${nomePlano} (${dataHoje})`;
+      const buffer = Buffer.from(c.contrato_html, 'utf8');
+      await db.query(
+        'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel, aluno_id) VALUES (?,?,?,?,?,?,1,?)',
+        [nomeDoc, 'contrato', 'html', buffer.length, 'text/html', buffer, c.aluno_id]
+      );
+    }
+
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
