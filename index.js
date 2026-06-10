@@ -256,6 +256,23 @@ async function setupDB() {
       )
     `);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS contratos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NOT NULL,
+        token VARCHAR(64) UNIQUE NOT NULL,
+        plano VARCHAR(200),
+        modalidade VARCHAR(50),
+        valor DECIMAL(10,2),
+        meses INT DEFAULT 1,
+        freq VARCHAR(20),
+        ip VARCHAR(100),
+        assinado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        contrato_html LONGTEXT,
+        FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
+      )
+    `);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -1038,6 +1055,41 @@ app.get('/api/estoque/:id/movimentacoes', auth, adminOnly, async (req, res) => {
     );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════
+// CONTRATOS
+// ══════════════════════════════════════
+app.post('/api/contratos', async (req, res) => {
+  try {
+    const { aluno_id, plano, modalidade, valor, meses, freq, contrato_html } = req.body;
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'desconhecido';
+    const token = require('crypto').randomBytes(32).toString('hex');
+    await db.query(
+      'INSERT INTO contratos (aluno_id, token, plano, modalidade, valor, meses, freq, ip, contrato_html) VALUES (?,?,?,?,?,?,?,?,?)',
+      [aluno_id, token, plano, modalidade, valor || 0, meses || 1, freq, ip, contrato_html || '']
+    );
+    res.json({ token });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/contratos/aluno/:aluno_id', auth, async (req, res) => {
+  try {
+    const id = req.user.tipo === 'aluno' ? req.user.id : req.params.aluno_id;
+    const [rows] = await db.query(
+      'SELECT id, token, plano, modalidade, valor, meses, freq, ip, assinado_em FROM contratos WHERE aluno_id=? ORDER BY assinado_em DESC',
+      [id]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/contratos/html/:token', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT contrato_html FROM contratos WHERE token=?', [req.params.token]);
+    if (!rows.length) return res.status(404).send('<h1>Contrato não encontrado</h1>');
+    res.type('html').send(rows[0].contrato_html);
+  } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
 });
 
 // START

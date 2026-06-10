@@ -142,8 +142,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <div class="steps" id="steps">
     <div class="step active" id="step-1"><div class="step-dot">1</div><div class="step-label">Plano</div></div>
     <div class="step" id="step-2"><div class="step-dot">2</div><div class="step-label">Dados</div></div>
-    <div class="step" id="step-3"><div class="step-dot">3</div><div class="step-label">Pagamento</div></div>
-    <div class="step" id="step-4"><div class="step-dot">✓</div><div class="step-label">Confirmação</div></div>
+    <div class="step" id="step-3"><div class="step-dot">3</div><div class="step-label">Contrato</div></div>
+    <div class="step" id="step-4"><div class="step-dot">4</div><div class="step-label">Pagamento</div></div>
+    <div class="step" id="step-5"><div class="step-dot">✓</div><div class="step-label">Confirmação</div></div>
   </div>
 
   <!-- VIEW 1 -->
@@ -216,12 +217,35 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
         Declaro que as informações são verdadeiras e estou ciente dos riscos inerentes à prática de artes marciais.
       </label>
     </div>
-    <button class="btn-submit" onclick="irParaPagamento()">CONTINUAR →</button>
+    <button class="btn-submit" onclick="irParaContrato()">CONTINUAR →</button>
     <button class="btn-back" onclick="setStep(1)">← Voltar</button>
   </div>
 
-  <!-- VIEW 3 -->
+  <!-- VIEW 3 — Contrato -->
   <div class="view" id="view-3">
+    <div class="resumo-box" id="resumo-contrato"></div>
+    <div class="form-sec">📋 Contrato de Prestação de Serviços</div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;max-height:420px;overflow-y:auto;padding:20px;margin-bottom:16px;font-size:12px;line-height:1.7;color:var(--white)" id="contrato-box">
+      <div id="contrato-conteudo"></div>
+    </div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px">
+      <label style="display:flex;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;color:var(--white)">
+        <input type="checkbox" id="cb-contrato" style="accent-color:var(--red);flex-shrink:0;margin-top:3px">
+        Li e aceito todos os termos do <strong>&nbsp;Contrato de Prestação de Serviços</strong> acima.
+      </label>
+    </div>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:20px">
+      <label style="display:flex;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;color:var(--white)">
+        <input type="checkbox" id="cb-manual" style="accent-color:var(--red);flex-shrink:0;margin-top:3px">
+        Li e aceito o <strong>&nbsp;Manual de Conduta Punch and Roll 2026</strong>, comprometendo-me a cumprir todas as normas.
+      </label>
+    </div>
+    <button class="btn-submit" onclick="assinarContrato()">✍️ ASSINAR E PROSSEGUIR</button>
+    <button class="btn-back" onclick="setStep(2)">← Voltar</button>
+  </div>
+
+  <!-- VIEW 4 — Pagamento -->
+  <div class="view" id="view-4">
     <div class="resumo-box" id="resumo-pagamento"></div>
     <div class="form-sec">💳 Forma de Pagamento</div>
     <div class="pay-tabs">
@@ -267,12 +291,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 
     <div style="height:20px"></div>
     <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">GERAR PIX</button>
-    <button class="btn-back" id="btn-voltar" onclick="setStep(2)">← Voltar</button>
+    <button class="btn-back" id="btn-voltar" onclick="setStep(3)">← Voltar</button>
     <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">🔒 SSL · Dados criptografados · Mercado Pago</div>
   </div>
 
-  <!-- VIEW 4 -->
-  <div class="view" id="view-4">
+  <!-- VIEW 5 — Confirmação -->
+  <div class="view" id="view-5">
     <div class="success-screen">
       <div class="success-icon">✓</div>
       <div class="success-title">MATRÍCULA CONFIRMADA!</div>
@@ -349,7 +373,7 @@ let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados
 
 function setStep(n){
   document.querySelectorAll('.view').forEach((v,i)=>v.classList.toggle('active',i===n-1));
-  for(let i=1;i<=4;i++){
+  for(let i=1;i<=5;i++){
     const s=document.getElementById('step-'+i);
     s.classList.remove('active','done');
     if(i<n)s.classList.add('done');
@@ -400,7 +424,7 @@ function irParaDados(){
   setStep(2);
 }
 
-function irParaPagamento(){
+function irParaContrato(){
   const campos=[
     {id:'f-nome',msg:'Informe seu nome completo'},
     {id:'f-cpf',msg:'Informe seu CPF'},
@@ -435,10 +459,124 @@ function irParaPagamento(){
     nivel:document.getElementById('f-nivel').value,
   };
   setStep(3);
+  renderResumo('resumo-contrato');
+  document.getElementById('contrato-conteudo').innerHTML=gerarContratoHTML();
+}
+
+function assinarContrato(){
+  if(!document.getElementById('cb-contrato').checked){alert('Você precisa aceitar os termos do contrato para continuar.');return;}
+  if(!document.getElementById('cb-manual').checked){alert('Você precisa aceitar o Manual de Conduta para continuar.');return;}
+  S.contratoHtml=document.getElementById('contrato-box').innerHTML;
+  setStep(4);
   renderResumoPagamento();
   atualizarParcelamento();
   document.getElementById('pix-valor-display').textContent=fmtR(S.plano.valor*S.plano.meses);
   document.getElementById('btn-pagar').innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
+}
+
+function gerarContratoHTML(){
+  const d=S.dados,p=S.plano;
+  const freqLabel=S.freq==='3x'?'3x por semana':'Livre (ilimitado)';
+  const modLabel={boxe:'Boxe',jiujitsu:'Jiu-Jitsu',ambos:'Boxe e Jiu-Jitsu'}[S.modalidade]||S.modalidade;
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const nascFmt=d.nasc?new Date(d.nasc+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+  const cancelClause=p.meses===1
+    ?'<p>O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
+    :`<p>O cancelamento antecipado do plano ${p.meses===6?'semestral':'anual'} está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias corridos</strong> por período mediante solicitação justificada.</p>`;
+  return `<div style="font-family:Arial,sans-serif;color:#f0f0f0;font-size:12px;line-height:1.8">
+<div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
+  <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
+  <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
+  <div style="font-size:10px;color:#888;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
+</div>
+<div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
+  <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
+  <p><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
+  <p style="margin-top:8px"><strong>CONTRATANTE:</strong> ${d.nome}<br>CPF: ${d.cpf} · Nascimento: ${nascFmt}<br>${d.end?'Endereço: '+d.end+', '+d.cidade+' · CEP '+d.cep+'<br>':''}WhatsApp: ${d.tel} · E-mail: ${d.email}</p>
+</div>
+<p>As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>, regido pelas cláusulas a seguir:</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
+<p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
+<div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+  <div><span style="color:#888;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
+  <div><span style="color:#888;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
+  <div><span style="color:#888;font-size:11px">Plano</span><br><strong>${p.nome}</strong></div>
+  <div><span style="color:#888;font-size:11px">Duração</span><br><strong>${p.meses===1?'Mensal (renovação automática)':p.meses+' meses'}</strong></div>
+  <div><span style="color:#888;font-size:11px">Valor mensal</span><br><strong>R$ ${p.valor},00</strong></div>
+  <div><span style="color:#888;font-size:11px">Total</span><br><strong>R$ ${p.valor*p.meses},00</strong></div>
+</div>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
+<p>O CONTRATANTE pagará <strong>R$ ${p.valor},00/mês</strong>, totalizando <strong>R$ ${p.valor*p.meses},00</strong>. O atraso superior a 15 dias resultará na suspensão do acesso até regularização.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Obrigações do Contratante</p>
+<ol style="padding-left:18px;line-height:2">
+  <li>Efetuar os pagamentos nas datas acordadas;</li>
+  <li>Respeitar as normas do Manual de Conduta Punch and Roll;</li>
+  <li>Comunicar previamente condições de saúde relevantes;</li>
+  <li>Zelar pelos equipamentos e instalações da academia;</li>
+  <li>Chegar preferencialmente 10 minutos antes das aulas;</li>
+  <li>Manter higiene pessoal adequada;</li>
+  <li>Respeitar colegas, professores e equipe;</li>
+  <li>Utilizar equipamentos de proteção adequados durante os treinos.</li>
+</ol>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 4ª — Obrigações da Contratada</p>
+<ol style="padding-left:18px;line-height:2">
+  <li>Disponibilizar professores qualificados para as aulas;</li>
+  <li>Manter instalações em condições adequadas de higiene e segurança;</li>
+  <li>Fornecer aulas conforme a frequência contratada;</li>
+  <li>Tratar todos os alunos com respeito e igualdade;</li>
+  <li>Comunicar com antecedência cancelamentos ou alterações de aulas.</li>
+</ol>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 5ª — Rescisão e Cancelamento</p>
+${cancelClause}
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 6ª — Responsabilidade e Riscos</p>
+<p>O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica as atividades por livre e espontânea vontade. A CONTRATADA exime-se de responsabilidade por lesões decorrentes da prática regular, desde que o aluno siga as orientações dos professores. <strong>A academia não se responsabiliza por objetos perdidos ou esquecidos.</strong></p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 7ª — Uso de Imagem</p>
+<p>Salvo manifestação contrária por escrito, o CONTRATANTE autoriza o uso de sua imagem para fins promocionais e institucionais da Punch and Roll Fight Team, sem ônus.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 8ª — Conduta</p>
+<p>O CONTRATANTE declara ter lido e aceito integralmente o <strong>Manual de Conduta Punch and Roll 2026</strong>. O descumprimento reiterado poderá resultar em advertência, suspensão ou rescisão unilateral sem restituição dos valores pagos.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 9ª — Disposições Gerais</p>
+<p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
+<div style="text-align:right;margin-top:12px;color:#888;font-size:11px">São José/SC, ${hoje}</div>
+
+<div style="border-top:2px solid #d4111c;margin-top:28px;padding-top:18px">
+<div style="text-align:center;margin-bottom:16px">
+  <div style="font-size:16px;font-weight:700;letter-spacing:2px">MANUAL DE CONDUTA</div>
+  <div style="font-size:12px;color:#d4111c;font-weight:600">Disciplina e Boas Práticas · Punch and Roll Fight Team · 2026</div>
+  <div style="font-size:10px;color:#888;margin-top:3px;font-style:italic">"Mais que uma academia. Uma família."</div>
+</div>
+<p><strong style="color:#d4111c">Apresentação —</strong> Punch and Roll Fight Team é uma equipe formada por pessoas que buscam evolução física, técnica e pessoal. Nossa missão não é apenas ensinar Boxe e Jiu-Jitsu — buscamos desenvolver disciplina, respeito, confiança, saúde, espírito esportivo e senso de comunidade. O descumprimento das normas poderá resultar em advertência, suspensão ou desligamento da equipe.</p>
+<p style="margin-top:12px"><strong style="color:#d4111c">Cap. I — Valores:</strong> Respeito · Disciplina · Humildade · Honestidade · Pontualidade · Organização · Espírito Esportivo · Segurança · Companheirismo · Evolução</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. II — Higiene Pessoal:</strong> Obrigatório: banho regular, escovar dentes antes das aulas, desodorante, unhas cortadas, roupas/kimono/luvas/bandagens limpas. Proibido treinar com uniforme sujo, odor excessivo, lesões infecciosas ou doenças contagiosas.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. III — Professores:</strong> Devem manter cabelos e barba organizados, uniforme oficial em bom estado, linguagem respeitosa e postura profissional. Vedado: aparência desleixada, linguagem ofensiva ou comentários discriminatórios.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. IV — Pontualidade:</strong> Alunos chegam 10 minutos antes e entram preparados. Professores presentes antes do início, encerram no horário programado.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. V — Tatame:</strong> Obrigatório: entrar descalço, manter limpo, respeitar espaços. Proibido: calçados de rua, comer, jogar lixo, sentar inadequadamente durante instruções.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. VI — Equipamentos:</strong> Cada aluno responsável por seus materiais: kimono e faixa, luvas e bandagens, protetor bucal, toalha e garrafa d'água. A academia não se responsabiliza por objetos perdidos.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. VII — Organização:</strong> Princípio — Usou → Guardou → Organizou. Luvas, aparadores, escudos, cones, cordas e colchonetes devem ser guardados após o uso.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. VIII — Limpeza:</strong> Todos colaboram com a limpeza de banheiros, recepção, tatame, área de equipamentos e área externa. Proibido: lixo no chão, copos/garrafas/toalhas espalhados.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. IX — Conduta nos Treinos:</strong> Obrigatório: respeitar professores e colegas, ouvir instruções, comportamento adequado. Proibido: interromper explicações, brincadeiras perigosas, provocações, linguagem ofensiva.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. X — Sparrings e Rolas:</strong> Os combates são ferramentas de aprendizado, não disputas de ego. Obrigatório: controlar força, respeitar iniciantes e diferenças físicas, parar quando solicitado, priorizar segurança. Não tolerado: agressividade excessiva, golpes para machucar, atitudes antidesportivas.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. XI — Segurança:</strong> Toda lesão deve ser comunicada ao professor imediatamente. Proibido treinar sob efeito de álcool, drogas ou em condições que coloquem terceiros em risco. Professores têm autoridade para impedir a participação quando necessário.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. XII — Celulares:</strong> Usar apenas quando necessário durante os treinos. Proibido: atender ligações durante instruções, filmar terceiros sem autorização.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. XIII — Crianças e Adolescentes:</strong> Pais e responsáveis devem respeitar os horários, buscar os alunos ao término e seguir as orientações dos professores.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. XIV — Redes Sociais:</strong> Respeito à equipe nas publicações. Proibido: atacar membros da equipe, difamar a academia, expor alunos sem autorização.</p>
+<p style="margin-top:10px"><strong style="color:#d4111c">Cap. XV — Professores:</strong> Dar exemplo dentro e fora, tratar todos igualmente, zelar pela segurança, cumprir a metodologia, estimular ambiente familiar. Advertência, suspensão ou desligamento poderão ser aplicados a qualquer integrante que descumprir este manual.</p>
+<div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-top:18px">
+  <div style="font-size:12px;font-weight:700;color:#d4111c;margin-bottom:8px;letter-spacing:1px">CÓDIGO DE HONRA PUNCH AND ROLL</div>
+  <ol style="padding-left:18px;line-height:2;color:#ddd">
+    <li>Respeito todos os membros da equipe.</li>
+    <li>Sou pontual.</li>
+    <li>Cuido do meu corpo e da minha higiene.</li>
+    <li>Cuido da academia como se fosse minha.</li>
+    <li>Ajudo os colegas a evoluírem.</li>
+    <li>Treino com disciplina e humildade.</li>
+    <li>Escuto meus professores.</li>
+    <li>Não utilizo minha técnica para intimidar pessoas.</li>
+    <li>Represento a Punch and Roll com honra.</li>
+    <li>Busco ser melhor hoje do que fui ontem.</li>
+  </ol>
+</div>
+<div style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid #333;color:#888;font-size:10px;font-style:italic">"Na Punch and Roll Fight Team, a força vem da técnica. A técnica vem da disciplina. E a disciplina constrói campeões dentro e fora dos tatames."<br>São José · Santa Catarina · 2026</div>
+</div></div>`;
 }
 
 function renderResumo(elId){
@@ -506,6 +644,7 @@ async function processarPagamento(){
       if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
       const alunoData=await apiRes.json();
       S.alunoId=alunoData.id;
+      if(S.contratoHtml){await fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:S.contratoHtml})}).catch(()=>{});}
 
       // 2. Gera PIX
       const pixRes=await fetch(API_URL+'/api/pagamentos/pix',{
@@ -546,7 +685,7 @@ async function processarPagamento(){
             clearInterval(S.pixInterval);
             document.getElementById('success-msg').textContent=
               'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento PIX confirmado! Você já faz parte da Punch and Roll. 🥊';
-            setStep(4);
+            setStep(5);
           }
         }catch(e){}
       },5000);
@@ -584,6 +723,7 @@ async function processarPagamento(){
         })
       });
       const alunoData=await apiRes.json();
+      if(S.contratoHtml){await fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:S.contratoHtml})}).catch(()=>{});}
 
       const cardRes=await fetch(API_URL+'/api/pagamentos/cartao',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -602,7 +742,7 @@ async function processarPagamento(){
       if(cardData.status==='approved'){
         document.getElementById('success-msg').textContent=
           'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento aprovado! Você já faz parte da Punch and Roll. 🥊';
-        setStep(4);
+        setStep(5);
       }else{
         throw new Error('Pagamento não aprovado. Verifique os dados do cartão.');
       }
