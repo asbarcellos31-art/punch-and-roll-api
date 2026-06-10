@@ -162,6 +162,7 @@ async function setupDB() {
     try { await conn.query("ALTER TABLE documentos ADD COLUMN categoria VARCHAR(50) DEFAULT 'outro'"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN arquivo LONGBLOB"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN mimetype VARCHAR(100)"); } catch(e){}
+    try { await conn.query("ALTER TABLE documentos ADD COLUMN aluno_id INT NULL"); } catch(e){}
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS pagamentos (
@@ -1174,12 +1175,12 @@ app.get('/api/contratos/html/:token', async (req, res) => {
 app.post('/api/documentos', auth, async (req, res) => {
   try {
     if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
-    const { nome, categoria, extensao, mimetype, arquivo_base64, tamanho } = req.body;
+    const { nome, categoria, extensao, mimetype, arquivo_base64, tamanho, aluno_id } = req.body;
     if (!nome || !arquivo_base64) return res.status(400).json({ error: 'nome e arquivo_base64 obrigatórios' });
     const buffer = Buffer.from(arquivo_base64, 'base64');
     await db.query(
-      'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel) VALUES (?,?,?,?,?,?,1)',
-      [nome, categoria || 'outro', extensao || 'pdf', tamanho || buffer.length, mimetype || 'application/pdf', buffer]
+      'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel, aluno_id) VALUES (?,?,?,?,?,?,1,?)',
+      [nome, categoria || 'outro', extensao || 'pdf', tamanho || buffer.length, mimetype || 'application/pdf', buffer, aluno_id || null]
     );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1187,7 +1188,17 @@ app.post('/api/documentos', auth, async (req, res) => {
 
 app.get('/api/documentos', auth, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT id, nome, categoria, extensao, tamanho, mimetype, criado_em FROM documentos WHERE visivel=1 ORDER BY criado_em DESC');
+    const [rows] = await db.query('SELECT id, nome, categoria, extensao, tamanho, mimetype, criado_em FROM documentos WHERE visivel=1 AND aluno_id IS NULL ORDER BY criado_em DESC');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/documentos/aluno/:aluno_id', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, nome, categoria, extensao, tamanho, mimetype, criado_em FROM documentos WHERE visivel=1 AND aluno_id=? ORDER BY criado_em DESC',
+      [req.params.aluno_id]
+    );
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
