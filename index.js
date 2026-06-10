@@ -512,7 +512,6 @@ app.post('/api/alunos/publico', async (req, res) => {
     await notificarWA(process.env.WA_ADMIN_NUM||'554898463-9257',`🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Plano:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}`);
     await notificarWA(d.tel,`Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*`);
     await enviarEmailAdmin('🥊 Nova Matrícula Online',`<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p>`);
-    await enviarEmailAluno(d.email,d.nome,'Matrícula recebida — Punch and Roll',`<h2>Olá, ${d.nome.split(' ')[0]}!</h2><p>Sua matrícula foi recebida. Entraremos em contato em breve.</p><p>Plano: <strong>${d.plano}</strong></p>`);
     res.json({ id: result.insertId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1102,23 +1101,74 @@ app.post('/api/contratos', async (req, res) => {
       [aluno_id, token, plano, modalidade, valor || 0, meses || 1, freq, ip, contrato_html || '']
     );
     const link = `https://punchandroll.com.br/assinar-contrato.html?token=${token}`;
-    enviarEmailAluno(email, nome, '📋 Seu contrato Punch and Roll — assine digitalmente',
-      `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0f0f0f;color:#f2f2f2;border-radius:12px;overflow:hidden">
-        <div style="background:#d4111c;padding:24px;text-align:center">
-          <h1 style="font-family:sans-serif;font-size:24px;letter-spacing:2px;margin:0">PUNCH AND ROLL</h1>
-          <p style="margin:4px 0 0;font-size:13px;opacity:.8">Fight Team · São José, SC</p>
+    const nomeFirst = (nome || 'aluno').split(' ')[0];
+    const modLabel = modalidade === 'boxe' ? 'Boxe' : modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : 'Boxe + Jiu-Jitsu';
+    const freqLabel = freq === 'livre' ? 'Frequência Livre' : '3x por semana';
+    enviarEmailAluno(email, nome, `🥊 Bem-vindo à Punch and Roll, ${nomeFirst}!`,
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif">
+      <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;margin-top:24px;margin-bottom:24px">
+
+        <!-- HEADER -->
+        <div style="background:#d4111c;padding:32px 24px;text-align:center">
+          <div style="font-size:40px;margin-bottom:8px">🥊</div>
+          <h1 style="color:#ffffff;font-size:28px;letter-spacing:3px;margin:0;font-family:Arial,sans-serif">PUNCH AND ROLL</h1>
+          <p style="color:rgba(255,255,255,.8);font-size:13px;margin:6px 0 0;letter-spacing:1px">FIGHT TEAM · SÃO JOSÉ, SC</p>
         </div>
-        <div style="padding:32px 24px">
-          <p style="font-size:16px;margin:0 0 16px">Olá, <strong>${nome || 'aluno'}</strong>!</p>
-          <p style="color:#ccc;line-height:1.6;margin:0 0 24px">Sua matrícula foi confirmada! Agora só falta assinar seu contrato digitalmente. Clique no botão abaixo para visualizar e assinar:</p>
-          <div style="text-align:center;margin:32px 0">
-            <a href="${link}" style="background:#d4111c;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:bold;letter-spacing:1px;display:inline-block">ASSINAR CONTRATO</a>
+
+        <!-- BOAS-VINDAS -->
+        <div style="padding:32px 28px">
+          <h2 style="color:#111;font-size:22px;margin:0 0 12px">Bem-vindo, ${nomeFirst}! 🎉</h2>
+          <p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">
+            Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi recebida com sucesso! Estamos muito felizes em ter você na nossa equipe.
+          </p>
+
+          <!-- CARD DO PLANO -->
+          <div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin-bottom:28px">
+            <p style="color:#888;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 12px">SEU PLANO</p>
+            <table style="width:100%;border-collapse:collapse">
+              <tr>
+                <td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Modalidade</td>
+                <td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${modLabel}</td>
+              </tr>
+              <tr>
+                <td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Frequência</td>
+                <td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${freqLabel}</td>
+              </tr>
+              <tr>
+                <td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Plano</td>
+                <td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${plano || modalidade}</td>
+              </tr>
+              <tr>
+                <td style="color:#555;font-size:13px;padding:8px 0 0">Mensalidade</td>
+                <td style="color:#d4111c;font-size:16px;font-weight:bold;text-align:right;padding:8px 0 0">R$ ${Number(valor||0).toFixed(0)}/mês</td>
+              </tr>
+            </table>
           </div>
-          <p style="color:#666;font-size:12px;text-align:center;margin:0">Ou acesse: <a href="${link}" style="color:#d4111c">${link}</a></p>
-          <hr style="border:none;border-top:1px solid #222;margin:24px 0">
-          <p style="color:#666;font-size:12px;margin:0">Plano: <strong style="color:#f2f2f2">${plano || modalidade}</strong></p>
+
+          <!-- CONTRATO -->
+          <div style="background:#fff8f8;border:1px solid #ffd0d0;border-radius:10px;padding:20px;margin-bottom:28px">
+            <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 8px">📋 Assine seu contrato</p>
+            <p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 20px">Para formalizar sua matrícula, assine digitalmente o contrato clicando no botão abaixo. Leva menos de 1 minuto.</p>
+            <div style="text-align:center">
+              <a href="${link}" style="background:#d4111c;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:bold;letter-spacing:1px;display:inline-block">ASSINAR CONTRATO</a>
+            </div>
+            <p style="color:#aaa;font-size:11px;text-align:center;margin:14px 0 0">Ou acesse: <a href="${link}" style="color:#d4111c">${link}</a></p>
+          </div>
+
+          <!-- ENDEREÇO -->
+          <div style="border-top:1px solid #eee;padding-top:20px">
+            <p style="color:#888;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px">ONDE NOS ENCONTRAR</p>
+            <p style="color:#444;font-size:13px;line-height:1.6;margin:0">📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC<br>💬 (48) 98463-9257<br>🌐 punchandroll.com.br</p>
+          </div>
         </div>
-      </div>`
+
+        <!-- FOOTER -->
+        <div style="background:#111;padding:20px 24px;text-align:center">
+          <p style="color:#888;font-size:11px;margin:0">© 2026 Punch and Roll Fight Team · São José, SC</p>
+        </div>
+
+      </div>
+      </body></html>`
     ).catch(() => {});
     res.json({ token });
   } catch (e) { res.status(500).json({ error: e.message }); }
