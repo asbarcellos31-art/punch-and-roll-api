@@ -1586,7 +1586,7 @@ async function carregarDocumentos(){
           <div style="font-size:11px;color:var(--muted);margin-top:2px">${d.categoria} · ${new Date(d.criado_em).toLocaleDateString('pt-BR')} · ${(d.tamanho/1024).toFixed(0)}KB</div>
         </div>
         <div style="display:flex;gap:6px">
-          <a href="${API}/api/documentos/${d.id}/download" target="_blank" class="btn btn-ghost btn-sm" title="Baixar">⬇️</a>
+          <a href="https://punch-and-roll-api-production.up.railway.app/api/documentos/${d.id}/download" target="_blank" class="btn btn-ghost btn-sm" title="Ver / Baixar">⬇️</a>
           <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirDocumento(${d.id},'${d.nome.replace(/'/g,"\\'")}')">🗑</button>
         </div>
       </div>`).join('');

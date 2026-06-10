@@ -1192,14 +1192,14 @@ app.get('/api/documentos', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/documentos/:id/download', auth, async (req, res) => {
+app.get('/api/documentos/:id/download', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT nome, extensao, mimetype, arquivo FROM documentos WHERE id=?', [req.params.id]);
+    const [rows] = await db.query('SELECT nome, extensao, mimetype, arquivo FROM documentos WHERE id=? AND visivel=1', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Não encontrado' });
     const doc = rows[0];
     await db.query('UPDATE documentos SET downloads=downloads+1 WHERE id=?', [req.params.id]);
     res.setHeader('Content-Type', doc.mimetype || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${doc.nome}.${doc.extensao}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${doc.nome}.${doc.extensao}"`);
     res.send(doc.arquivo);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
