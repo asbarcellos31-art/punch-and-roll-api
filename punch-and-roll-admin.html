@@ -1502,7 +1502,102 @@ async function togglePin(id,pin){
 }
 
 function renderDocumentos(){
-  document.getElementById('page-documentos').innerHTML='<div class="alert alert-y">📁 Módulo de documentos em breve.</div>';
+  document.getElementById('page-documentos').innerHTML=`
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">📎 Enviar Documento</div>
+      <div class="fg"><label class="fl">Nome do documento</label><input class="fi" id="doc-nome" placeholder="Ex: Manual de Conduta 2026, Contrato Padrão..."></div>
+      <div class="fg"><label class="fl">Categoria</label>
+        <select class="fi" id="doc-cat">
+          <option value="manual">📋 Manual de Conduta</option>
+          <option value="contrato">📄 Contrato</option>
+          <option value="regulamento">📜 Regulamento</option>
+          <option value="outro">📁 Outro</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Arquivo (PDF, imagem ou doc)</label>
+        <div id="drop-zone" style="border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="document.getElementById('doc-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--red)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleDocDrop(event)">
+          <div style="font-size:28px;margin-bottom:6px">📂</div>
+          <div style="font-size:13px;color:var(--muted)">Clique para selecionar ou arraste o arquivo aqui</div>
+          <div id="doc-file-name" style="font-size:12px;color:var(--white);margin-top:8px;display:none"></div>
+          <input type="file" id="doc-file" style="display:none" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="mostrarNomeArquivo(this)">
+        </div>
+      </div>
+      <button class="btn btn-r" id="btn-upload-doc" onclick="uploadDocumento()">📤 Enviar Documento</button>
+    </div>
+    <div class="card">
+      <div class="card-title">📁 Documentos Armazenados</div>
+      <div id="lista-documentos"><div class="loading">Carregando...</div></div>
+    </div>`;
+  carregarDocumentos();
+}
+
+function mostrarNomeArquivo(input){
+  const el = document.getElementById('doc-file-name');
+  if(input.files[0]){ el.textContent='✓ '+input.files[0].name; el.style.display='block'; document.getElementById('drop-zone').style.borderColor='var(--red)'; }
+}
+
+function handleDocDrop(e){
+  e.preventDefault();
+  document.getElementById('drop-zone').style.borderColor='var(--border)';
+  const f = e.dataTransfer.files[0];
+  if(!f) return;
+  const dt = new DataTransfer(); dt.items.add(f);
+  document.getElementById('doc-file').files = dt.files;
+  mostrarNomeArquivo(document.getElementById('doc-file'));
+}
+
+async function uploadDocumento(){
+  const nome = document.getElementById('doc-nome').value.trim();
+  const cat = document.getElementById('doc-cat').value;
+  const file = document.getElementById('doc-file').files[0];
+  if(!nome){ alert('Informe o nome do documento!'); return; }
+  if(!file){ alert('Selecione um arquivo!'); return; }
+  const btn = document.getElementById('btn-upload-doc');
+  btn.disabled=true; btn.textContent='Enviando...';
+  try {
+    const form = new FormData();
+    form.append('nome', nome);
+    form.append('categoria', cat);
+    form.append('arquivo', file);
+    const res = await fetch(API+'/api/documentos', { method:'POST', headers:{'Authorization':'Bearer '+_token}, body:form });
+    if(!res.ok) throw new Error((await res.json()).error||'Erro ao enviar');
+    document.getElementById('doc-nome').value='';
+    document.getElementById('doc-file').value='';
+    document.getElementById('doc-file-name').style.display='none';
+    document.getElementById('drop-zone').style.borderColor='var(--border)';
+    alert('✅ Documento enviado!');
+    carregarDocumentos();
+  } catch(e){ alert('Erro: '+e.message); }
+  finally { btn.disabled=false; btn.textContent='📤 Enviar Documento'; }
+}
+
+async function carregarDocumentos(){
+  const el = document.getElementById('lista-documentos');
+  if(!el) return;
+  try {
+    const docs = await GET('/api/documentos');
+    if(!docs||docs.length===0){ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Nenhum documento cadastrado.</div>'; return; }
+    const catIcon = {manual:'📋',contrato:'📄',regulamento:'📜',outro:'📁'};
+    el.innerHTML = docs.map(d=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:24px">${catIcon[d.categoria]||'📁'}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${d.nome}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${d.categoria} · ${new Date(d.criado_em).toLocaleDateString('pt-BR')} · ${(d.tamanho/1024).toFixed(0)}KB</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <a href="${API}/api/documentos/${d.id}/download" target="_blank" class="btn btn-ghost btn-sm" title="Baixar">⬇️</a>
+          <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirDocumento(${d.id},'${d.nome.replace(/'/g,"\\'")}')">🗑</button>
+        </div>
+      </div>`).join('');
+  } catch(e){ if(el) el.innerHTML='<div style="color:#f87171;font-size:12px">Erro ao carregar documentos.</div>'; }
+}
+
+async function excluirDocumento(id, nome){
+  if(!confirm('Excluir "'+nome+'"?')) return;
+  try { await DEL('/api/documentos/'+id); carregarDocumentos(); }
+  catch(e){ alert('Erro: '+e.message); }
 }
 
 function renderMarketing(){renderMktWA();}

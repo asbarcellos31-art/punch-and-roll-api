@@ -5,7 +5,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const axios = require('axios');
+const multer = require('multer');
 require('dotenv').config();
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Origin','Accept'] }));
@@ -156,6 +159,9 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try { await conn.query("ALTER TABLE documentos ADD COLUMN categoria VARCHAR(50) DEFAULT 'outro'"); } catch(e){}
+    try { await conn.query("ALTER TABLE documentos ADD COLUMN arquivo LONGBLOB"); } catch(e){}
+    try { await conn.query("ALTER TABLE documentos ADD COLUMN mimetype VARCHAR(100)"); } catch(e){}
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS pagamentos (
@@ -1203,6 +1209,50 @@ app.get('/api/contratos/html/:token', async (req, res) => {
     if (!rows.length) return res.status(404).send('<h1>Contrato não encontrado</h1>');
     res.type('html').send(rows[0].contrato_html);
   } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
+});
+
+// ══════════════════════════════════════
+// DOCUMENTOS
+// ══════════════════════════════════════
+app.post('/api/documentos', auth, upload.single('arquivo'), async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
+    const { nome, categoria } = req.body;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'Arquivo obrigatório' });
+    await db.query(
+      'INSERT INTO documentos (nome, categoria, extensao, tamanho, mimetype, arquivo, visivel) VALUES (?,?,?,?,?,?,1)',
+      [nome, categoria || 'outro', file.originalname.split('.').pop(), file.size, file.mimetype, file.buffer]
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/documentos', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT id, nome, categoria, extensao, tamanho, mimetype, criado_em FROM documentos WHERE visivel=1 ORDER BY criado_em DESC');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/documentos/:id/download', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT nome, extensao, mimetype, arquivo FROM documentos WHERE id=?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Não encontrado' });
+    const doc = rows[0];
+    await db.query('UPDATE documentos SET downloads=downloads+1 WHERE id=?', [req.params.id]);
+    res.setHeader('Content-Type', doc.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${doc.nome}.${doc.extensao}"`);
+    res.send(doc.arquivo);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/documentos/:id', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'admin' && req.user.tipo !== 'master') return res.status(403).json({ error: 'Acesso negado' });
+    await db.query('UPDATE documentos SET visivel=0 WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/contratos/meta/:token', async (req, res) => {
