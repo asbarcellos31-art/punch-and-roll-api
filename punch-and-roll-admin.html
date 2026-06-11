@@ -1698,72 +1698,154 @@ function verDocumento(id, nome){
 
 function renderMarketing(){renderMktWA();}
 
+let leData = [];
+let leView = 'horario'; // 'horario' | 'lista'
+let leFiltros = { modalidade: '', dia: '', hora: '', status: '' };
+
 async function renderListaEspera() {
   const pg = document.getElementById('page-lista-espera');
   pg.innerHTML = `<div style="font-size:13px;color:var(--muted);text-align:center;padding:30px">Carregando...</div>`;
-  let lista;
-  try { lista = await GET('/api/lista-espera'); }
+  try { leData = await GET('/api/lista-espera'); }
   catch(e) { pg.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; return; }
+  leRender();
+}
 
+function leRender() {
+  const pg = document.getElementById('page-lista-espera');
   const modLabel = m => ({boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'})[m]||m||'—';
   const statusBadge = s => s==='contatado'
     ? `<span style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 8px;font-size:10px">✅ Contatado</span>`
     : `<span style="background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:2px 8px;font-size:10px">⏳ Pendente</span>`;
 
-  // Resumo por horário sugerido
-  const contagem = {};
-  lista.forEach(r => {
-    if (!r.dia_sugerido && !r.hora_sugerida) return;
-    const chave = `${r.dia_sugerido||'?'} ${r.hora_sugerida||'?'} — ${modLabel(r.modalidade)}`;
-    contagem[chave] = (contagem[chave]||0) + 1;
+  // Filtrar
+  let lista = leData.filter(r => {
+    if (leFiltros.modalidade && r.modalidade !== leFiltros.modalidade) return false;
+    if (leFiltros.dia && r.dia_sugerido !== leFiltros.dia) return false;
+    if (leFiltros.hora && r.hora_sugerida !== leFiltros.hora) return false;
+    if (leFiltros.status && r.status !== leFiltros.status) return false;
+    return true;
   });
-  const topHorarios = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Opções únicas para os selects
+  const dias = [...new Set(leData.map(r=>r.dia_sugerido).filter(Boolean))];
+  const horas = [...new Set(leData.map(r=>r.hora_sugerida).filter(Boolean))].sort();
+
+  // Agrupamento por horário (para view de horários)
+  const grupos = {};
+  leData.forEach(r => {
+    const chave = `${r.dia_sugerido||'Sem dia'} às ${r.hora_sugerida||'?'} — ${modLabel(r.modalidade)}`;
+    if (!grupos[chave]) grupos[chave] = { chave, dia:r.dia_sugerido, hora:r.hora_sugerida, modalidade:r.modalidade, pessoas:[] };
+    grupos[chave].pessoas.push(r);
+  });
+  const gruposOrdenados = Object.values(grupos).sort((a,b) => b.pessoas.length - a.pessoas.length);
+
+  const pendentes = leData.filter(r=>r.status!=='contatado').length;
 
   pg.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:12px;color:var(--muted)">${lista.length} pessoa(s) na lista</div>
-      <a href="/horarios.html" target="_blank" class="btn btn-ghost btn-sm">🔗 Ver página pública</a>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:13px;color:var(--muted)">${leData.length} total</span>
+        ${pendentes>0?`<span style="background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:2px 10px;font-size:11px">${pendentes} pendente${pendentes>1?'s':''}</span>`:''}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm ${leView==='horario'?'btn-r':'btn-ghost'}" onclick="leView='horario';leRender()">📊 Por Horário</button>
+        <button class="btn btn-sm ${leView==='lista'?'btn-r':'btn-ghost'}" onclick="leView='lista';leRender()">📋 Lista</button>
+        <a href="/horarios.html" target="_blank" class="btn btn-ghost btn-sm">🔗 Página pública</a>
+      </div>
     </div>
 
-    ${topHorarios.length>0?`
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-title">🔥 Horários mais solicitados</div>
-      ${topHorarios.map(([h,n])=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
-          <div style="font-size:13px">${h}</div>
-          <span style="background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:12px;padding:2px 10px;font-size:12px;font-weight:600">${n} pedido${n>1?'s':''}</span>
-        </div>`).join('')}
-    </div>`:''}
+    <!-- Filtros -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <select class="fi" style="flex:1;min-width:120px;max-width:160px;padding:7px 10px;font-size:12px" onchange="leFiltros.modalidade=this.value;leRender()">
+        <option value="">Modalidade</option>
+        <option value="boxe" ${leFiltros.modalidade==='boxe'?'selected':''}>🥊 Boxe</option>
+        <option value="jiujitsu" ${leFiltros.modalidade==='jiujitsu'?'selected':''}>🟦 Jiu-Jitsu</option>
+        <option value="ambos" ${leFiltros.modalidade==='ambos'?'selected':''}>🥊🟦 Ambos</option>
+      </select>
+      <select class="fi" style="flex:1;min-width:120px;max-width:160px;padding:7px 10px;font-size:12px" onchange="leFiltros.dia=this.value;leRender()">
+        <option value="">Dia</option>
+        ${dias.map(d=>`<option value="${d}" ${leFiltros.dia===d?'selected':''}>${d}</option>`).join('')}
+      </select>
+      <select class="fi" style="flex:1;min-width:120px;max-width:160px;padding:7px 10px;font-size:12px" onchange="leFiltros.hora=this.value;leRender()">
+        <option value="">Horário</option>
+        ${horas.map(h=>`<option value="${h}" ${leFiltros.hora===h?'selected':''}>${h}</option>`).join('')}
+      </select>
+      <select class="fi" style="flex:1;min-width:120px;max-width:160px;padding:7px 10px;font-size:12px" onchange="leFiltros.status=this.value;leRender()">
+        <option value="">Status</option>
+        <option value="pendente" ${leFiltros.status==='pendente'?'selected':''}>⏳ Pendente</option>
+        <option value="contatado" ${leFiltros.status==='contatado'?'selected':''}>✅ Contatado</option>
+      </select>
+      ${Object.values(leFiltros).some(Boolean)?`<button class="btn btn-ghost btn-sm" onclick="leFiltros={modalidade:'',dia:'',hora:'',status:''};leRender()">✕ Limpar</button>`:''}
+    </div>
 
-    ${lista.length===0
-      ? `<div class="card"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Nenhum registro ainda</div></div>`
-      : lista.map(r=>`
-        <div class="card" style="margin-bottom:10px;padding:14px 16px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:14px;font-weight:600;margin-bottom:4px">${r.nome}</div>
-              <div style="font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px">
-                ${r.tel?`<span>📱 ${r.tel}</span>`:''}
-                ${r.modalidade?`<span>${modLabel(r.modalidade)}</span>`:''}
-                ${r.dia_sugerido?`<span>📅 ${r.dia_sugerido}${r.hora_sugerida?' às '+r.hora_sugerida:''}</span>`:''}
-              </div>
-              ${r.obs?`<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic">"${r.obs}"</div>`:''}
-              <div style="font-size:10px;color:var(--muted);margin-top:4px">${new Date(r.criado_em).toLocaleDateString('pt-BR')}</div>
+    ${leView==='horario' ? leRenderGrupos(gruposOrdenados, modLabel, statusBadge) : leRenderLista(lista, modLabel, statusBadge)}`;
+}
+
+function leRenderGrupos(grupos, modLabel, statusBadge) {
+  if (!grupos.length) return `<div class="card"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Nenhum registro com horário sugerido</div></div>`;
+  return grupos.map(g => {
+    const pendentes = g.pessoas.filter(p=>p.status!=='contatado').length;
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:15px;font-weight:700">${g.dia||'Sem dia'} · ${g.hora||'?'}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${modLabel(g.modalidade)}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:12px;padding:3px 12px;font-size:13px;font-weight:700">${g.pessoas.length} pessoa${g.pessoas.length>1?'s':''}</span>
+          ${pendentes>0?`<span style="background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:2px 8px;font-size:10px">${pendentes} pendente${pendentes>1?'s':''}</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${g.pessoas.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #1e1e1e;border-radius:6px">
+            <div>
+              <div style="font-size:13px;font-weight:500">${r.nome}</div>
+              ${r.tel?`<div style="font-size:11px;color:var(--muted)">📱 ${r.tel}</div>`:''}
+              ${r.obs?`<div style="font-size:10px;color:var(--muted);font-style:italic">"${r.obs}"</div>`:''}
             </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
               ${statusBadge(r.status)}
-              ${r.status!=='contatado'?`<button class="btn btn-ghost btn-sm" onclick="marcarContatado(${r.id},this)">✓ Contatado</button>`:''}
-              ${r.tel?`<a href="https://wa.me/55${r.tel.replace(/\D/g,'')}" target="_blank" class="btn btn-ghost btn-sm">💬 WA</a>`:''}
+              ${r.status!=='contatado'?`<button class="btn btn-ghost btn-sm" onclick="marcarContatado(${r.id},this)" title="Marcar contatado">✓</button>`:''}
+              ${r.tel?`<a href="https://wa.me/55${r.tel.replace(/\D/g,'')}" target="_blank" class="btn btn-ghost btn-sm" title="Abrir WhatsApp">💬</a>`:''}
             </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function leRenderLista(lista, modLabel, statusBadge) {
+  if (!lista.length) return `<div class="card"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Nenhum resultado para os filtros aplicados</div></div>`;
+  return lista.map(r=>`
+    <div class="card" style="margin-bottom:8px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;margin-bottom:3px">${r.nome}</div>
+          <div style="font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px">
+            ${r.tel?`<span>📱 ${r.tel}</span>`:''}
+            ${r.modalidade?`<span>${modLabel(r.modalidade)}</span>`:''}
+            ${r.dia_sugerido?`<span>📅 ${r.dia_sugerido}${r.hora_sugerida?' às '+r.hora_sugerida:''}</span>`:''}
           </div>
-        </div>`).join('')}`;
+          ${r.obs?`<div style="font-size:11px;color:var(--muted);margin-top:3px;font-style:italic">"${r.obs}"</div>`:''}
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">${new Date(r.criado_em).toLocaleDateString('pt-BR')}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+          ${statusBadge(r.status)}
+          ${r.status!=='contatado'?`<button class="btn btn-ghost btn-sm" onclick="marcarContatado(${r.id},this)">✓ Contatado</button>`:''}
+          ${r.tel?`<a href="https://wa.me/55${r.tel.replace(/\D/g,'')}" target="_blank" class="btn btn-ghost btn-sm">💬</a>`:''}
+        </div>
+      </div>
+    </div>`).join('');
 }
 
 async function marcarContatado(id, btn) {
   btn.disabled = true;
   try {
     await PUT('/api/lista-espera/'+id+'/status', { status: 'contatado' });
-    renderListaEspera();
+    const item = leData.find(r=>r.id===id);
+    if (item) item.status = 'contatado';
+    leRender();
   } catch(e) { alert('Erro: '+e.message); btn.disabled=false; }
 }
 
