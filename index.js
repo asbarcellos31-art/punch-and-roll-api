@@ -648,10 +648,20 @@ app.post('/api/checkins', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/checkins/:id', auth, adminOnly, async (req, res) => {
+app.delete('/api/checkins/:id', auth, async (req, res) => {
   try {
-    await db.query('DELETE FROM checkins WHERE id=?',[req.params.id]);
-    res.json({ message: 'Check-in removido!' });
+    const [rows] = await db.query('SELECT * FROM checkins WHERE id=?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Check-in não encontrado' });
+    const ck = rows[0];
+    // Aluno só pode cancelar o próprio check-in e apenas no mesmo dia
+    if (req.user.tipo === 'aluno') {
+      if (ck.aluno_id !== req.user.id) return res.status(403).json({ error: 'Acesso negado' });
+      const hoje = new Date().toISOString().split('T')[0];
+      const dtCk = ck.data_checkin instanceof Date ? ck.data_checkin.toISOString().split('T')[0] : String(ck.data_checkin).split('T')[0];
+      if (dtCk !== hoje) return res.status(400).json({ error: 'Só é possível cancelar check-in do dia atual' });
+    }
+    await db.query('DELETE FROM checkins WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

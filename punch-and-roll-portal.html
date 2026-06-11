@@ -304,16 +304,21 @@ function renderAgenda() {
   if(aulasD.length===0) { html+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem aulas neste dia</div>'; }
   else {
     aulasD.forEach(au=>{
-      const ckFeito = cache.checkins.some(c=>c.aula_id===au.id);
+      const ck = cache.checkins.find(c=>c.aula_id===au.id);
+      const ckFeito = !!ck;
       const [h,mi]=au.hora.split(':').map(Number);
       const diff=(h*60+mi)-nowMin;
       let btn='';
-      if(ckFeito) btn=`<button disabled style="padding:7px 12px;background:rgba(34,197,94,.3);color:var(--green);border:1px solid rgba(34,197,94,.5);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px">✓ Confirmado</button>`;
+      if(ckFeito) {
+        const podeCanc = isHoje;
+        btn=`<div style="display:flex;gap:6px;align-items:center">
+          <span style="padding:7px 10px;background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.4);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600">✓ Confirmado</span>
+          ${podeCanc?`<button onclick="cancelarCheckin(${ck.id})" style="padding:7px 8px;background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer" title="Cancelar check-in">✕</button>`:''}
+        </div>`;
+      }
       else if(bloqueado) btn=`<span style="font-size:10px;color:#f87171">⛔ Inadimplente</span>`;
-      else if(!isHoje) btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Reservar</button>`;
-      else if(diff>120){const hh=Math.floor(diff/60),mm=diff%60;btn=`<span style="font-size:10px;color:var(--muted)">Abre em ${hh>0?hh+'h ':''}${mm}min</span>`;}
-      else if(diff<-15) btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
-      else btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">✓ Check-in</button>`;
+      else if(diff<-15&&isHoje) btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
+      else btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:${isHoje?'rgba(34,197,94,.15)':'rgba(59,130,246,.15)'};color:${isHoje?'var(--green)':'var(--blue)'};border:1px solid ${isHoje?'rgba(34,197,94,.3)':'rgba(59,130,246,.3)'};border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">${isHoje?'✓ Check-in':'Reservar'}</button>`;
       html+=`<div class="aula-item">
         <div class="aula-hora">${au.hora}</div>
         <div class="aula-info"><div class="aula-nome">${au.nome}</div><div class="aula-meta">${au.vagas} vagas · ${au.modalidade==='boxe'?'🥊 Boxe':'🟦 Jiu-Jitsu'}</div></div>
@@ -327,15 +332,32 @@ function renderAgenda() {
 function selecionarDia(dia) { diaSelecionado=dia; renderAgenda(); }
 
 async function fazerCheckin(aulaId) {
+  // Só 1 check-in por dia
+  const hoje = diaHoje;
+  const jaTem = cache.checkins.some(c => {
+    const dt = c.data_checkin ? String(c.data_checkin).split('T')[0] : '';
+    return dt === new Date().toISOString().split('T')[0];
+  });
+  if (jaTem) { alert('Você já tem um check-in confirmado hoje. Cancele o atual para reservar outro.'); return; }
   try {
     await api('POST','/api/checkins',{aula_id:aulaId});
-    // Recarregar checkins
     const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
     cache.checkins = Array.isArray(cks)?cks:[];
     alert('✅ Check-in confirmado! Até lá! 🥊');
     renderAgenda();
     renderInicio();
   } catch(e) { alert(e.message); }
+}
+
+async function cancelarCheckin(ckId) {
+  if (!confirm('Cancelar seu check-in desta aula?')) return;
+  try {
+    await api('DELETE','/api/checkins/'+ckId);
+    const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
+    cache.checkins = Array.isArray(cks)?cks:[];
+    renderAgenda();
+    renderInicio();
+  } catch(e) { alert(e.message||'Erro ao cancelar.'); }
 }
 
 // RECADOS
