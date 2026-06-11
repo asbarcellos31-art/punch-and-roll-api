@@ -974,9 +974,12 @@ app.get('/api/despesas', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+const normDate = v => v ? String(v).split('T')[0] : null;
+
 app.post('/api/despesas', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, data_vencimento, categoria, metodo, obs, parcelas = 1, recorrente = false } = req.body;
+    const { descricao, valor, categoria, metodo, obs, parcelas = 1, recorrente = false } = req.body;
+    const data_vencimento = normDate(req.body.data_vencimento);
     if (!descricao || !valor || !data_vencimento) return res.status(400).json({ error: 'Preencha descrição, valor e vencimento' });
     const n = Math.min(Math.max(parseInt(parcelas) || 1, 1), 60);
     const grupo = n > 1 || recorrente ? require('crypto').randomUUID() : null;
@@ -998,7 +1001,9 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
 
 app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, data_vencimento, data_pagamento, status, categoria, metodo, obs, recorrente } = req.body;
+    const { descricao, valor, status, categoria, metodo, obs, recorrente } = req.body;
+    const data_vencimento = normDate(req.body.data_vencimento);
+    const data_pagamento = normDate(req.body.data_pagamento);
     await db.query(
       'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=? WHERE id=?',
       [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, req.params.id]
