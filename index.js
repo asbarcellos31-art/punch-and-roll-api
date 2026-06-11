@@ -655,7 +655,7 @@ app.delete('/api/checkins/:id', auth, async (req, res) => {
     const ck = rows[0];
     // Aluno só pode cancelar o próprio check-in e apenas no mesmo dia
     if (req.user.tipo === 'aluno') {
-      if (ck.aluno_id !== req.user.id) return res.status(403).json({ error: 'Acesso negado' });
+      if (Number(ck.aluno_id) !== Number(req.user.id)) return res.status(403).json({ error: 'Acesso negado' });
       const hoje = new Date().toISOString().split('T')[0];
       const dtCk = ck.data_checkin instanceof Date ? ck.data_checkin.toISOString().split('T')[0] : String(ck.data_checkin).split('T')[0];
       if (dtCk !== hoje) return res.status(400).json({ error: 'Só é possível cancelar check-in do dia atual' });

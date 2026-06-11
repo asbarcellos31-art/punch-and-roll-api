@@ -1265,7 +1265,8 @@ async function pagarDespesa(id){
   const d=(finResumo?.despesas||[]).find(x=>x.id===id);
   if(!d||!confirm('Marcar "'+d.descricao+'" como pago?'))return;
   try{
-    const r=await PUT('/api/despesas/'+id,{...d,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente});
+    const venc=d.data_vencimento?String(d.data_vencimento).split('T')[0]:null;
+    const r=await PUT('/api/despesas/'+id,{...d,data_vencimento:venc,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente});
     finResumo=null; renderFinanceiro();
     if(r?.recorrente_criado) setTimeout(()=>alert('🔄 Próximo mês criado automaticamente!'),400);
   }catch(e){alert('Erro: '+e.message);}
