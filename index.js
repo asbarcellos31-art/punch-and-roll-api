@@ -560,6 +560,10 @@ app.post('/api/lista-espera', async (req, res) => {
       'INSERT INTO lista_espera (nome, tel, modalidade, dia_sugerido, hora_sugerida, obs) VALUES (?,?,?,?,?,?)',
       [nome, tel||null, modalidade||null, dia_sugerido||null, hora_sugerida||null, obs||null]
     );
+    // Notifica admin no WhatsApp
+    const modLabel = { boxe:'🥊 Boxe', jiujitsu:'🟦 Jiu-Jitsu', ambos:'🥊🟦 Ambos' };
+    const msg = `📋 *Nova entrada na Lista de Espera*\n\n👤 ${nome}${tel ? '\n📱 ' + tel : ''}\n${modalidade ? '🏋️ ' + (modLabel[modalidade]||modalidade) : ''}${dia_sugerido ? '\n📅 ' + dia_sugerido + (hora_sugerida ? ' às ' + hora_sugerida : '') : ''}${obs ? '\n💬 ' + obs : ''}\n\nAcesse o admin para gerenciar.`;
+    if (process.env.ADMIN_TEL) notificarWA(process.env.ADMIN_TEL, msg).catch(()=>{});
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
