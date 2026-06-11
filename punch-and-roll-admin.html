@@ -791,21 +791,43 @@ function abrirModalAula(id) {
   editingAulaId = id||null;
   const a = id ? cache.aulas.find(x=>x.id===id) : null;
   const box = criarModal('modal-aula-dyn', a?'✏️ Editar Aula':'+ Nova Aula');
+  const DIAS_SEMANA = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
   box.innerHTML += `
     <div class="frow">
       <div class="fg"><label class="fl">Nome da Aula *</label><input class="fi" id="au-nome" value="${a?.nome||''}" placeholder="Ex: Boxe Iniciante"></div>
       <div class="fg"><label class="fl">Horário *</label><input class="fi" type="time" id="au-hora" value="${a?.hora||'07:00'}"></div>
     </div>
     <div class="frow">
-      <div class="fg"><label class="fl">Dia *</label><select class="fi" id="au-dia">${['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'].map(d=>`<option${(a?.dia||selectedDay)===d?' selected':''}>${d}</option>`).join('')}</select></div>
       <div class="fg"><label class="fl">Vagas</label><input class="fi" type="number" id="au-vagas" value="${a?.vagas||15}" min="1" max="60"></div>
+      <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="au-modalidade"><option value="boxe"${a?.modalidade==='boxe'?' selected':''}>🥊 Boxe</option><option value="jiujitsu"${a?.modalidade==='jiujitsu'?' selected':''}>🟦 Jiu-Jitsu</option></select></div>
     </div>
-    <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="au-modalidade"><option value="boxe"${a?.modalidade==='boxe'?' selected':''}>🥊 Boxe</option><option value="jiujitsu"${a?.modalidade==='jiujitsu'?' selected':''}>🟦 Jiu-Jitsu</option></select></div>
+    <div class="fg">
+      <label class="fl">${a ? 'Dia' : 'Dias da semana *'}</label>
+      ${a
+        ? `<select class="fi" id="au-dia">${DIAS_SEMANA.map(d=>`<option${a.dia===d?' selected':''}>${d}</option>`).join('')}</select>`
+        : `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+            ${DIAS_SEMANA.map(d=>`
+              <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:#111;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;user-select:none" id="lbl-${d}">
+                <input type="checkbox" id="au-dia-${d}" value="${d}" style="accent-color:var(--red)" onchange="leToggleDia('${d}',this.checked)">
+                ${d}
+              </label>`).join('')}
+          </div>`}
+    </div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-aula-dyn').remove()">Cancelar</button>
       <button class="btn btn-r" style="flex:1" id="btn-salvar-aula" onclick="salvarAula()">💾 Salvar</button>
     </div>`;
   document.body.appendChild(box.parentElement||box);
+  // Pré-selecionar dia atual ao criar
+  if (!a) {
+    const chk = document.getElementById('au-dia-'+selectedDay);
+    if (chk) { chk.checked=true; leToggleDia(selectedDay,true); }
+  }
+}
+
+function leToggleDia(dia, checked) {
+  const lbl = document.getElementById('lbl-'+dia);
+  if (lbl) lbl.style.borderColor = checked ? 'var(--red)' : 'var(--border)';
 }
 
 async function salvarAula() {
@@ -813,10 +835,22 @@ async function salvarAula() {
   if(!nome){alert('Informe o nome da aula!');return;}
   const btn=document.getElementById('btn-salvar-aula');
   btn.textContent='Salvando...'; btn.disabled=true;
-  const dados={nome,hora:document.getElementById('au-hora').value,dia:document.getElementById('au-dia').value,vagas:parseInt(document.getElementById('au-vagas').value)||15,modalidade:document.getElementById('au-modalidade').value,status:'ativo'};
+  const hora=document.getElementById('au-hora').value;
+  const vagas=parseInt(document.getElementById('au-vagas').value)||15;
+  const modalidade=document.getElementById('au-modalidade').value;
+
   try {
-    if(editingAulaId) await PUT('/api/aulas/'+editingAulaId,dados);
-    else await POST('/api/aulas',dados);
+    if(editingAulaId) {
+      // Edição: salva no dia único do select
+      const dia=document.getElementById('au-dia').value;
+      await PUT('/api/aulas/'+editingAulaId,{nome,hora,dia,vagas,modalidade,status:'ativo'});
+    } else {
+      // Criação: cria uma aula para cada dia marcado
+      const DIAS_SEMANA=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+      const diasSelecionados=DIAS_SEMANA.filter(d=>document.getElementById('au-dia-'+d)?.checked);
+      if(!diasSelecionados.length){alert('Selecione ao menos um dia!');btn.textContent='💾 Salvar';btn.disabled=false;return;}
+      await Promise.all(diasSelecionados.map(dia=>POST('/api/aulas',{nome,hora,dia,vagas,modalidade,status:'ativo'})));
+    }
     const m=document.getElementById('modal-aula-dyn'); if(m)m.remove();
     editingAulaId=null; await carregarTudo(); renderAgenda();
     alert('✅ Aula salva!');
