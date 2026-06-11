@@ -494,6 +494,25 @@ app.get('/api/alunos/me', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Aluno solicita mudança de plano
+app.post('/api/alunos/me/solicitar-plano', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const { plano_nome, plano_valor } = req.body;
+    if (!plano_nome) return res.status(400).json({ error: 'Plano não informado' });
+    const [rows] = await db.query('SELECT nome, tel, plano FROM alunos WHERE id=?', [req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
+    const a = rows[0];
+    const adminTel = process.env.ADMIN_TEL || '';
+    if (adminTel) {
+      await notificarWA(adminTel,
+        `📋 *Solicitação de Mudança de Plano*\n\n👤 Aluno: ${a.nome}\n📞 Tel: ${a.tel||'—'}\n\n📌 Plano atual: ${a.plano||'—'}\n✅ Plano desejado: ${plano_nome}${plano_valor?' (R$ '+plano_valor+'/mês)':''}\n\nAcesse o admin para aplicar a mudança.`
+      ).catch(()=>{});
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/alunos/:id', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
