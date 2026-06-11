@@ -1067,14 +1067,18 @@ function renderFinContas(){
   const totalPago=doMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const qtdVenc=doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
   document.getElementById('fin-content').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px">
         <button onclick="contasMesNav(-1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">◀</button>
         <span style="font-size:12px;font-weight:600;min-width:120px;text-align:center;text-transform:capitalize">${contasMesLabel()}</span>
         <button onclick="contasMesNav(1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">▶</button>
         <button onclick="contasMes='';renderFinContas()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:${!contasMes?'var(--red)':'var(--panel2)'};color:${!contasMes?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer">Todos</button>
       </div>
-      <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="exportarContasCSV()">📥 CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirContas()">🖨️ PDF</button>
+        <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <div style="flex:1;background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:8px 10px">
@@ -1118,6 +1122,84 @@ function renderFinContas(){
           </div>
         </div>`;
       }).join('')}`;
+}
+
+function contasGetFiltradas() {
+  const todas = finResumo?.despesas||[];
+  const doMes = contasMes ? todas.filter(d=>d.data_vencimento&&d.data_vencimento.startsWith(contasMes)) : todas;
+  return contasFilter==='todas' ? doMes
+    : contasFilter==='pago' ? doMes.filter(d=>d.status==='pago')
+    : contasFilter==='vencida' ? doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr)
+    : doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+}
+
+function exportarContasCSV() {
+  const dados = contasGetFiltradas();
+  if (!dados.length) { alert('Nenhuma conta para exportar.'); return; }
+  const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+  const linhas = [
+    ['Descrição','Categoria','Vencimento','Pagamento','Valor (R$)','Status','Método'].map(esc).join(';'),
+    ...dados.map(d => [
+      d.descricao, d.categoria||'', fmtD(d.data_vencimento), d.data_pagamento?fmtD(d.data_pagamento):'',
+      Number(d.valor||0).toFixed(2).replace('.',','), d.status==='pago'?'Pago':d.data_vencimento<todayStr?'Vencida':'Pendente', d.metodo||''
+    ].map(esc).join(';'))
+  ];
+  const bom = '﻿';
+  const blob = new Blob([bom + linhas.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `contas-${contasMes||'todas'}-${contasFilter}.csv`;
+  a.click();
+}
+
+function imprimirContas() {
+  const dados = contasGetFiltradas();
+  if (!dados.length) { alert('Nenhuma conta para imprimir.'); return; }
+  const totalPend = dados.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const totalPago = dados.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const titulo = `Contas — ${contasMesLabel()} — ${({pendente:'Pendentes',vencida:'Vencidas',pago:'Pagas',todas:'Todas'})[contasFilter]||''}`;
+  const linhas = dados.map(d => {
+    const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
+    const cor = d.status==='pago' ? '#16a34a' : vencida ? '#dc2626' : '#ca8a04';
+    const st = d.status==='pago' ? 'Pago' : vencida ? 'Vencida' : 'Pendente';
+    return `<tr>
+      <td>${d.descricao}</td>
+      <td>${d.categoria||'—'}</td>
+      <td>${fmtD(d.data_vencimento)}</td>
+      <td>${d.data_pagamento?fmtD(d.data_pagamento):'—'}</td>
+      <td style="text-align:right;font-weight:600">R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
+      <td style="color:${cor};font-weight:600">${st}</td>
+    </tr>`;
+  }).join('');
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:20px}
+    h2{font-size:16px;margin-bottom:4px}
+    .sub{font-size:11px;color:#666;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f3f3f3;padding:7px 8px;text-align:left;font-size:11px;border-bottom:2px solid #ddd}
+    td{padding:7px 8px;border-bottom:1px solid #eee;font-size:11px}
+    .totais{margin-top:14px;display:flex;gap:24px}
+    .totais div{padding:8px 14px;border-radius:6px;font-weight:700}
+    .t-pend{background:#fef2f2;color:#dc2626}
+    .t-pago{background:#f0fdf4;color:#16a34a}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
+  <h2>PUNCH AND ROLL — ${titulo}</h2>
+  <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+  <table>
+    <thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th></tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>
+  <div class="totais">
+    ${totalPend>0?`<div class="t-pend">A pagar: R$ ${totalPend.toFixed(2).replace('.',',')}</div>`:''}
+    ${totalPago>0?`<div class="t-pago">Pago: R$ ${totalPago.toFixed(2).replace('.',',')}</div>`:''}
+    <div style="padding:8px 14px;background:#f3f3f3;border-radius:6px;font-weight:700">Total: R$ ${(totalPend+totalPago).toFixed(2).replace('.',',')}</div>
+  </div>
+  </body></html>`);
+  w.document.close();
 }
 
 function abrirModalDespesa(id){
