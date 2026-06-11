@@ -153,6 +153,8 @@ textarea.fi{resize:none}
     <div class="sb-item" id="sb-mkt-wa" onclick="navTo('mkt-wa')"><span class="ico">💬</span>WhatsApp</div>
     <div class="sb-item" id="sb-mkt-email" onclick="navTo('mkt-email')"><span class="ico">📧</span>E-mail</div>
     <div class="sb-item" id="sb-mkt-campanhas" onclick="navTo('mkt-campanhas')"><span class="ico">📣</span>Campanhas</div>
+    <div class="sb-sec">Loja</div>
+    <div class="sb-item" id="sb-shop" onclick="navTo('shop')"><span class="ico">🛒</span>Loja / Produtos</div>
     <div class="sb-sec">Equipe</div>
     <div class="sb-item" id="sb-equipe" onclick="navTo('equipe')"><span class="ico">👤</span>Equipe</div>
   </nav>
@@ -186,6 +188,7 @@ textarea.fi{resize:none}
   <div class="page" id="page-mkt-email"></div>
   <div class="page" id="page-mkt-campanhas"></div>
   <div class="page" id="page-equipe"></div>
+  <div class="page" id="page-shop"></div>
 </div>
 
 <nav class="bottom-nav">
@@ -404,7 +407,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','lista-espera':'Lista de Espera','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','lista-espera':'Lista de Espera','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe',shop:'🛒 Loja'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\'wa\')">+ Mensagem</button>',
@@ -416,6 +419,7 @@ function navTo(page) {
     estoque:'<button class="btn btn-r btn-sm" onclick="abrirModalProduto()">+ Produto</button>',
     recados:'<button class="btn btn-r btn-sm" onclick="abrirModalRecado()">+ Recado</button>',
     equipe: _meuNivel==='master'?'<button class="btn btn-r btn-sm" onclick="abrirModalEquipe()">+ Membro</button>':'',
+    shop: '<button class="btn btn-r btn-sm" onclick="shopAbrirProduto()">+ Produto</button>',
   };
   document.getElementById('topbar-actions').innerHTML = actions[page]||'';
   currentPage = page; closeSB();
@@ -436,6 +440,7 @@ function navTo(page) {
   if(page==='mkt-email') renderMktEmail();
   if(page==='mkt-campanhas') renderMktCampanhas();
   if(page==='equipe') renderEquipe();
+  if(page==='shop') renderShopAdmin();
 }
 
 function toggleSB() {
@@ -2315,6 +2320,198 @@ async function excluirEquipe(id,nome){
   if(!confirm('Excluir membro "'+nome+'"?'))return;
   try{await DEL('/api/equipe/'+id);await renderEquipe();alert('✅ Membro removido!');}
   catch(e){alert('Erro: '+e.message);}
+}
+
+// ══════════════════════════════════════
+// SHOP ADMIN
+// ══════════════════════════════════════
+let _shopTab = 'produtos';
+let _shopProdutos = [];
+let _shopPedidos = [];
+let _shopPedFilter = 'todos';
+
+async function renderShopAdmin() {
+  const pg = document.getElementById('page-shop');
+  pg.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="stab-produtos" class="btn ${_shopTab==='produtos'?'btn-r':'btn-ghost'} btn-sm" onclick="shopSetTab('produtos')">📦 Produtos</button>
+      <button id="stab-pedidos" class="btn ${_shopTab==='pedidos'?'btn-r':'btn-ghost'} btn-sm" onclick="shopSetTab('pedidos')">🛒 Pedidos</button>
+      <a href="/shop.html" target="_blank" class="btn btn-ghost btn-sm" style="margin-left:auto;text-decoration:none">🔗 Ver loja</a>
+    </div>
+    <div id="shop-content"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+  `;
+  await shopCarregar();
+}
+
+async function shopCarregar() {
+  try {
+    if (_shopTab === 'produtos') {
+      _shopProdutos = await GET('/api/shop/produtos');
+      shopRenderProdutos();
+    } else {
+      const qs = _shopPedFilter !== 'todos' ? `?status=${_shopPedFilter}` : '';
+      _shopPedidos = await GET('/api/shop/pedidos'+qs);
+      shopRenderPedidos();
+    }
+  } catch(e) { document.getElementById('shop-content').innerHTML = `<div class="alert alert-r">Erro: ${e.message}</div>`; }
+}
+
+function shopSetTab(tab) {
+  _shopTab = tab;
+  renderShopAdmin();
+}
+
+const SHOP_STATUS_LABELS = {novo:'🆕 Novo',confirmado:'✅ Confirmado',pronto:'📦 Pronto',entregue:'🎉 Entregue',cancelado:'❌ Cancelado'};
+const SHOP_STATUS_CLS = {novo:'bb',confirmado:'bg',pronto:'by',entregue:'bg',cancelado:'br'};
+
+function shopRenderProdutos() {
+  const el = document.getElementById('shop-content');
+  if (!_shopProdutos.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Nenhum produto cadastrado. Clique em "+ Produto" para começar.</div>';
+    return;
+  }
+  const cats = [...new Set(_shopProdutos.map(p=>p.categoria))].sort();
+  let html = '';
+  for (const cat of cats) {
+    const prods = _shopProdutos.filter(p=>p.categoria===cat);
+    html += `<div class="sec-title" style="text-transform:capitalize">📂 ${cat}</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
+    prods.forEach(p => {
+      html += `
+        <div style="background:var(--panel2);border:1px solid ${p.ativo?'var(--border)':'#2a1a1a'};border-radius:10px;overflow:hidden;opacity:${p.ativo?1:.6}">
+          ${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:120px;object-fit:cover" onerror="this.style.display='none'">` : `<div style="width:100%;height:80px;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:32px">🛒</div>`}
+          <div style="padding:10px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nome}</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">R$ ${parseFloat(p.preco).toFixed(2).replace('.',',')}</div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px">${p.estoque} em estoque · <span class="badge ${p.ativo?'bg':'br'}">${p.ativo?'Ativo':'Inativo'}</span></div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="shopAbrirProduto(${p.id})">✏️</button>
+              <button class="btn btn-sm" style="flex:1;background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="shopExcluirProduto(${p.id},'${p.nome.replace(/'/g,"\\'")}')">🗑️</button>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function shopRenderPedidos() {
+  const el = document.getElementById('shop-content');
+  const filtros = ['todos','novo','confirmado','pronto','entregue','cancelado'];
+  let html = `<div class="filter-row">
+    ${filtros.map(f=>`<button class="btn btn-sm ${f===_shopPedFilter?'btn-r':'btn-ghost'}" onclick="shopSetPedFilter('${f}')">${f==='todos'?'Todos':SHOP_STATUS_LABELS[f]}</button>`).join('')}
+  </div>`;
+  if (!_shopPedidos.length) {
+    html += '<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Nenhum pedido encontrado.</div>';
+    el.innerHTML = html;
+    return;
+  }
+  _shopPedidos.forEach(p => {
+    const dt = p.criado_em ? fmtD(String(p.criado_em).slice(0,10)) : '—';
+    html += `
+      <div class="item" id="pedido-item-${p.id}">
+        <div class="item-top">
+          <div>
+            <div class="item-name">#${p.id} · ${p.nome_comprador}</div>
+            <div class="item-meta">${p.tel||'—'} · ${dt}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${p.resumo_itens||'—'}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">R$ ${parseFloat(p.total||0).toFixed(2).replace('.',',')}</div>
+            <span class="badge ${SHOP_STATUS_CLS[p.status]||'bb'}">${SHOP_STATUS_LABELS[p.status]||p.status}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${p.status==='novo'?`<button class="btn btn-g btn-sm" onclick="shopStatusPedido(${p.id},'confirmado')">✅ Confirmar</button>`:''}
+          ${p.status==='confirmado'?`<button class="btn btn-sm btn-sm" style="background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3)" onclick="shopStatusPedido(${p.id},'pronto')">📦 Pronto</button>`:''}
+          ${p.status==='pronto'?`<button class="btn btn-g btn-sm" onclick="shopStatusPedido(${p.id},'entregue')">🎉 Entregue</button>`:''}
+          ${['novo','confirmado'].includes(p.status)?`<button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="shopStatusPedido(${p.id},'cancelado')">❌ Cancelar</button>`:''}
+          ${p.obs?`<div style="font-size:11px;color:var(--muted);padding:4px 8px;background:var(--panel);border-radius:6px;width:100%">📝 ${p.obs}</div>`:''}
+        </div>
+      </div>`;
+  });
+  el.innerHTML = html;
+}
+
+async function shopSetPedFilter(f) {
+  _shopPedFilter = f;
+  const qs = f !== 'todos' ? `?status=${f}` : '';
+  try { _shopPedidos = await GET('/api/shop/pedidos'+qs); } catch(e){}
+  shopRenderPedidos();
+}
+
+async function shopStatusPedido(id, status) {
+  try {
+    await PUT('/api/shop/pedidos/'+id+'/status', {status});
+    await shopCarregar();
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+function shopAbrirProduto(id) {
+  const p = id ? _shopProdutos.find(x=>x.id===id) : null;
+  const box = criarModal('modal-shop-produto', p ? 'Editar Produto' : '🛒 Novo Produto');
+  box.innerHTML += `
+    <div class="fg"><label class="fl">Nome *</label><input class="fi" id="sp-nome" value="${p?.nome||''}" placeholder="Ex: Camiseta Punch and Roll"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Preço (R$) *</label><input class="fi" type="number" id="sp-preco" value="${p?.preco||''}" step="0.01" placeholder="0,00"></div>
+      <div class="fg"><label class="fl">Estoque</label><input class="fi" type="number" id="sp-estoque" value="${p?.estoque||0}"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Categoria</label>
+        <select class="fi" id="sp-cat">
+          ${['camiseta','boné','garrafa','kimono','luva','acessório','equipamento','outro'].map(c=>`<option value="${c}" ${(p?.categoria||'outro')===c?'selected':''}>${c.charAt(0).toUpperCase()+c.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fi" id="sp-ativo">
+          <option value="1" ${(!p||p.ativo)?'selected':''}>Ativo</option>
+          <option value="0" ${p&&!p.ativo?'selected':''}>Inativo</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">URL da Imagem</label><input class="fi" id="sp-img" value="${p?.imagem_url||''}" placeholder="https://...jpg"></div>
+    <div id="sp-img-preview" style="margin-bottom:12px;display:${p?.imagem_url?'block':'none'}">
+      <img src="${p?.imagem_url||''}" style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;background:var(--panel)" onerror="this.parentElement.style.display='none'">
+    </div>
+    <div class="fg"><label class="fl">Descrição</label><textarea class="fi" id="sp-desc" rows="2" placeholder="Descrição do produto...">${p?.descricao||''}</textarea></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="document.getElementById('modal-shop-produto').remove()">Cancelar</button>
+      <button class="btn btn-r" onclick="shopSalvarProduto(${id||'null'})">💾 Salvar</button>
+    </div>
+  `;
+  document.getElementById('sp-img').addEventListener('input', function() {
+    const pv = document.getElementById('sp-img-preview');
+    const img = pv.querySelector('img');
+    if (this.value) { img.src=this.value; pv.style.display='block'; } else pv.style.display='none';
+  });
+  document.body.appendChild(box.parentElement);
+}
+
+async function shopSalvarProduto(id) {
+  const nome = document.getElementById('sp-nome').value.trim();
+  const preco = parseFloat(document.getElementById('sp-preco').value)||0;
+  if (!nome || !preco) { alert('Nome e preço são obrigatórios!'); return; }
+  const dados = {
+    nome, preco,
+    estoque: parseInt(document.getElementById('sp-estoque').value)||0,
+    categoria: document.getElementById('sp-cat').value,
+    imagem_url: document.getElementById('sp-img').value.trim()||null,
+    descricao: document.getElementById('sp-desc').value.trim()||null,
+    ativo: document.getElementById('sp-ativo').value === '1',
+  };
+  try {
+    if (id && id !== 'null') await PUT('/api/shop/produtos/'+id, dados);
+    else await POST('/api/shop/produtos', dados);
+    document.getElementById('modal-shop-produto').remove();
+    await shopCarregar();
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+async function shopExcluirProduto(id, nome) {
+  if (!confirm(`Excluir "${nome}"?`)) return;
+  try { await DEL('/api/shop/produtos/'+id); await shopCarregar(); }
+  catch(e) { alert('Erro: '+e.message); }
 }
 
 // ══════════════════════════════════════

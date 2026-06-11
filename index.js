@@ -310,6 +310,44 @@ async function setupDB() {
     try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado_em TIMESTAMP NULL"); } catch(e){}
     try { await conn.query("ALTER TABLE contratos ADD COLUMN criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); } catch(e){}
 
+    // ── SHOP ──────────────────────────────────────────────
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS shop_produtos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(200) NOT NULL,
+        descricao TEXT,
+        preco DECIMAL(10,2) NOT NULL DEFAULT 0,
+        categoria VARCHAR(50) DEFAULT 'outro',
+        imagem_url TEXT,
+        estoque INT DEFAULT 0,
+        ativo TINYINT DEFAULT 1,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS shop_pedidos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NULL,
+        nome_comprador VARCHAR(200),
+        tel VARCHAR(30),
+        status VARCHAR(30) DEFAULT 'novo',
+        total DECIMAL(10,2) DEFAULT 0,
+        obs TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS shop_pedido_itens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pedido_id INT NOT NULL,
+        produto_id INT NOT NULL,
+        nome_produto VARCHAR(200),
+        preco_unitario DECIMAL(10,2),
+        qtd INT DEFAULT 1,
+        FOREIGN KEY (pedido_id) REFERENCES shop_pedidos(id) ON DELETE CASCADE
+      )
+    `);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -1435,6 +1473,175 @@ app.get('/api/contratos/meta/:token', async (req, res) => {
     const [rows] = await db.query('SELECT assinado, assinado_em, plano, modalidade, criado_em FROM contratos WHERE token=?', [req.params.token]);
     if (!rows.length) return res.status(404).json({ error: 'Não encontrado' });
     res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════
+// SHOP
+// ══════════════════════════════════════
+
+// Produtos — público
+app.get('/api/shop/produtos', async (req, res) => {
+  try {
+    const admin = req.headers.authorization?.split(' ')[1];
+    let isAdmin = false;
+    try { const u = jwt.verify(admin, JWT_SECRET); if (u.tipo === 'admin') isAdmin = true; } catch(e){}
+    const where = isAdmin ? '' : 'WHERE ativo=1';
+    const [rows] = await db.query(`SELECT * FROM shop_produtos ${where} ORDER BY categoria, nome`);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/shop/produtos', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, descricao, preco, categoria, imagem_url, estoque, ativo } = req.body;
+    const [r] = await db.query(
+      'INSERT INTO shop_produtos (nome,descricao,preco,categoria,imagem_url,estoque,ativo) VALUES (?,?,?,?,?,?,?)',
+      [nome, descricao||null, parseFloat(preco)||0, categoria||'outro', imagem_url||null, parseInt(estoque)||0, ativo===false?0:1]
+    );
+    res.json({ id: r.insertId });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/shop/produtos/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, descricao, preco, categoria, imagem_url, estoque, ativo } = req.body;
+    await db.query(
+      'UPDATE shop_produtos SET nome=?,descricao=?,preco=?,categoria=?,imagem_url=?,estoque=?,ativo=? WHERE id=?',
+      [nome, descricao||null, parseFloat(preco)||0, categoria||'outro', imagem_url||null, parseInt(estoque)||0, ativo===false?0:1, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/shop/produtos/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM shop_produtos WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Pedidos — criar (público com nome+tel ou aluno logado)
+app.post('/api/shop/pedidos', async (req, res) => {
+  try {
+    let { nome, tel, aluno_id, itens, obs } = req.body;
+    if (!itens || !itens.length) return res.status(400).json({ error: 'Carrinho vazio' });
+
+    // Se autenticado como aluno, pegar dados do cadastro
+    const tokenHeader = req.headers.authorization?.split(' ')[1];
+    if (tokenHeader) {
+      try {
+        const u = jwt.verify(tokenHeader, JWT_SECRET);
+        if (u.tipo === 'aluno') {
+          aluno_id = u.id;
+          if (!nome || !tel) {
+            const [rows] = await db.query('SELECT nome, tel FROM alunos WHERE id=?', [u.id]);
+            if (rows[0]) { nome = nome || rows[0].nome; tel = tel || rows[0].tel; }
+          }
+        }
+      } catch(e){}
+    }
+
+    if (!nome || !tel) return res.status(400).json({ error: 'Nome e telefone obrigatórios' });
+
+    let total = 0;
+    const itensValid = [];
+    for (const item of itens) {
+      const [p] = await db.query('SELECT * FROM shop_produtos WHERE id=? AND ativo=1', [item.produto_id]);
+      if (!p.length) return res.status(400).json({ error: `Produto ${item.produto_id} não encontrado` });
+      if (p[0].estoque < item.qtd) return res.status(400).json({ error: `Estoque insuficiente: ${p[0].nome}` });
+      itensValid.push({ ...p[0], qtd: item.qtd });
+      total += parseFloat(p[0].preco) * item.qtd;
+    }
+
+    const [r] = await db.query(
+      'INSERT INTO shop_pedidos (aluno_id,nome_comprador,tel,total,obs) VALUES (?,?,?,?,?)',
+      [aluno_id || null, nome, tel, total, obs || null]
+    );
+    const pedidoId = r.insertId;
+
+    for (const item of itensValid) {
+      await db.query(
+        'INSERT INTO shop_pedido_itens (pedido_id,produto_id,nome_produto,preco_unitario,qtd) VALUES (?,?,?,?,?)',
+        [pedidoId, item.id, item.nome, item.preco, item.qtd]
+      );
+      await db.query('UPDATE shop_produtos SET estoque=estoque-? WHERE id=?', [item.qtd, item.id]);
+    }
+
+    // Notifica admin
+    const itensTxt = itensValid.map(i => `• ${i.nome} x${i.qtd}`).join('\n');
+    const adminTel = process.env.ADMIN_TEL || '';
+    if (adminTel) {
+      await notificarWA(adminTel,
+        `🛒 *Novo Pedido #${pedidoId}*\n👤 ${nome} · ${tel}\n\n${itensTxt}\n\n💰 *Total: R$ ${total.toFixed(2).replace('.',',')}*`
+      ).catch(()=>{});
+    }
+
+    res.json({ ok: true, pedido_id: pedidoId, total });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Pedidos — listar (admin)
+app.get('/api/shop/pedidos', auth, adminOnly, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = status && status !== 'todos' ? 'WHERE p.status=?' : '';
+    const params = status && status !== 'todos' ? [status] : [];
+    const [pedidos] = await db.query(
+      `SELECT p.*, GROUP_CONCAT(CONCAT(i.qtd,'x ',i.nome_produto) SEPARATOR ' | ') as resumo_itens
+       FROM shop_pedidos p
+       LEFT JOIN shop_pedido_itens i ON i.pedido_id=p.id
+       ${where}
+       GROUP BY p.id
+       ORDER BY p.criado_em DESC`,
+      params
+    );
+    res.json(pedidos);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Pedido itens (admin detalhe)
+app.get('/api/shop/pedidos/:id/itens', auth, adminOnly, async (req, res) => {
+  try {
+    const [itens] = await db.query('SELECT * FROM shop_pedido_itens WHERE pedido_id=?', [req.params.id]);
+    res.json(itens);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Meus pedidos (aluno)
+app.get('/api/shop/pedidos/meus', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const [pedidos] = await db.query(
+      `SELECT p.*, GROUP_CONCAT(CONCAT(i.qtd,'x ',i.nome_produto) SEPARATOR ' | ') as resumo_itens
+       FROM shop_pedidos p
+       LEFT JOIN shop_pedido_itens i ON i.pedido_id=p.id
+       WHERE p.aluno_id=?
+       GROUP BY p.id
+       ORDER BY p.criado_em DESC`,
+      [req.user.id]
+    );
+    res.json(pedidos);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Atualizar status pedido (admin)
+app.put('/api/shop/pedidos/:id/status', auth, adminOnly, async (req, res) => {
+  try {
+    const { status } = req.body;
+    await db.query('UPDATE shop_pedidos SET status=? WHERE id=?', [status, req.params.id]);
+    // Notifica cliente
+    const [p] = await db.query('SELECT * FROM shop_pedidos WHERE id=?', [req.params.id]);
+    if (p[0] && p[0].tel) {
+      const msgs = {
+        confirmado: `✅ Pedido #${req.params.id} confirmado! Estamos preparando seu pedido. 🥊`,
+        pronto: `📦 Pedido #${req.params.id} pronto para retirada! Venha buscar na academia. 🥊`,
+        entregue: `🎉 Pedido #${req.params.id} entregue. Obrigado pela preferência! Punch and Roll 🥊`,
+        cancelado: `❌ Pedido #${req.params.id} foi cancelado. Em caso de dúvidas, entre em contato.`,
+      };
+      if (msgs[status]) await notificarWA(p[0].tel, msgs[status]).catch(()=>{});
+    }
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Loja — Punch and Roll Fight Team</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--red:#d4111c;--black:#080808;--dark:#0f0f0f;--panel:#161616;--panel2:#1e1e1e;--border:#222;--white:#f2f2f2;--muted:#666;--green:#22c55e}
+html,body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100%}
+.topbar{height:52px;background:var(--dark);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;position:sticky;top:0;z-index:50}
+.topbar-logo{width:32px;height:32px;background:var(--black);border-radius:50%;border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.topbar-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;flex:1}
+.cart-btn{background:rgba(212,17,28,.15);border:1px solid rgba(212,17,28,.3);color:var(--white);border-radius:8px;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;display:flex;align-items:center;gap:6px}
+.cart-badge{background:var(--red);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.container{max-width:480px;margin:0 auto;padding:16px}
+.cat-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);padding-bottom:6px;border-bottom:1px solid var(--border);margin:18px 0 12px}
+.products-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+.prod-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s}
+.prod-card:hover{border-color:#444}
+.prod-img{width:100%;height:120px;object-fit:cover}
+.prod-img-ph{height:90px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:36px}
+.prod-body{padding:10px}
+.prod-nome{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:3px}
+.prod-desc{font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px}
+.prod-preco{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green);margin-bottom:6px}
+.prod-estoque{font-size:10px;color:var(--muted);margin-bottom:6px}
+.btn-add{width:100%;padding:7px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;cursor:pointer;transition:background .2s}
+.btn-add:hover{background:#e8151f}
+.qtd-ctrl{display:flex;align-items:center;justify-content:center;gap:8px}
+.qtd-btn{width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;font-size:16px;line-height:1;font-weight:700}
+.qtd-btn.minus{background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.3)}
+.qtd-btn.plus{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.qtd-num{font-weight:700;font-size:15px;min-width:20px;text-align:center}
+.esgotado{text-align:center;font-size:11px;color:#f87171}
+.cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--dark);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:40;transform:translateY(100%);transition:transform .3s}
+.cart-bar.show{transform:translateY(0)}
+.cart-info{flex:1}
+.cart-count{font-size:12px;color:var(--muted)}
+.cart-total{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)}
+.btn-checkout{padding:10px 20px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 14px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:16px}
+.fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
+.fi{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s;margin-bottom:12px}
+.fi:focus{border-color:var(--red)}
+.btn-r{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;margin-top:4px}
+.btn-r:hover{background:#e8151f}
+.btn-cancel{width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:8px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px}
+@media(min-width:600px){.products-grid{grid-template-columns:repeat(3,1fr)}.overlay{align-items:center}.modal{border-radius:14px}.modal-handle{display:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none">
+    <div class="topbar-logo">🥊</div>
+    <div class="topbar-title">PUNCH AND ROLL</div>
+  </a>
+  <button class="cart-btn" id="cart-btn" onclick="abrirCheckout()" style="display:none">
+    🛒 <span id="cart-count-badge" class="cart-badge">0</span>
+  </button>
+</div>
+
+<div class="container">
+  <div style="padding:16px 0 8px">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px">🛒 LOJA</div>
+    <div style="font-size:12px;color:var(--muted)">Camisetas, acessórios e equipamentos</div>
+  </div>
+  <div id="produtos-container"><div class="empty"><div class="spinner"></div>Carregando...</div></div>
+</div>
+
+<!-- Barra carrinho fixa -->
+<div class="cart-bar" id="cart-bar">
+  <div class="cart-info">
+    <div class="cart-count" id="cart-bar-count">0 itens</div>
+    <div class="cart-total" id="cart-bar-total">R$ 0,00</div>
+  </div>
+  <button class="btn-checkout" onclick="abrirCheckout()">FINALIZAR 🥊</button>
+</div>
+
+<!-- MODAL CHECKOUT -->
+<div class="overlay" id="modal-checkout">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Finalizar Pedido</div>
+    <div id="checkout-resumo" style="background:var(--panel2);border-radius:8px;padding:12px;margin-bottom:16px"></div>
+    <label class="fl">Nome completo *</label>
+    <input class="fi" id="ck-nome" placeholder="Seu nome">
+    <label class="fl">WhatsApp *</label>
+    <input class="fi" id="ck-tel" placeholder="(48) 99999-9999" maxlength="15" oninput="maskTel(this)">
+    <label class="fl">Observação (tamanho, cor, etc.)</label>
+    <input class="fi" id="ck-obs" placeholder="Ex: Camiseta tam. M, cor preta">
+    <button class="btn-r" id="btn-confirmar" onclick="confirmarPedido()">🥊 CONFIRMAR PEDIDO</button>
+    <button class="btn-cancel" onclick="fecharCheckout()">Cancelar</button>
+    <div id="ck-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:8px;display:none">Preencha nome e WhatsApp</div>
+  </div>
+</div>
+
+<script>
+const API = 'https://punch-and-roll-api-production.up.railway.app';
+let produtos = [];
+let cart = JSON.parse(localStorage.getItem('pr_shop_cart_pub')||'[]');
+
+function fmtP(v){ return 'R$ '+parseFloat(v).toFixed(2).replace('.',','); }
+function maskTel(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>10)v=v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');else if(v.length>6)v=v.replace(/(\d{2})(\d{4,5})(\d{0,4})/,'($1) $2-$3');else if(v.length>2)v=v.replace(/(\d{2})(\d*)/,'($1) $2');el.value=v}
+
+function saveCart(){ localStorage.setItem('pr_shop_cart_pub', JSON.stringify(cart)); }
+function cartQtd(id){ return (cart.find(x=>x.id===id)||{qtd:0}).qtd; }
+function cartTotal(){ return cart.reduce((s,i)=>s+i.preco*i.qtd,0); }
+function cartCount(){ return cart.reduce((s,i)=>s+i.qtd,0); }
+
+function addCart(id){
+  const p = produtos.find(x=>x.id===id);
+  if(!p) return;
+  const item = cart.find(x=>x.id===id);
+  if(item){ if(item.qtd>=p.estoque){alert('Estoque máximo!');return;} item.qtd++; }
+  else cart.push({id,nome:p.nome,preco:parseFloat(p.preco),qtd:1});
+  saveCart(); renderProdutos(); updateCartUI();
+}
+function remCart(id){
+  const item=cart.find(x=>x.id===id);
+  if(!item)return;
+  item.qtd--;
+  if(item.qtd<=0) cart=cart.filter(x=>x.id!==id);
+  saveCart(); renderProdutos(); updateCartUI();
+}
+
+function updateCartUI(){
+  const cnt=cartCount(), tot=cartTotal();
+  const btn=document.getElementById('cart-btn');
+  const bar=document.getElementById('cart-bar');
+  document.getElementById('cart-count-badge').textContent=cnt;
+  document.getElementById('cart-bar-count').textContent=cnt+' '+(cnt===1?'item':'itens');
+  document.getElementById('cart-bar-total').textContent=fmtP(tot);
+  if(cnt>0){btn.style.display='flex';bar.classList.add('show');}
+  else{btn.style.display='none';bar.classList.remove('show');}
+}
+
+function renderProdutos(){
+  const el=document.getElementById('produtos-container');
+  if(!produtos.length){el.innerHTML='<div class="empty">Nenhum produto disponível no momento.</div>';return;}
+  const cats=[...new Set(produtos.map(p=>p.categoria))].sort();
+  let html='';
+  cats.forEach(cat=>{
+    const prods=produtos.filter(p=>p.categoria===cat);
+    html+=`<div class="cat-title">${cat.toUpperCase()}</div><div class="products-grid">`;
+    prods.forEach(p=>{
+      const qtd=cartQtd(p.id);
+      html+=`<div class="prod-card">
+        ${p.imagem_url?`<img class="prod-img" src="${p.imagem_url}" onerror="this.className='prod-img-ph';this.innerHTML='🛒';this.removeAttribute('src')" alt="${p.nome}">`:`<div class="prod-img-ph">🛒</div>`}
+        <div class="prod-body">
+          <div class="prod-nome">${p.nome}</div>
+          ${p.descricao?`<div class="prod-desc">${p.descricao.slice(0,70)}</div>`:''}
+          <div class="prod-preco">${fmtP(p.preco)}</div>
+          <div class="prod-estoque">${p.estoque>0?p.estoque+' disponíveis':'Esgotado'}</div>
+          ${p.estoque===0?`<div class="esgotado">Esgotado</div>`:
+            qtd>0?`<div class="qtd-ctrl">
+              <button class="qtd-btn minus" onclick="remCart(${p.id})">−</button>
+              <span class="qtd-num">${qtd}</span>
+              <button class="qtd-btn plus" onclick="addCart(${p.id})">+</button>
+            </div>`:
+            `<button class="btn-add" onclick="addCart(${p.id})">ADICIONAR</button>`
+          }
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html+'<div style="height:80px"></div>';
+}
+
+function abrirCheckout(){
+  if(!cart.length){alert('Carrinho vazio!');return;}
+  const el=document.getElementById('checkout-resumo');
+  el.innerHTML=cart.map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0">
+    <span>${i.qtd}x ${i.nome}</span><span>${fmtP(i.preco*i.qtd)}</span></div>`).join('')+
+    `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:600">
+      <span>Total</span><span style="color:var(--green)">${fmtP(cartTotal())}</span></div>`;
+  document.getElementById('modal-checkout').classList.add('open');
+  document.getElementById('ck-erro').style.display='none';
+}
+function fecharCheckout(){ document.getElementById('modal-checkout').classList.remove('open'); }
+
+async function confirmarPedido(){
+  const nome=document.getElementById('ck-nome').value.trim();
+  const tel=document.getElementById('ck-tel').value.trim();
+  if(!nome||!tel){document.getElementById('ck-erro').style.display='block';return;}
+  const btn=document.getElementById('btn-confirmar');
+  btn.innerHTML='<span class="spinner"></span>Enviando...'; btn.disabled=true;
+  document.getElementById('ck-erro').style.display='none';
+  try{
+    const itens=cart.map(i=>({produto_id:i.id,qtd:i.qtd}));
+    const obs=document.getElementById('ck-obs').value.trim()||null;
+    const r=await fetch(API+'/api/shop/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,tel,itens,obs})});
+    const data=await r.json();
+    if(!r.ok)throw new Error(data.error||'Erro');
+    cart=[]; saveCart(); updateCartUI(); fecharCheckout();
+    renderProdutos();
+    alert(`✅ Pedido #${data.pedido_id} realizado com sucesso!\nA equipe entrará em contato via WhatsApp. 🥊`);
+  }catch(e){
+    document.getElementById('ck-erro').textContent='Erro: '+e.message;
+    document.getElementById('ck-erro').style.display='block';
+    btn.innerHTML='🥊 CONFIRMAR PEDIDO'; btn.disabled=false;
+  }
+}
+
+document.getElementById('modal-checkout').addEventListener('click',e=>{if(e.target===document.getElementById('modal-checkout'))fecharCheckout()});
+
+// Carregar produtos
+(async()=>{
+  try{
+    const r=await fetch(API+'/api/shop/produtos');
+    const data=await r.json();
+    produtos=Array.isArray(data)?data:[];
+    renderProdutos();
+    updateCartUI();
+  }catch(e){document.getElementById('produtos-container').innerHTML='<div class="empty">Erro ao carregar produtos.</div>';}
+})();
+</script>
+</body>
+</html>

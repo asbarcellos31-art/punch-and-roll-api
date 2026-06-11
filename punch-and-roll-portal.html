@@ -86,12 +86,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     <div class="page" id="page-financeiro"></div>
     <div class="page" id="page-agenda"></div>
     <div class="page" id="page-recados"></div>
+    <div class="page" id="page-shop"></div>
   </div>
   <nav class="bottom-nav">
     <button class="bn active" id="bn-inicio" onclick="navTo('inicio')"><span class="bn-icon">🏠</span>Início</button>
     <button class="bn" id="bn-financeiro" onclick="navTo('financeiro')"><span class="bn-icon">💳</span>Financeiro</button>
     <button class="bn" id="bn-agenda" onclick="navTo('agenda')"><span class="bn-icon">📅</span>Agenda</button>
     <button class="bn" id="bn-recados" onclick="navTo('recados')"><span class="bn-icon">📢</span>Recados</button>
+    <button class="bn" id="bn-shop" onclick="navTo('shop')"><span class="bn-icon">🛒</span>Loja</button>
   </nav>
 </div>
 
@@ -106,8 +108,9 @@ const nowMin = new Date().getHours()*60+new Date().getMinutes();
 
 let _token = localStorage.getItem('pr_aluno_token')||'';
 let aluno = null;
-let cache = { aulas:[], recados:[], pagamentos:[], checkins:[] };
+let cache = { aulas:[], recados:[], pagamentos:[], checkins:[], shopProdutos:[], shopPedidos:[] };
 let diaSelecionado = diaHoje;
+let shopCart = JSON.parse(localStorage.getItem('pr_shop_cart')||'[]');
 
 async function api(method, path, body) {
   const opts = {method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token}};
@@ -185,12 +188,13 @@ function navTo(pg) {
   document.getElementById('page-'+pg).classList.add('active');
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   document.getElementById('bn-'+pg).classList.add('active');
-  const titles={inicio:'Início',financeiro:'Situação Financeira',agenda:'Agenda & Check-in',recados:'Recados'};
+  const titles={inicio:'Início',financeiro:'Situação Financeira',agenda:'Agenda & Check-in',recados:'Recados',shop:'🛒 Loja'};
   document.getElementById('page-title').textContent=titles[pg]||pg;
   if(pg==='inicio') renderInicio();
   if(pg==='financeiro') renderFinanceiro();
   if(pg==='agenda') renderAgenda();
   if(pg==='recados') renderRecados();
+  if(pg==='shop') renderShopPortal();
 }
 
 // INÍCIO
@@ -378,6 +382,177 @@ function renderRecados() {
           <div style="font-size:12px;color:var(--muted);line-height:1.6">${r.body}</div>
         </div>`;
       }).join('');
+}
+
+// ══ SHOP ══
+function shopSaveCart() { localStorage.setItem('pr_shop_cart', JSON.stringify(shopCart)); }
+
+function shopCartQtd(prodId) { return (shopCart.find(x=>x.id===prodId)||{qtd:0}).qtd; }
+
+function shopAddCart(prodId) {
+  const p = cache.shopProdutos.find(x=>x.id===prodId);
+  if (!p) return;
+  const item = shopCart.find(x=>x.id===prodId);
+  if (item) {
+    if (item.qtd >= p.estoque) { alert('Estoque máximo atingido!'); return; }
+    item.qtd++;
+  } else {
+    shopCart.push({ id:prodId, nome:p.nome, preco:parseFloat(p.preco), qtd:1 });
+  }
+  shopSaveCart();
+  renderShopPortal();
+}
+
+function shopRemCart(prodId) {
+  const item = shopCart.find(x=>x.id===prodId);
+  if (!item) return;
+  item.qtd--;
+  if (item.qtd <= 0) shopCart = shopCart.filter(x=>x.id!==prodId);
+  shopSaveCart();
+  renderShopPortal();
+}
+
+async function renderShopPortal() {
+  const el = document.getElementById('page-shop');
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);font-size:13px"><div class="spinner"></div>Carregando...</div>';
+  try {
+    const [prods, peds] = await Promise.all([
+      api('GET','/api/shop/produtos'),
+      api('GET','/api/shop/pedidos/meus').catch(()=>[]),
+    ]);
+    cache.shopProdutos = Array.isArray(prods)?prods:[];
+    cache.shopPedidos = Array.isArray(peds)?peds:[];
+    shopRenderContent();
+  } catch(e) { el.innerHTML = `<div class="alert-r">Erro: ${e.message}</div>`; }
+}
+
+function shopRenderContent() {
+  const el = document.getElementById('page-shop');
+  const prods = cache.shopProdutos;
+  const cartTotal = shopCart.reduce((s,i)=>s+i.preco*i.qtd,0);
+  const cartCount = shopCart.reduce((s,i)=>s+i.qtd,0);
+  const fmtP = v => 'R$ '+parseFloat(v).toFixed(2).replace('.',',');
+
+  let html = '';
+
+  // Carrinho fixo no topo se tiver itens
+  if (cartCount > 0) {
+    html += `<div style="background:rgba(212,17,28,.12);border:1px solid rgba(212,17,28,.3);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:13px;font-weight:600">🛒 ${cartCount} ${cartCount===1?'item':'itens'}</div>
+      <div style="font-size:12px;color:var(--muted)">${shopCart.map(i=>`${i.qtd}x ${i.nome}`).join(', ')}</div></div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtP(cartTotal)}</div>
+        <button onclick="shopCheckout()" style="padding:5px 12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:14px;cursor:pointer;margin-top:4px">FINALIZAR</button>
+      </div>
+    </div>`;
+  }
+
+  if (!prods.length) {
+    html += '<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Nenhum produto disponível no momento.</div>';
+  } else {
+    const cats = [...new Set(prods.map(p=>p.categoria))].sort();
+    cats.forEach(cat => {
+      html += `<div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;margin-top:${html?'16px':'0'}">${cat.toUpperCase()}</div>`;
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
+      prods.filter(p=>p.categoria===cat).forEach(p => {
+        const qtdNoCart = shopCartQtd(p.id);
+        html += `
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            ${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100px;object-fit:cover" onerror="this.style.display='none'">` : `<div style="height:70px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:28px">🛒</div>`}
+            <div style="padding:8px">
+              <div style="font-size:12px;font-weight:600;line-height:1.3;margin-bottom:2px">${p.nome}</div>
+              ${p.descricao?`<div style="font-size:10px;color:var(--muted);margin-bottom:4px;line-height:1.3">${p.descricao.slice(0,60)}</div>`:''}
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--green);margin-bottom:6px">${fmtP(p.preco)}</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Estoque: ${p.estoque}</div>
+              ${p.estoque===0 ? `<div style="font-size:11px;color:#f87171;text-align:center">Esgotado</div>` :
+                qtdNoCart > 0 ?
+                `<div style="display:flex;align-items:center;justify-content:center;gap:8px">
+                  <button onclick="shopRemCart(${p.id})" style="width:28px;height:28px;background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.3);border-radius:6px;cursor:pointer;font-size:16px;line-height:1">−</button>
+                  <span style="font-weight:600;font-size:14px">${qtdNoCart}</span>
+                  <button onclick="shopAddCart(${p.id})" style="width:28px;height:28px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;cursor:pointer;font-size:16px;line-height:1">+</button>
+                </div>` :
+                `<button onclick="shopAddCart(${p.id})" style="width:100%;padding:5px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">+ Adicionar</button>`
+              }
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+    });
+  }
+
+  // Meus pedidos
+  if (cache.shopPedidos.length) {
+    const statusLabel = {novo:'🆕 Novo',confirmado:'✅ Confirmado',pronto:'📦 Pronto p/ retirada',entregue:'🎉 Entregue',cancelado:'❌ Cancelado'};
+    const statusCls = {novo:'bb',confirmado:'bg',pronto:'by',entregue:'bg',cancelado:'br'};
+    html += '<div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);padding-bottom:6px;border-bottom:1px solid var(--border);margin:20px 0 10px">MEUS PEDIDOS</div>';
+    cache.shopPedidos.forEach(p => {
+      html += `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div><div style="font-size:13px;font-weight:600">Pedido #${p.id}</div>
+          <div style="font-size:11px;color:var(--muted)">${p.resumo_itens||'—'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmtD(String(p.criado_em).slice(0,10))}</div></div>
+          <div style="text-align:right">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--green)">R$ ${parseFloat(p.total||0).toFixed(2).replace('.',',')}</div>
+            <span class="badge ${statusCls[p.status]||'bb'}">${statusLabel[p.status]||p.status}</span>
+          </div>
+        </div>
+        ${p.obs?`<div style="font-size:11px;color:var(--muted);margin-top:6px">📝 ${p.obs}</div>`:''}
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+function shopCheckout() {
+  if (!shopCart.length) return;
+  const cartTotal = shopCart.reduce((s,i)=>s+i.preco*i.qtd,0);
+  const fmtP = v => 'R$ '+parseFloat(v).toFixed(2).replace('.',',');
+
+  const box = document.createElement('div');
+  box.id = 'modal-shop-checkout';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:flex-end;justify-content:center';
+  box.innerHTML = `
+    <div style="background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
+      <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 14px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">Finalizar Pedido</div>
+        <button onclick="document.getElementById('modal-shop-checkout').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div style="background:var(--panel2);border-radius:8px;padding:10px;margin-bottom:14px">
+        ${shopCart.map(i=>`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px"><span>${i.qtd}x ${i.nome}</span><span>${fmtP(i.preco*i.qtd)}</span></div>`).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:600">
+          <span>Total</span><span style="color:var(--green)">${fmtP(cartTotal)}</span>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block">Observação (opcional)</label>
+        <input id="ck-obs" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="Cor, tamanho, recado...">
+      </div>
+      <button onclick="shopEnviarPedido()" style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">🥊 CONFIRMAR PEDIDO</button>
+      <button onclick="document.getElementById('modal-shop-checkout').remove()" style="width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:8px">Cancelar</button>
+    </div>`;
+  box.addEventListener('click', e => { if(e.target===box) box.remove(); });
+  document.body.appendChild(box);
+}
+
+async function shopEnviarPedido() {
+  const obs = document.getElementById('ck-obs')?.value.trim()||null;
+  const itens = shopCart.map(i=>({produto_id:i.id, qtd:i.qtd}));
+  try {
+    const btn = document.querySelector('#modal-shop-checkout button');
+    if(btn){btn.textContent='Enviando...';btn.disabled=true;}
+    await api('POST','/api/shop/pedidos',{itens,obs});
+    shopCart = [];
+    shopSaveCart();
+    document.getElementById('modal-shop-checkout')?.remove();
+    alert('✅ Pedido realizado! A equipe entrará em contato. 🥊');
+    await renderShopPortal();
+  } catch(e) {
+    alert('Erro: '+e.message);
+    const btn = document.querySelector('#modal-shop-checkout button');
+    if(btn){btn.textContent='🥊 CONFIRMAR PEDIDO';btn.disabled=false;}
+  }
 }
 
 // Auto-login com token salvo
