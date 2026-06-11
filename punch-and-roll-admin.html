@@ -149,6 +149,7 @@ textarea.fi{resize:none}
     <div class="sb-item" id="sb-portal-config" onclick="navTo('portal-config')"><span class="ico">⚙️</span>Config. Portal</div>
     <div class="sb-sec">Marketing</div>
     <div class="sb-item" id="sb-avisos" onclick="navTo('avisos')"><span class="ico">🔔</span>Avisos Vencimento</div>
+    <div class="sb-item" id="sb-lista-espera" onclick="navTo('lista-espera')"><span class="ico">📋</span>Lista de Espera</div>
     <div class="sb-item" id="sb-mkt-wa" onclick="navTo('mkt-wa')"><span class="ico">💬</span>WhatsApp</div>
     <div class="sb-item" id="sb-mkt-email" onclick="navTo('mkt-email')"><span class="ico">📧</span>E-mail</div>
     <div class="sb-item" id="sb-mkt-campanhas" onclick="navTo('mkt-campanhas')"><span class="ico">📣</span>Campanhas</div>
@@ -179,6 +180,7 @@ textarea.fi{resize:none}
   <div class="page" id="page-documentos"></div>
   <div class="page" id="page-marketing"></div>
   <div class="page" id="page-avisos"></div>
+  <div class="page" id="page-lista-espera"></div>
   <div class="page" id="page-portal-config"></div>
   <div class="page" id="page-mkt-wa"></div>
   <div class="page" id="page-mkt-email"></div>
@@ -402,7 +404,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','lista-espera':'Lista de Espera','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\'wa\')">+ Mensagem</button>',
@@ -428,6 +430,7 @@ function navTo(page) {
   if(page==='documentos') renderDocumentos();
   if(page==='marketing') renderMarketing();
   if(page==='avisos') renderAvisos();
+  if(page==='lista-espera') renderListaEspera();
   if(page==='portal-config') renderPortalConfig();
   if(page==='mkt-wa') renderMktWA();
   if(page==='mkt-email') renderMktEmail();
@@ -1694,6 +1697,75 @@ function verDocumento(id, nome){
 }
 
 function renderMarketing(){renderMktWA();}
+
+async function renderListaEspera() {
+  const pg = document.getElementById('page-lista-espera');
+  pg.innerHTML = `<div style="font-size:13px;color:var(--muted);text-align:center;padding:30px">Carregando...</div>`;
+  let lista;
+  try { lista = await GET('/api/lista-espera'); }
+  catch(e) { pg.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; return; }
+
+  const modLabel = m => ({boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'})[m]||m||'—';
+  const statusBadge = s => s==='contatado'
+    ? `<span style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 8px;font-size:10px">✅ Contatado</span>`
+    : `<span style="background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.25);border-radius:4px;padding:2px 8px;font-size:10px">⏳ Pendente</span>`;
+
+  // Resumo por horário sugerido
+  const contagem = {};
+  lista.forEach(r => {
+    if (!r.dia_sugerido && !r.hora_sugerida) return;
+    const chave = `${r.dia_sugerido||'?'} ${r.hora_sugerida||'?'} — ${modLabel(r.modalidade)}`;
+    contagem[chave] = (contagem[chave]||0) + 1;
+  });
+  const topHorarios = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  pg.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted)">${lista.length} pessoa(s) na lista</div>
+      <a href="/horarios.html" target="_blank" class="btn btn-ghost btn-sm">🔗 Ver página pública</a>
+    </div>
+
+    ${topHorarios.length>0?`
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🔥 Horários mais solicitados</div>
+      ${topHorarios.map(([h,n])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
+          <div style="font-size:13px">${h}</div>
+          <span style="background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:12px;padding:2px 10px;font-size:12px;font-weight:600">${n} pedido${n>1?'s':''}</span>
+        </div>`).join('')}
+    </div>`:''}
+
+    ${lista.length===0
+      ? `<div class="card"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Nenhum registro ainda</div></div>`
+      : lista.map(r=>`
+        <div class="card" style="margin-bottom:10px;padding:14px 16px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600;margin-bottom:4px">${r.nome}</div>
+              <div style="font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px">
+                ${r.tel?`<span>📱 ${r.tel}</span>`:''}
+                ${r.modalidade?`<span>${modLabel(r.modalidade)}</span>`:''}
+                ${r.dia_sugerido?`<span>📅 ${r.dia_sugerido}${r.hora_sugerida?' às '+r.hora_sugerida:''}</span>`:''}
+              </div>
+              ${r.obs?`<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic">"${r.obs}"</div>`:''}
+              <div style="font-size:10px;color:var(--muted);margin-top:4px">${new Date(r.criado_em).toLocaleDateString('pt-BR')}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+              ${statusBadge(r.status)}
+              ${r.status!=='contatado'?`<button class="btn btn-ghost btn-sm" onclick="marcarContatado(${r.id},this)">✓ Contatado</button>`:''}
+              ${r.tel?`<a href="https://wa.me/55${r.tel.replace(/\D/g,'')}" target="_blank" class="btn btn-ghost btn-sm">💬 WA</a>`:''}
+            </div>
+          </div>
+        </div>`).join('')}`;
+}
+
+async function marcarContatado(id, btn) {
+  btn.disabled = true;
+  try {
+    await PUT('/api/lista-espera/'+id+'/status', { status: 'contatado' });
+    renderListaEspera();
+  } catch(e) { alert('Erro: '+e.message); btn.disabled=false; }
+}
 
 async function renderAvisos() {
   const pg = document.getElementById('page-avisos');

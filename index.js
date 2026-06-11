@@ -165,6 +165,20 @@ async function setupDB() {
     try { await conn.query("ALTER TABLE documentos ADD COLUMN aluno_id INT NULL"); } catch(e){}
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS lista_espera (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(120) NOT NULL,
+        tel VARCHAR(30),
+        modalidade VARCHAR(30),
+        dia_sugerido VARCHAR(20),
+        hora_sugerida VARCHAR(10),
+        obs TEXT,
+        status VARCHAR(20) DEFAULT 'pendente',
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS avisos_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         aluno_id INT NOT NULL,
@@ -537,6 +551,33 @@ app.post('/api/alunos/publico', async (req, res) => {
 // ══════════════════════════════════════
 // AULAS
 // ══════════════════════════════════════
+// Lista de espera — público
+app.post('/api/lista-espera', async (req, res) => {
+  try {
+    const { nome, tel, modalidade, dia_sugerido, hora_sugerida, obs } = req.body;
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+    await db.query(
+      'INSERT INTO lista_espera (nome, tel, modalidade, dia_sugerido, hora_sugerida, obs) VALUES (?,?,?,?,?,?)',
+      [nome, tel||null, modalidade||null, dia_sugerido||null, hora_sugerida||null, obs||null]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/lista-espera', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM lista_espera ORDER BY criado_em DESC');
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/lista-espera/:id/status', auth, async (req, res) => {
+  try {
+    await db.query('UPDATE lista_espera SET status=? WHERE id=?', [req.body.status, req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/aulas', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM aulas ORDER BY FIELD(dia,"Segunda","Terça","Quarta","Quinta","Sexta","Sábado"), hora');

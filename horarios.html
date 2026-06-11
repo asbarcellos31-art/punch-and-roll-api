@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Grade de Horários — Punch and Roll</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--red:#d4111c;--black:#080808;--dark:#0f0f0f;--panel:#161616;--border:#222;--white:#f2f2f2;--muted:#666;--blue:#3b82f6;--green:#22c55e}
+html,body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100%}
+
+.header{background:var(--dark);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header-brand{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;text-decoration:none;color:inherit}
+.header-brand span{color:var(--red)}
+.header-badge{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+.hero{text-align:center;padding:40px 20px 28px;background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%)}
+.hero h1{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;margin-bottom:8px}
+.hero h1 span{color:var(--red)}
+.hero p{font-size:14px;color:var(--muted);max-width:400px;margin:0 auto}
+
+.container{max-width:720px;margin:0 auto;padding:0 16px 100px}
+
+.tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px}
+.tab{flex-shrink:0;padding:8px 18px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
+.tab.active{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+
+.grade-section{margin-bottom:28px}
+.dia-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+.aula-card{background:var(--dark);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px}
+.aula-hora{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--white);min-width:56px}
+.aula-info{flex:1}
+.aula-nome{font-size:14px;font-weight:600}
+.aula-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.aula-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:600;letter-spacing:.5px}
+.badge-boxe{background:rgba(212,17,28,.15);color:#f87171;border:1px solid rgba(212,17,28,.25)}
+.badge-jiujitsu{background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.25)}
+
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+
+/* Formulário lista de espera */
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:6px}
+.section-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+
+.card{background:var(--dark);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.frow{grid-template-columns:1fr}}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fl{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.fi{background:#111;border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s;width:100%}
+.fi:focus{border-color:var(--red)}
+select.fi option{background:#111}
+
+.btn-enviar{width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;transition:background .2s;box-shadow:0 4px 20px rgba(212,17,28,.35)}
+.btn-enviar:hover:not(:disabled){background:#e8151f}
+.btn-enviar:disabled{opacity:.4;cursor:not-allowed}
+
+.success-msg{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:16px;text-align:center;color:var(--green);font-size:13px;display:none}
+
+.divider{border:none;border-top:1px solid var(--border);margin:32px 0}
+
+.cta-matricula{background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:12px;padding:20px;text-align:center;margin-bottom:24px}
+.cta-matricula p{font-size:13px;color:var(--muted);margin-bottom:12px}
+.btn-cta{display:inline-block;padding:12px 28px;background:var(--red);color:#fff;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;text-decoration:none;box-shadow:0 4px 16px rgba(212,17,28,.4)}
+
+.loader{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/" class="header-brand">PUNCH AND <span>ROLL</span></a>
+  <div class="header-badge">Horários</div>
+</div>
+
+<div class="hero">
+  <h1>GRADE DE <span>HORÁRIOS</span></h1>
+  <p>Confira os horários disponíveis e entre na lista de espera para novos horários</p>
+</div>
+
+<div class="container">
+
+  <!-- Filtro modalidade -->
+  <div class="tabs" style="margin-top:20px">
+    <button class="tab active" onclick="filtrar('todos',this)">Todos</button>
+    <button class="tab" onclick="filtrar('boxe',this)">🥊 Boxe</button>
+    <button class="tab" onclick="filtrar('jiujitsu',this)">🟦 Jiu-Jitsu</button>
+  </div>
+
+  <div id="grade-loader" class="loader">Carregando horários...</div>
+  <div id="grade"></div>
+
+  <hr class="divider">
+
+  <!-- CTA matrícula -->
+  <div class="cta-matricula">
+    <p>Gostou dos horários? Faça sua matrícula agora mesmo.</p>
+    <a href="/punch-and-roll-matricula.html" class="btn-cta">QUERO ME MATRICULAR</a>
+  </div>
+
+  <!-- Lista de espera -->
+  <div class="section-title">📋 LISTA DE ESPERA</div>
+  <p class="section-sub">Não encontrou um horário ideal? Sugira o dia e horário que funcionaria para você. Usamos essas informações para abrir novas turmas conforme a demanda.</p>
+
+  <div class="card">
+    <div class="frow">
+      <div class="fg">
+        <label class="fl">Seu nome *</label>
+        <input class="fi" id="le-nome" placeholder="Ex: João Silva" maxlength="120">
+      </div>
+      <div class="fg">
+        <label class="fl">WhatsApp</label>
+        <input class="fi" id="le-tel" placeholder="(48) 9 9999-9999" maxlength="20">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label class="fl">Modalidade de interesse</label>
+        <select class="fi" id="le-modalidade">
+          <option value="">Selecione...</option>
+          <option value="boxe">🥊 Boxe</option>
+          <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+          <option value="ambos">🥊🟦 Ambos</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Dia preferido</label>
+        <select class="fi" id="le-dia">
+          <option value="">Selecione...</option>
+          <option>Segunda</option>
+          <option>Terça</option>
+          <option>Quarta</option>
+          <option>Quinta</option>
+          <option>Sexta</option>
+          <option>Sábado</option>
+          <option>Qualquer dia</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Horário preferido</label>
+      <select class="fi" id="le-hora">
+        <option value="">Selecione...</option>
+        <option value="06:00">06:00 — Manhã cedo</option>
+        <option value="07:00">07:00 — Manhã</option>
+        <option value="08:00">08:00 — Manhã</option>
+        <option value="09:00">09:00 — Manhã</option>
+        <option value="10:00">10:00 — Manhã</option>
+        <option value="11:00">11:00 — Manhã</option>
+        <option value="12:00">12:00 — Meio-dia</option>
+        <option value="13:00">13:00 — Tarde</option>
+        <option value="14:00">14:00 — Tarde</option>
+        <option value="15:00">15:00 — Tarde</option>
+        <option value="16:00">16:00 — Tarde</option>
+        <option value="17:00">17:00 — Tarde</option>
+        <option value="18:00">18:00 — Início da noite</option>
+        <option value="19:00">19:00 — Noite</option>
+        <option value="20:00">20:00 — Noite</option>
+        <option value="21:00">21:00 — Noite</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Observações (opcional)</label>
+      <input class="fi" id="le-obs" placeholder="Ex: prefiro turmas pequenas, tenho filhos...">
+    </div>
+    <button class="btn-enviar" id="btn-enviar" onclick="enviarListaEspera()">ENTRAR NA LISTA DE ESPERA</button>
+    <div class="success-msg" id="success-msg">
+      ✅ Recebemos seu interesse! Entraremos em contato quando um horário compatível estiver disponível.
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'https://punch-and-roll-api-production.up.railway.app';
+const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+let todasAulas = [];
+let filtroAtivo = 'todos';
+
+async function carregarGrade() {
+  try {
+    const res = await fetch(`${API}/api/aulas`);
+    todasAulas = await res.json();
+    renderGrade();
+  } catch(e) {
+    document.getElementById('grade-loader').textContent = 'Erro ao carregar horários.';
+  }
+}
+
+function filtrar(mod, btn) {
+  filtroAtivo = mod;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderGrade();
+}
+
+function renderGrade() {
+  document.getElementById('grade-loader').style.display = 'none';
+  const aulas = filtroAtivo === 'todos' ? todasAulas : todasAulas.filter(a => a.modalidade === filtroAtivo);
+  const ativas = aulas.filter(a => a.status === 'ativo');
+
+  if (ativas.length === 0) {
+    document.getElementById('grade').innerHTML = '<div class="empty">Nenhuma aula encontrada para este filtro.</div>';
+    return;
+  }
+
+  let html = '';
+  for (const dia of DIAS) {
+    const diaAulas = ativas.filter(a => a.dia === dia).sort((a,b) => a.hora.localeCompare(b.hora));
+    if (!diaAulas.length) continue;
+    html += `<div class="grade-section"><div class="dia-title">${dia}</div>`;
+    for (const a of diaAulas) {
+      const mod = a.modalidade === 'boxe' ? 'boxe' : 'jiujitsu';
+      const label = a.modalidade === 'boxe' ? '🥊 Boxe' : '🟦 Jiu-Jitsu';
+      html += `<div class="aula-card">
+        <div class="aula-hora">${a.hora?.slice(0,5)}</div>
+        <div class="aula-info">
+          <div class="aula-nome">${a.nome}</div>
+          <div class="aula-meta">${a.vagas} vagas · ${dia}</div>
+        </div>
+        <span class="aula-badge badge-${mod}">${label}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  document.getElementById('grade').innerHTML = html;
+}
+
+async function enviarListaEspera() {
+  const nome = document.getElementById('le-nome').value.trim();
+  if (!nome) { alert('Informe seu nome!'); return; }
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.textContent = 'ENVIANDO...';
+  try {
+    await fetch(`${API}/api/lista-espera`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome,
+        tel: document.getElementById('le-tel').value.trim(),
+        modalidade: document.getElementById('le-modalidade').value,
+        dia_sugerido: document.getElementById('le-dia').value,
+        hora_sugerida: document.getElementById('le-hora').value,
+        obs: document.getElementById('le-obs').value.trim(),
+      })
+    });
+    document.getElementById('success-msg').style.display = 'block';
+    btn.style.display = 'none';
+    ['le-nome','le-tel','le-obs'].forEach(id => document.getElementById(id).value = '');
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'ENTRAR NA LISTA DE ESPERA';
+    alert('Erro ao enviar. Tente novamente.');
+  }
+}
+
+carregarGrade();
+</script>
+</body>
+</html>
