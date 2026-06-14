@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--red:#d4111c;--black:#080808;--dark:#0f0f0f;--panel:#161616;--border:#222;--white:#f2f2f2;--muted:#666}
+:root{--red:#d4111c;--black:#ffffff;--dark:#f3f4f6;--panel:#ffffff;--border:#e5e7eb;--white:#111827;--muted:#6b7280}
 html,body{height:100%;background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;overflow-x:hidden}
 
 /* HERO */
@@ -30,19 +30,19 @@ html,body{height:100%;background:var(--black);color:var(--white);font-family:'DM
 .card-matricula{background:var(--red);border-color:var(--red);box-shadow:0 8px 32px rgba(212,17,28,.35)}
 .card-matricula:hover{background:#e8151f;box-shadow:0 12px 40px rgba(212,17,28,.5)}
 
-.card-portal{background:var(--panel);border-color:#2a2a2a}
-.card-portal:hover{border-color:#444;background:#1c1c1c}
+.card-portal{background:var(--panel);border-color:var(--border)}
+.card-portal:hover{border-color:#9ca3af;background:var(--dark)}
 
-.card-horarios{background:var(--panel);border-color:#2a2a2a}
-.card-horarios:hover{border-color:#3b82f6;background:#1c1c1c}
-.card-horarios .card-icon{background:rgba(59,130,246,.15)}
+.card-horarios{background:var(--panel);border-color:var(--border)}
+.card-horarios:hover{border-color:#3b82f6;background:var(--dark)}
+.card-horarios .card-icon{background:rgba(59,130,246,.1)}
 
-.card-shop{background:var(--panel);border-color:#2a2a2a}
-.card-shop:hover{border-color:#7c3aed;background:#1c1c1c}
-.card-shop .card-icon{background:rgba(124,58,237,.15)}
+.card-shop{background:var(--panel);border-color:var(--border)}
+.card-shop:hover{border-color:#7c3aed;background:var(--dark)}
+.card-shop .card-icon{background:rgba(124,58,237,.1)}
 
-.card-admin{background:transparent;border-color:#1a1a1a}
-.card-admin:hover{border-color:#333;background:rgba(255,255,255,.03)}
+.card-admin{background:transparent;border-color:var(--border)}
+.card-admin:hover{border-color:#9ca3af;background:var(--dark)}
 
 .card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
 .card-matricula .card-icon{background:rgba(255,255,255,.15)}
@@ -69,16 +69,16 @@ footer a:hover{color:var(--white)}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
 .modal{background:var(--dark);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:24px;width:100%;max-width:400px}
-.modal-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 16px}
+.modal-handle{width:36px;height:4px;background:#d1d5db;border-radius:2px;margin:0 auto 16px}
 .modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:20px;text-align:center}
 .fg{margin-bottom:14px}
 .fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
-.fi{width:100%;background:#1c1c1c;border:1px solid var(--border);border-radius:6px;padding:11px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.fi{width:100%;background:#ffffff;border:1px solid var(--border);border-radius:6px;padding:11px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
 .fi:focus{border-color:var(--red)}
 .btn-login{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;margin-top:6px;transition:background .2s}
 .btn-login:hover{background:#e8151f}
 .btn-cancel{width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;transition:all .2s}
-.btn-cancel:hover{border-color:#444;color:var(--white)}
+.btn-cancel:hover{border-color:#9ca3af;color:var(--white)}
 .erro{color:#f87171;font-size:12px;text-align:center;margin-top:8px;display:none}
 
 @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}

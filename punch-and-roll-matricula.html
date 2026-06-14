@@ -9,7 +9,7 @@
 <script src="https://sdk.mercadopago.com/js/v2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--black:#080808;--dark:#0f0f0f;--panel:#161616;--panel2:#1c1c1c;--border:#242424;--red:#d4111c;--red2:#ff1a26;--white:#f2f2f2;--muted:#5a5a5a;--muted2:#333;--green:#16a34a;--green2:#22c55e;}
+:root{--black:#ffffff;--dark:#f3f4f6;--panel:#ffffff;--panel2:#f9fafb;--border:#e5e7eb;--red:#d4111c;--red2:#b91c1c;--white:#111827;--muted:#6b7280;--muted2:#d1d5db;--green:#16a34a;--green2:#15803d;}
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white);min-height:100vh;overflow-x:hidden}
 .hero{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px 40px;overflow:hidden}
@@ -62,7 +62,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .fg{margin-bottom:12px}
 .fl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block}
 .fi{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;transition:border-color .2s;-webkit-appearance:none}
-.fi:focus{outline:none;border-color:var(--red);background:#1e1e1e}
+.fi:focus{outline:none;border-color:var(--red);background:#f9fafb}
 .fi::placeholder{color:var(--muted)}
 .fi option{background:var(--panel2)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -76,7 +76,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
 .pix-chave:hover{background:var(--border)}
 .credit-box{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:20px;display:none}
 .credit-box.active{display:block}
-.card-preview{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:10px;padding:18px;margin-bottom:16px;border:1px solid #2a2a4a;position:relative;overflow:hidden}
+.card-preview{background:linear-gradient(135deg,#1e3a5f,#1a3a6b);border-radius:10px;padding:18px;margin-bottom:16px;border:1px solid #2563eb;position:relative;overflow:hidden}
 .card-preview::before{content:'';position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(212,17,28,.15)}
 .card-brand{font-size:11px;color:#6b7280;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
 .card-number-preview{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:4px;color:#e2e8f0}
@@ -471,7 +471,7 @@ function gerarContratoHTML(){
 <div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
   <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
   <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
-  <div style="font-size:10px;color:#888;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
+  <div style="font-size:10px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
 </div>
 <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
   <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
@@ -482,17 +482,17 @@ function gerarContratoHTML(){
 <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
 <p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
 <div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-  <div><span style="color:#888;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
-  <div><span style="color:#888;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
-  <div><span style="color:#888;font-size:11px">Plano</span><br><strong>${p.nome}</strong></div>
-  <div><span style="color:#888;font-size:11px">Duração</span><br><strong>${p.meses===1?'Mensal (renovação automática)':p.meses+' meses'}</strong></div>
-  <div><span style="color:#888;font-size:11px">Valor mensal</span><br><strong>R$ ${p.valor},00</strong></div>
-  <div><span style="color:#888;font-size:11px">Total</span><br><strong>R$ ${p.valor*p.meses},00</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong>${p.nome}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong>${p.meses===1?'Mensal (renovação automática)':p.meses+' meses'}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong>R$ ${p.valor},00</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Total</span><br><strong>R$ ${p.valor*p.meses},00</strong></div>
 </div>
 <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
 <p>O CONTRATANTE pagará <strong>R$ ${p.valor},00/mês</strong>, totalizando <strong>R$ ${p.valor*p.meses},00</strong>. O atraso superior a 15 dias resultará na suspensão do acesso até regularização.</p>
 <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Sistema de Check-in e Controle de Frequência</p>
-<p style="background:#1a1a1a;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px">
+<p style="background:#fff5f5;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px">
   <strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> realizado pelo CONTRATANTE através do Portal do Aluno, acessível em:<br><br>
   <strong style="font-size:14px">🔗 https://punchandroll.com.br/punch-and-roll-portal.html</strong><br><br>
   O check-in deve ser realizado no dia da aula, antes ou após o treino. <strong>Aulas sem check-in registrado não serão computadas para fins de controle de frequência e eventual reposição.</strong>
@@ -534,91 +534,91 @@ ${cancelClause}
 <p>O CONTRATANTE declara ter lido e aceito integralmente o <strong>Manual de Conduta Punch and Roll 2026</strong>. O descumprimento reiterado poderá resultar em advertência, suspensão ou rescisão unilateral sem restituição dos valores pagos.</p>
 <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 10ª — Disposições Gerais</p>
 <p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
-<div style="text-align:right;margin-top:12px;color:#888;font-size:11px">São José/SC, ${hoje}</div>
+<div style="text-align:right;margin-top:12px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div>
 
 <div style="border-top:2px solid #d4111c;margin-top:28px;padding-top:18px">
 
 <div style="text-align:center;margin-bottom:20px">
   <div style="font-size:18px;font-weight:700;letter-spacing:3px">MANUAL DE CONDUTA</div>
   <div style="font-size:12px;color:#d4111c;font-weight:600;margin-top:4px">DISCIPLINA E BOAS PRÁTICAS · PUNCH AND ROLL FIGHT TEAM · 2026</div>
-  <div style="font-size:11px;color:#888;margin-top:6px;font-style:italic">"Mais que uma academia. Uma família."</div>
+  <div style="font-size:11px;color:#6b7280;margin-top:6px;font-style:italic">"Mais que uma academia. Uma família."</div>
 </div>
 
-<p style="margin-bottom:14px;line-height:1.7;color:#ccc"><strong style="color:#fff">Sobre a Punch and Roll —</strong> Punch and Roll Fight Team é uma equipe formada por pessoas que buscam evolução física, técnica e pessoal. Nossa missão não é apenas ensinar Boxe e Jiu-Jitsu — buscamos desenvolver disciplina, respeito, confiança, saúde, espírito esportivo e senso de comunidade. Todos os alunos, professores, colaboradores e visitantes devem respeitar as regras descritas neste manual. O descumprimento poderá resultar em advertência, suspensão ou desligamento da equipe.</p>
+<p style="margin-bottom:14px;line-height:1.7;color:#374151"><strong style="color:#111827">Sobre a Punch and Roll —</strong> Punch and Roll Fight Team é uma equipe formada por pessoas que buscam evolução física, técnica e pessoal. Nossa missão não é apenas ensinar Boxe e Jiu-Jitsu — buscamos desenvolver disciplina, respeito, confiança, saúde, espírito esportivo e senso de comunidade. Todos os alunos, professores, colaboradores e visitantes devem respeitar as regras descritas neste manual. O descumprimento poderá resultar em advertência, suspensão ou desligamento da equipe.</p>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO I</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:8px">VALORES DA EQUIPE</div>
-  <p style="font-size:12px;color:#aaa;margin-bottom:8px;font-style:italic">Todo integrante da Punch and Roll deve praticar:</p>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:8px;font-style:italic">Todo integrante da Punch and Roll deve praticar:</p>
   <div style="display:flex;flex-wrap:wrap;gap:6px">
-    ${['Respeito','Disciplina','Humildade','Honestidade','Pontualidade','Organização','Esp. Esportivo','Segurança','Companheirismo','Evolução'].map(v=>`<span style="background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:4px 10px;font-size:11px;letter-spacing:.5px">${v}</span>`).join('')}
+    ${['Respeito','Disciplina','Humildade','Honestidade','Pontualidade','Organização','Esp. Esportivo','Segurança','Companheirismo','Evolução'].map(v=>`<span style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:4px 10px;font-size:11px;letter-spacing:.5px">${v}</span>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO II</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">HIGIENE PESSOAL</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">A higiene é uma demonstração de respeito aos colegas.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">A higiene é uma demonstração de respeito aos colegas.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ OBRIGATÓRIO — ALUNOS E PROFESSORES</div>
-    ${['Tomar banho regularmente','Escovar os dentes antes das aulas','Utilizar desodorante','Manter unhas das mãos e dos pés cortadas','Utilizar roupas limpas','Utilizar kimonos limpos','Utilizar luvas e bandagens limpas','Utilizar protetores devidamente higienizados'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Tomar banho regularmente','Escovar os dentes antes das aulas','Utilizar desodorante','Manter unhas das mãos e dos pés cortadas','Utilizar roupas limpas','Utilizar kimonos limpos','Utilizar luvas e bandagens limpas','Utilizar protetores devidamente higienizados'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ NÃO SERÁ PERMITIDO TREINAR</div>
-    ${['Com uniforme excessivamente sujo','Com odor excessivo','Com lesões infecciosas expostas','Com doenças contagiosas'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Com uniforme excessivamente sujo','Com odor excessivo','Com lesões infecciosas expostas','Com doenças contagiosas'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO III</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">APRESENTAÇÃO DOS PROFESSORES</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Os professores representam a imagem da equipe.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Os professores representam a imagem da equipe.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ DEVEM MANTER</div>
-    ${['Cabelos limpos e organizados','Barba aparada e higienizada','Uniforme oficial da equipe em bom estado','Linguagem respeitosa','Postura profissional'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Cabelos limpos e organizados','Barba aparada e higienizada','Uniforme oficial da equipe em bom estado','Linguagem respeitosa','Postura profissional'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ É VEDADO</div>
-    ${['Ministrar aulas com aparência desleixada','Utilizar linguagem ofensiva','Fazer comentários discriminatórios ou constrangedores'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Ministrar aulas com aparência desleixada','Utilizar linguagem ofensiva','Fazer comentários discriminatórios ou constrangedores'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO IV</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">PONTUALIDADE</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">A pontualidade demonstra respeito pelo tempo dos colegas.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">A pontualidade demonstra respeito pelo tempo dos colegas.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ ALUNOS</div>
-    ${['Chegar preferencialmente 10 minutos antes do horário','Ingressar na aula já preparado para o treino'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Chegar preferencialmente 10 minutos antes do horário','Ingressar na aula já preparado para o treino'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px">
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ PROFESSORES</div>
-    ${['Estar presentes antes do início das aulas','Preparar previamente materiais e equipamentos','Iniciar e encerrar as aulas nos horários programados'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Estar presentes antes do início das aulas','Preparar previamente materiais e equipamentos','Iniciar e encerrar as aulas nos horários programados'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO V</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">UTILIZAÇÃO DO TATAME</div>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ OBRIGATÓRIO</div>
-    ${['Entrar descalço no tatame','Manter o tatame limpo','Respeitar os espaços delimitados'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Entrar descalço no tatame','Manter o tatame limpo','Respeitar os espaços delimitados'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ PROIBIDO</div>
-    ${['Entrar com calçados utilizados na rua','Comer sobre o tatame','Jogar lixo no chão','Sentar-se de forma inadequada durante as instruções'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Entrar com calçados utilizados na rua','Comer sobre o tatame','Jogar lixo no chão','Sentar-se de forma inadequada durante as instruções'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO VI</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">EQUIPAMENTOS PESSOAIS</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Cada aluno é responsável por seus materiais.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Cada aluno é responsável por seus materiais.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ TRAZER OBRIGATORIAMENTE QUANDO APLICÁVEL</div>
-    ${['Kimono e faixa','Luvas e bandagens','Protetor bucal','Toalha e garrafa de água','Equipamentos de proteção exigidos para cada modalidade'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Kimono e faixa','Luvas e bandagens','Protetor bucal','Toalha e garrafa de água','Equipamentos de proteção exigidos para cada modalidade'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ ATENÇÃO</div>
     <div style="font-size:12px;color:#ccc;padding:3px 0">✗ A academia não se responsabiliza por objetos esquecidos ou perdidos</div>
   </div>
@@ -627,12 +627,12 @@ ${cancelClause}
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO VII</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">ORGANIZAÇÃO DOS EQUIPAMENTOS</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Todo equipamento utilizado deve retornar ao local correto. A organização é responsabilidade de todos.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Todo equipamento utilizado deve retornar ao local correto. A organização é responsabilidade de todos.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ QUEM UTILIZA: GUARDA, ORGANIZA E CONSERVA</div>
-    ${['Luvas de treino e aparadores','Escudos e cones','Cordas e colchonetes','Materiais de preparação física'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Luvas de treino e aparadores','Escudos e cones','Cordas e colchonetes','Materiais de preparação física'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:10px">
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px">
     <div style="font-size:11px;color:#fbbf24;font-weight:600">⚡ PRINCÍPIO: Usou → Guardou → Organizou</div>
   </div>
 </div>
@@ -640,104 +640,104 @@ ${cancelClause}
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO VIII</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">LIMPEZA DOS AMBIENTES</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Todos devem colaborar com a limpeza.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Todos devem colaborar com a limpeza.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ INCLUI TODOS OS AMBIENTES</div>
-    ${['Banheiros','Área de recepção','Tatame','Área de equipamentos','Área externa','Dar descarga · lavar as mãos · manter o banheiro limpo'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Banheiros','Área de recepção','Tatame','Área de equipamentos','Área externa','Dar descarga · lavar as mãos · manter o banheiro limpo'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ PROIBIDO</div>
-    ${['Jogar lixo no chão','Deixar copos descartáveis espalhados','Deixar garrafas vazias','Deixar toalhas ou equipamentos abandonados'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Jogar lixo no chão','Deixar copos descartáveis espalhados','Deixar garrafas vazias','Deixar toalhas ou equipamentos abandonados'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO IX</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">CONDUTA DURANTE OS TREINOS</div>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ TODOS DEVEM</div>
-    ${['Respeitar os professores','Respeitar os colegas','Ouvir as instruções','Manter comportamento adequado'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Respeitar os professores','Respeitar os colegas','Ouvir as instruções','Manter comportamento adequado'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ PROIBIDO</div>
-    ${['Interromper explicações','Fazer brincadeiras perigosas','Provocar colegas','Utilizar linguagem ofensiva'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Interromper explicações','Fazer brincadeiras perigosas','Provocar colegas','Utilizar linguagem ofensiva'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO X</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">SPARRINGS E ROLAS</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Os combates são <strong style="color:#fff">ferramentas de aprendizado</strong>, não disputas de ego. O respeito ao parceiro é inegociável.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Os combates são <strong style="color:#111827">ferramentas de aprendizado</strong>, não disputas de ego. O respeito ao parceiro é inegociável.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ TODO PARTICIPANTE DEVERÁ</div>
-    ${['Controlar força e intensidade','Respeitar iniciantes','Respeitar diferenças físicas','Interromper imediatamente quando solicitado pelo professor','Priorizar segurança acima de tudo'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Controlar força e intensidade','Respeitar iniciantes','Respeitar diferenças físicas','Interromper imediatamente quando solicitado pelo professor','Priorizar segurança acima de tudo'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ NÃO SERÁ TOLERADO</div>
-    ${['Excesso de agressividade','Golpes intencionais para machucar','Desrespeito ao parceiro de treino','Atitudes antidesportivas'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Excesso de agressividade','Golpes intencionais para machucar','Desrespeito ao parceiro de treino','Atitudes antidesportivas'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO XI</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">SEGURANÇA</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Toda lesão deve ser comunicada imediatamente ao professor.</p>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Toda lesão deve ser comunicada imediatamente ao professor.</p>
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ PROIBIDO TREINAR</div>
-    ${['Sob efeito de álcool','Sob efeito de drogas ilícitas','Em condições físicas que coloquem terceiros em risco'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Sob efeito de álcool','Sob efeito de drogas ilícitas','Em condições físicas que coloquem terceiros em risco'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a1a0a;border:1px solid #3a3a1a;border-radius:6px;padding:10px">
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#fbbf24;letter-spacing:1px;margin-bottom:6px">⚠ AUTORIDADE DO PROFESSOR</div>
-    <div style="font-size:12px;color:#ccc">✓ Os professores possuem autoridade para impedir qualquer aluno de participar da aula caso identifiquem riscos à segurança.</div>
+    <div style="font-size:12px;color:#374151">✓ Os professores possuem autoridade para impedir qualquer aluno de participar da aula caso identifiquem riscos à segurança.</div>
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO XII</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">CELULARES</div>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ DURANTE OS TREINOS</div>
-    ${['Utilizar apenas quando necessário','Manter o foco na atividade'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Utilizar apenas quando necessário','Manter o foco na atividade'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ PROIBIDO</div>
-    ${['Atender ligações durante instruções','Filmar terceiros sem autorização'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Atender ligações durante instruções','Filmar terceiros sem autorização'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO XIII</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">CRIANÇAS E ADOLESCENTES</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">A formação do caráter é parte fundamental da metodologia da equipe.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">A formação do caráter é parte fundamental da metodologia da equipe.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ PAIS E RESPONSÁVEIS DEVERÃO</div>
-    ${['Respeitar os horários de início e término das aulas','Buscar os alunos ao término das aulas','Respeitar as orientações dos professores'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Respeitar os horários de início e término das aulas','Buscar os alunos ao término das aulas','Respeitar as orientações dos professores'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO XIV</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">REDES SOCIAIS</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">A imagem da Punch and Roll deve ser preservada por todos.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">A imagem da Punch and Roll deve ser preservada por todos.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ ESPERA-SE DE TODOS</div>
-    ${['Respeito à equipe nas publicações','Respeito aos colegas e professores','Representar a academia com orgulho e responsabilidade'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Respeito à equipe nas publicações','Respeito aos colegas e professores','Representar a academia com orgulho e responsabilidade'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a0f0f;border:1px solid #3a1a1a;border-radius:6px;padding:10px">
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px">
     <div style="font-size:10px;color:#f87171;letter-spacing:1px;margin-bottom:6px">✗ NÃO SERÃO TOLERADAS PUBLICAÇÕES QUE</div>
-    ${['Ataquem membros da equipe','Difamem a academia','Exponham alunos sem autorização'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #2a1a1a">✗ ${i}</div>`).join('')}
+    ${['Ataquem membros da equipe','Difamem a academia','Exponham alunos sem autorização'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}
   </div>
 </div>
 
 <div style="margin-bottom:16px">
   <div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO XV</div>
   <div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px">PROFESSORES</div>
-  <p style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px">Além das demais regras, os professores têm responsabilidades adicionais.</p>
-  <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:10px;margin-bottom:8px">
+  <p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">Além das demais regras, os professores têm responsabilidades adicionais.</p>
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:10px;color:#4ade80;letter-spacing:1px;margin-bottom:6px">✓ OS PROFESSORES DEVEM</div>
-    ${['Dar exemplo dentro e fora da academia','Tratar todos os alunos de forma igualitária','Zelar pela segurança dos treinos','Cumprir a metodologia definida pela equipe','Estimular um ambiente acolhedor e familiar','Comunicar imediatamente problemas estruturais ou disciplinares aos sócios'].map(i=>`<div style="font-size:12px;color:#ccc;padding:3px 0;border-bottom:1px solid #1a2a1a">✓ ${i}</div>`).join('')}
+    ${['Dar exemplo dentro e fora da academia','Tratar todos os alunos de forma igualitária','Zelar pela segurança dos treinos','Cumprir a metodologia definida pela equipe','Estimular um ambiente acolhedor e familiar','Comunicar imediatamente problemas estruturais ou disciplinares aos sócios'].map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}
   </div>
-  <div style="background:#1a1a0a;border:1px solid #3a3a1a;border-radius:6px;padding:10px">
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px">
     <div style="font-size:12px;color:#fbbf24;line-height:1.6"><strong>Advertência, suspensão ou desligamento</strong> poderão ser aplicados a qualquer integrante — aluno, professor ou colaborador — que descumprir as normas deste manual, a critério dos sócios da Punch and Roll Fight Team.</div>
   </div>
 </div>

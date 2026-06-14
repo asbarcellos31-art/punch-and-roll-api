@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--bg:#080808;--dark:#111;--panel:#181818;--panel2:#1f1f1f;--border:#2a2a2a;--red:#d4111c;--white:#f0f0f0;--muted:#666;--muted2:#333;--green:#22c55e;--yellow:#f59e0b;--blue:#3b82f6;}
+:root{--bg:#ffffff;--dark:#f3f4f6;--panel:#ffffff;--panel2:#f9fafb;--border:#e5e7eb;--red:#d4111c;--white:#111827;--muted:#6b7280;--muted2:#d1d5db;--green:#16a34a;--yellow:#d97706;--blue:#2563eb;}
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--white)}
 #app{position:fixed;inset:0;display:flex;flex-direction:column}
 .topbar{height:52px;background:var(--dark);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:10}
@@ -812,7 +812,7 @@ function abrirModalAula(id) {
         ? `<select class="fi" id="au-dia">${DIAS_SEMANA.map(d=>`<option${a.dia===d?' selected':''}>${d}</option>`).join('')}</select>`
         : `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
             ${DIAS_SEMANA.map(d=>`
-              <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:#111;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;user-select:none" id="lbl-${d}">
+              <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;user-select:none" id="lbl-${d}">
                 <input type="checkbox" id="au-dia-${d}" value="${d}" style="accent-color:var(--red)" onchange="leToggleDia('${d}',this.checked)">
                 ${d}
               </label>`).join('')}
@@ -1191,7 +1191,7 @@ function imprimirContas() {
     .t-pago{background:#f0fdf4;color:#16a34a}
     @media print{button{display:none}}
   </style></head><body>
-  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#111;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
+  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir</button>
   <h2>PUNCH AND ROLL — ${titulo}</h2>
   <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
   <table>
@@ -1920,7 +1920,7 @@ function leRenderGrupos(grupos, modLabel, statusBadge) {
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${g.pessoas.map(r=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #1e1e1e;border-radius:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px">
             <div>
               <div style="font-size:13px;font-weight:500">${r.nome}</div>
               ${r.tel?`<div style="font-size:11px;color:var(--muted)">📱 ${r.tel}</div>`:''}
@@ -1997,16 +1997,16 @@ async function renderAvisos() {
         ${lista.length>0?`<button class="btn btn-sm" style="background:${cfg.bg};color:${cfg.cor};border:1px solid ${cfg.borda}" onclick="enviarAvisoGrupo(${cfg.dias})">🚀 Enviar para todos</button>`:''}
       </div>
 
-      <div style="background:#0d0d0d;border:1px solid #222;border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px">
         <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Preview da mensagem (WhatsApp)</div>
-        <div style="font-size:12px;color:#ccc;line-height:1.7;white-space:pre-wrap">${escHtml(preview)}</div>
+        <div style="font-size:12px;color:#374151;line-height:1.7;white-space:pre-wrap">${escHtml(preview)}</div>
       </div>
 
       ${lista.length===0
         ? `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">Nenhum aluno para este grupo hoje</div>`
         : `<div style="display:flex;flex-direction:column;gap:6px">
             ${lista.map(a=>`
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #1e1e1e;border-radius:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px">
                 <div>
                   <div style="font-size:13px;font-weight:500">${a.nome}</div>
                   <div style="font-size:11px;color:var(--muted)">${a.tel||'—'} · Venc. ${a.vencimento?new Date(a.vencimento).toLocaleDateString('pt-BR'):'—'}</div>
