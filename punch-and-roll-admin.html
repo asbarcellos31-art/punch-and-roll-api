@@ -3182,11 +3182,15 @@ function etHtmlB(b){
   }
 }
 
-function etGerarHtml(saudacao, assinatura, blocos, cor){
-  cor=cor||'#d4111c';
-  const s=saudacao?`<div style="font-size:17px;font-weight:bold;color:${cor};margin-bottom:16px;">${saudacao}</div>`:'';
+function etAutoTextColor(hex){try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return(0.299*r+0.587*g+0.114*b)>128?'#111827':'#ffffff';}catch{return'#111827';}}
+
+function etGerarHtml(saudacao, assinatura, blocos, corFundo, corAnd){
+  corFundo=corFundo||'#ffffff'; corAnd=corAnd||'#d4111c';
+  const tc=etAutoTextColor(corFundo);
+  const cab=`<div style="background:${corFundo};padding:22px 32px;text-align:center;border-bottom:4px solid ${corAnd}"><div style="font-size:26px;font-weight:900;letter-spacing:3px;line-height:1"><span style="color:${tc}">PUNCH </span><span style="color:${corAnd}">AND</span><span style="color:${tc}"> ROLL</span></div><div style="color:${tc};opacity:0.5;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-top:5px">FIGHT TEAM</div></div>`;
+  const s=saudacao?`<div style="font-size:17px;font-weight:bold;color:#111827;margin-bottom:16px;">${saudacao}</div>`:'';
   const a=assinatura?`<div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;color:#555;font-size:14px;white-space:pre-line;">${assinatura}</div>`:'';
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><div style="background:${cor};padding:24px 32px;text-align:center;"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></div><div style="padding:32px;color:#333;line-height:1.7;font-size:15px;">${s}${blocos.map(etHtmlB).join('')}${a}</div></div></body></html>`;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">${cab}<div style="padding:32px;color:#333;line-height:1.7;font-size:15px;">${s}${blocos.map(etHtmlB).join('')}${a}</div></div></body></html>`;
 }
 
 function etAtualizarPreview(){
@@ -3195,8 +3199,9 @@ function etAtualizarPreview(){
   etSyncTexto();
   const saud=(document.getElementById('et-saudacao')?.value||'Olá, {{nome}}!').replace(/\{\{nome\}\}/g,'Maria');
   const ass=document.getElementById('et-assinatura')?.value||'Punch and Roll Fight Team';
-  const cor=document.getElementById('et-cor-cab')?.value||'#d4111c';
-  iframe.srcdoc=etGerarHtml(saud,ass,window._etBlocos,cor);
+  const corFundo=document.getElementById('et-cor-fundo')?.value||'#ffffff';
+  const corAnd=document.getElementById('et-cor-cab')?.value||'#d4111c';
+  iframe.srcdoc=etGerarHtml(saud,ass,window._etBlocos,corFundo,corAnd);
 }
 
 function etSyncTexto(){
@@ -3374,8 +3379,9 @@ async function emRenderTemplates(c){
 async function emPrevTpl(id){
   const tpl=await GET('/api/email/templates/'+id).catch(()=>null);if(!tpl) return;
   const blocos=etDeser(tpl.corpo);
-  const cor=tpl.cor_cabecalho||'#d4111c';
-  const html=blocos?etGerarHtml(tpl.saudacao||'Olá, {{nome}}!',tpl.assinatura||'Punch and Roll Fight Team',blocos,cor):tpl.corpo||'';
+  const corAnd=tpl.cor_cabecalho||'#d4111c';
+  const corFundo=tpl.cor_fundo_cab||'#ffffff';
+  const html=blocos?etGerarHtml(tpl.saudacao||'Olá, {{nome}}!',tpl.assinatura||'Punch and Roll Fight Team',blocos,corFundo,corAnd):tpl.corpo||'';
   const modal=document.createElement('div');modal.className='modal-overlay open';
   modal.innerHTML=`<div class="modal-box" style="max-width:660px;padding:0;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border)">
@@ -3399,37 +3405,44 @@ async function emNovoTemplateModal(tplId){
   const modal=document.createElement('div');
   modal.className='modal-overlay open';modal.id='modal-em-template';
   modal.style.cssText='align-items:stretch;padding:0;overflow:hidden';
-  const corCab=(tpl?.cor_cabecalho||'#d4111c');
-  modal.innerHTML=`<div style="background:var(--panel);width:100%;max-width:1200px;display:flex;flex-direction:column;height:100%">
-    <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0">
-      <span style="font-size:14px">📝</span>
+  const corAnd=(tpl?.cor_cabecalho||'#d4111c');
+  const corFundo=(tpl?.cor_fundo_cab||'#ffffff');
+  modal.innerHTML=`<div style="background:var(--panel);width:100%;max-width:1200px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Linha 1: nome + botões -->
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0">
+      <span>📝</span>
       <strong style="font-size:13px;white-space:nowrap">${tplId?'Editar':'Novo'} Template</strong>
-      <input class="fi" id="et-nome" value="${(tpl?.nome||'').replace(/"/g,'&quot;')}" placeholder="Nome do template" style="flex:1;min-width:100px;max-width:220px">
-      <button onclick="document.getElementById('modal-em-template').remove()" class="btn btn-ghost btn-sm" style="flex-shrink:0">Cancelar</button>
-      <button onclick="emSalvarTemplate(${tplId||'null'})" class="btn btn-r btn-sm" id="et-btn" style="flex-shrink:0">${tplId?'Salvar':'Criar Template'}</button>
+      <input class="fi" id="et-nome" value="${(tpl?.nome||'').replace(/"/g,'&quot;')}" placeholder="Nome do template" style="flex:1;min-width:80px;max-width:200px">
+      <button onclick="document.getElementById('modal-em-template').remove()" class="btn btn-ghost btn-sm">Cancelar</button>
+      <button onclick="emSalvarTemplate(${tplId||'null'})" class="btn btn-r btn-sm" id="et-btn">${tplId?'Salvar':'Criar Template'}</button>
     </div>
-    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
-      <div style="flex:1;overflow-y:auto;padding:12px;min-width:0;display:flex;flex-direction:column;gap:10px">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
-          <div class="fg" style="margin:0"><label class="fl">Assunto do email</label><input class="fi" id="et-assunto" value="${(tpl?.assunto||'').replace(/"/g,'&quot;')}" placeholder="Assunto (suporta {{nome}})" oninput="etAtualizarPreview()"></div>
-          <div class="fg" style="margin:0"><label class="fl">Saudação</label><input class="fi" id="et-saudacao" value="${(tpl?.saudacao||'Olá, {{nome}}!').replace(/"/g,'&quot;')}" placeholder="Olá, {{nome}}!" oninput="etAtualizarPreview()"></div>
-          <div class="fg" style="margin:0"><label class="fl">Assinatura</label><input class="fi" id="et-assinatura" value="${(tpl?.assinatura||'Punch and Roll Fight Team').replace(/"/g,'&quot;')}" placeholder="Punch and Roll Fight Team" oninput="etAtualizarPreview()"></div>
-          <div class="fg" style="margin:0"><label class="fl" style="white-space:nowrap">🎨 Cor cabeçalho</label><input type="color" id="et-cor-cab" value="${corCab}" onchange="etAtualizarPreview()" style="width:40px;height:34px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>
-        </div>
+    <!-- Linha 2: campos fixos (NÃO scrollam) -->
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:8px;align-items:end">
+      <div><label class="fl">Assunto</label><input class="fi" id="et-assunto" value="${(tpl?.assunto||'').replace(/"/g,'&quot;')}" placeholder="Assunto do email" oninput="etAtualizarPreview()"></div>
+      <div><label class="fl">Saudação</label><input class="fi" id="et-saudacao" value="${(tpl?.saudacao||'Olá, {{nome}}!').replace(/"/g,'&quot;')}" placeholder="Olá, {{nome}}!" oninput="etAtualizarPreview()"></div>
+      <div><label class="fl">Assinatura</label><input class="fi" id="et-assinatura" value="${(tpl?.assinatura||'Punch and Roll Fight Team').replace(/"/g,'&quot;')}" placeholder="Punch and Roll Fight Team" oninput="etAtualizarPreview()"></div>
+      <div><label class="fl" style="white-space:nowrap;font-size:10px">Fundo cab.</label><input type="color" id="et-cor-fundo" value="${corFundo}" onchange="etAtualizarPreview()" title="Cor de fundo do cabeçalho" style="width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;display:block"></div>
+      <div><label class="fl" style="white-space:nowrap;font-size:10px">Cor AND</label><input type="color" id="et-cor-cab" value="${corAnd}" onchange="etAtualizarPreview()" title="Cor da palavra AND e destaque" style="width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer;display:block"></div>
+    </div>
+    <!-- Linha 3: conteúdo principal -->
+    <div style="display:flex;flex:1;min-height:0;overflow:hidden">
+      <!-- Blocos: só esta área scrolla -->
+      <div style="flex:1;overflow-y:auto;min-width:0;padding:12px 12px 40px 12px">
         <div id="et-blocos-c"></div>
-        <div style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:var(--bg)">
+        <div style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:var(--bg);margin-top:10px">
           <div style="font-size:11px;font-weight:600;color:var(--muted);text-align:center;margin-bottom:8px">+ Adicionar bloco</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-            <button onclick="etAdd('texto')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px"><span style="font-size:16px">📝</span>Texto</button>
-            <button onclick="etAdd('callout')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#fffbeb;border-color:#f59e0b"><span style="font-size:16px">🟡</span>Destaque</button>
-            <button onclick="etAdd('botao')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#eef2ff;border-color:#818cf8"><span style="font-size:16px">🔗</span>Botão</button>
-            <button onclick="etAdd('rodape')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#f1f5f9;border-color:#94a3b8"><span style="font-size:16px">🏢</span>Rodapé</button>
+            <button onclick="etAdd('texto')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:2px;font-size:11px"><span style="font-size:16px">📝</span>Texto</button>
+            <button onclick="etAdd('callout')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:2px;font-size:11px;background:#fffbeb;border-color:#f59e0b"><span style="font-size:16px">🟡</span>Destaque</button>
+            <button onclick="etAdd('botao')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:2px;font-size:11px;background:#eef2ff;border-color:#818cf8"><span style="font-size:16px">🔗</span>Botão</button>
+            <button onclick="etAdd('rodape')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:2px;font-size:11px;background:#f1f5f9;border-color:#94a3b8"><span style="font-size:16px">🏢</span>Rodapé</button>
           </div>
         </div>
       </div>
-      <div style="width:360px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:#f4f4f4;min-height:0">
-        <div style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0">👁 Preview (dados de exemplo)</div>
-        <iframe id="et-preview-iframe" style="flex:1;border:none;background:#f4f4f4;min-height:0" sandbox="allow-same-origin"></iframe>
+      <!-- Preview: lado direito -->
+      <div style="width:360px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:#f4f4f4;overflow:hidden">
+        <div style="padding:7px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0">👁 Preview</div>
+        <iframe id="et-preview-iframe" style="flex:1;border:none;background:#f4f4f4" sandbox="allow-same-origin"></iframe>
       </div>
     </div>
   </div>`;
@@ -3447,12 +3460,13 @@ async function emSalvarTemplate(tplId){
   const saudacao=document.getElementById('et-saudacao')?.value||'Olá, {{nome}}!';
   const assinatura=document.getElementById('et-assinatura')?.value||'Punch and Roll Fight Team';
   const cor_cabecalho=document.getElementById('et-cor-cab')?.value||'#d4111c';
+  const cor_fundo_cab=document.getElementById('et-cor-fundo')?.value||'#ffffff';
   const corpo=etSer();
   const btn=document.getElementById('et-btn');
   if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   try{
-    if(tplId) await PUT('/api/email/templates/'+tplId,{nome,assunto,saudacao,corpo,assinatura,cor_cabecalho});
-    else await POST('/api/email/templates',{nome,assunto,saudacao,corpo,assinatura,cor_cabecalho});
+    if(tplId) await PUT('/api/email/templates/'+tplId,{nome,assunto,saudacao,corpo,assinatura,cor_cabecalho,cor_fundo_cab});
+    else await POST('/api/email/templates',{nome,assunto,saudacao,corpo,assinatura,cor_cabecalho,cor_fundo_cab});
     document.getElementById('modal-em-template')?.remove();
     await emRenderTab();
   }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent=tplId?'Salvar Alterações':'Criar Template';}}
