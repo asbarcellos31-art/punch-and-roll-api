@@ -2078,43 +2078,353 @@ const SEGS=[{id:'todos',label:'Todos',icon:'👥',n:()=>cache.alunos.length},{id
 const TPLS_WA=[{id:'cobranca',nome:'Cobrança',txt:'Olá {nome}! 🥊 Sua mensalidade da *Punch and Roll* está em atraso. Regularize!'},{id:'vencendo',nome:'Vencimento',txt:'Olá {nome}! 🥊 Sua mensalidade vence em breve. Renove!'},{id:'livre',nome:'Livre',txt:''}];
 const TPLS_EMAIL=[{id:'newsletter',nome:'Newsletter',assunto:'Novidades da Punch and Roll',txt:'Olá {nome}...'},{id:'cobranca',nome:'Cobrança',assunto:'Mensalidade — Punch and Roll',txt:'Olá {nome}, sua mensalidade está em atraso.'},{id:'livre',nome:'Livre',assunto:'',txt:''}];
 
+let waTab = 'disparos';
 async function renderMktWA(){
   const pg = document.getElementById('page-mkt-wa');
+  const tabs = [
+    {id:'disparos', label:'⚡ Disparos'},
+    {id:'aniversario', label:'🎂 Aniversariantes'},
+    {id:'campanhas', label:'📣 Campanhas'},
+    {id:'listas', label:'📋 Listas'},
+    {id:'historico', label:'📜 Histórico'},
+    {id:'config', label:'⚙️ Config'},
+  ];
   pg.innerHTML=`
     <div class="card" id="wa-status-card">
-      <div class="card-title">📱 Status WhatsApp</div>
-      <div id="wa-status-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="card-title" style="margin:0">📱 WhatsApp</div>
+        <button onclick="waGerarQR()" class="btn btn-ghost btn-sm">🔗 QR Code</button>
+      </div>
+      <div id="wa-status-body" style="display:flex;align-items:center;gap:10px">
         <div class="spinner"></div><span style="color:var(--muted);font-size:13px">Verificando...</span>
       </div>
     </div>
-    <div class="card"><div class="card-title">⚡ Disparos Rápidos</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${[{seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'🔴',label:'Cobrar',n:cache.alunos.filter(a=>a.status==='atrasado').length},
-           {seg:'vencendo',color:'var(--yellow)',bg:'rgba(245,158,11,.08)',border:'rgba(245,158,11,.25)',icon:'⚠️',label:'Avisar',n:cache.alunos.filter(a=>a.status==='vencendo').length},
-           {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📣',label:'Geral',n:cache.alunos.length},
-           {seg:'livre',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✏️',label:'Livre',n:null}
-          ].map(item=>`<button onclick="mktNovaMsg('wa','${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
+    <div class="day-tabs" style="margin-bottom:12px">
+      ${tabs.map(t=>`<button class="day-tab${waTab===t.id?' active':''}" onclick="waNavTo('${t.id}')">${t.label}</button>`).join('')}
+    </div>
+    <div id="wa-tab-content"></div>`;
+
+  apiFetch('/api/whatsapp/status').then(s=>{
+    const isOpen = s.status==='open';
+    document.getElementById('wa-status-body').innerHTML = isOpen
+      ? `<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span><span style="font-size:13px;font-weight:600;color:#22c55e">Conectado</span><span style="font-size:12px;color:var(--muted)">${s.nome||''} · ${(s.numero||'').replace('55','')}</span>`
+      : `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block"></span><span style="font-size:13px;font-weight:600;color:#ef4444">Desconectado</span>`;
+  }).catch(()=>{});
+  waRenderTab();
+}
+
+function waNavTo(tab){ waTab=tab; document.querySelectorAll('.day-tab').forEach(b=>{b.classList.toggle('active',b.textContent.includes(tab)||b.onclick?.toString().includes(tab))}); document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.day-tab').forEach(b=>{if(b.getAttribute('onclick')?.includes(`'${tab}'`))b.classList.add('active');}); waRenderTab(); }
+
+async function waRenderTab(){
+  const c = document.getElementById('wa-tab-content');
+  if(!c) return;
+  if(waTab==='disparos') waRenderDisparos(c);
+  else if(waTab==='aniversario') waRenderAniversario(c);
+  else if(waTab==='campanhas') waRenderCampanhas(c);
+  else if(waTab==='listas') waRenderListas(c);
+  else if(waTab==='historico') waRenderHistorico(c);
+  else if(waTab==='config') waRenderConfig(c);
+}
+
+function waRenderDisparos(c){
+  c.innerHTML=`<div class="card"><div class="card-title">⚡ Disparos Rápidos</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${[{seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'🔴',label:'Cobrar',n:cache.alunos.filter(a=>a.status==='atrasado').length},
+         {seg:'vencendo',color:'var(--yellow)',bg:'rgba(245,158,11,.08)',border:'rgba(245,158,11,.25)',icon:'⚠️',label:'Avisar',n:cache.alunos.filter(a=>a.status==='vencendo').length},
+         {seg:'ativos',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✅',label:'Ativos',n:cache.alunos.filter(a=>a.status==='ativo').length},
+         {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📣',label:'Todos',n:cache.alunos.length}
+        ].map(item=>`<button onclick="waDisparoRapido('${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
           <div style="font-size:18px;margin-bottom:4px">${item.icon}</div>
           <div style="font-size:12px;font-weight:600;color:${item.color}">${item.label}</div>
-          ${item.n!==null?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>`:''}
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>
         </button>`).join('')}
-      </div>
-    </div>`;
+    </div>
+  </div>`;
+}
 
-  // Carrega status WA
+async function waDisparoRapido(seg){
+  const texto = prompt(`Mensagem para ${seg} (use {{nome}} para personalizar):`);
+  if(!texto) return;
+  const n = seg==='atrasados' ? cache.alunos.filter(a=>a.status==='atrasado').length : seg==='vencendo' ? cache.alunos.filter(a=>a.status==='vencendo').length : seg==='ativos' ? cache.alunos.filter(a=>a.status==='ativo').length : cache.alunos.length;
+  if(!confirm(`Enviar para ${n} aluno(s)?`)) return;
   try {
-    const s = await apiFetch('/api/whatsapp/status');
-    const isOpen = s.status === 'open';
-    document.getElementById('wa-status-body').innerHTML = isOpen
-      ? `<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0"></span>
-         <span style="font-size:13px;font-weight:600;color:#22c55e">Conectado</span>
-         <span style="font-size:12px;color:var(--muted)">${s.nome || ''} · ${s.numero ? s.numero.replace('55','').replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3') : ''}</span>`
-      : `<span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;flex-shrink:0"></span>
-         <span style="font-size:13px;font-weight:600;color:#ef4444">Desconectado</span>
-         <button onclick="waGerarQR()" class="btn btn-r btn-sm" style="margin-left:8px">🔗 Conectar via QR</button>`;
-  } catch(e) {
-    document.getElementById('wa-status-body').innerHTML = `<span style="font-size:13px;color:var(--muted)">Erro ao verificar status</span><button onclick="waGerarQR()" class="btn btn-r btn-sm" style="margin-left:8px">🔗 Gerar QR</button>`;
-  }
+    const r = await apiFetch('/api/marketing/enviar',{method:'POST',body:JSON.stringify({tipo:'wa',titulo:'Disparo rápido',texto,segmento:seg})});
+    alert(`✅ Enviado para ${r.enviados} aluno(s)!`);
+  } catch(e){ alert('Erro: '+e.message); }
+}
+
+async function waRenderAniversario(c){
+  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  const hoje = new Date();
+  const m = hoje.getMonth()+1;
+  try {
+    const [hojeData, mesData] = await Promise.all([
+      apiFetch(`/api/wa/aniversariantes?mes=${m}&dia=${hoje.getDate()}`),
+      apiFetch(`/api/wa/aniversariantes?mes=${m}`)
+    ]);
+    c.innerHTML=`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin:0">🎂 Aniversariantes de Hoje (${hojeData.length})</div>
+          ${hojeData.length>0?`<button onclick="waDispararAniversario([])" class="btn btn-r btn-sm">🥊 Disparar todos</button>`:''}
+        </div>
+        ${hojeData.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum aniversariante hoje.</p>':
+          hojeData.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div><div style="font-size:13px;font-weight:500">${a.nome}</div><div style="font-size:11px;color:var(--muted)">${a.tel||'sem tel'} · ${a.modalidade||''}</div></div>
+            <button onclick="waDispararAniversario([${a.id}])" class="btn btn-ghost btn-sm">Enviar</button>
+          </div>`).join('')}
+      </div>
+      <div class="card">
+        <div class="card-title">📅 Aniversariantes do Mês</div>
+        ${mesData.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum.</p>':
+          `<table style="width:100%;border-collapse:collapse;font-size:12px">
+            <tr style="color:var(--muted)"><th style="text-align:left;padding:4px 8px">Nome</th><th style="padding:4px 8px">Dia</th><th style="padding:4px 8px">Tel</th><th></th></tr>
+            ${mesData.map(a=>`<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 8px;font-weight:500">${a.nome}</td>
+              <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:700">${a.dia}</td>
+              <td style="padding:6px 8px;color:var(--muted)">${a.tel||'—'}</td>
+              <td style="padding:6px 8px"><button onclick="waDispararAniversario([${a.id}])" class="btn btn-ghost btn-sm">Enviar</button></td>
+            </tr>`).join('')}
+          </table>`}
+      </div>`;
+  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+}
+
+async function waDispararAniversario(ids){
+  if(!confirm(ids.length?'Enviar mensagem para este aluno?':`Enviar para todos os aniversariantes de hoje?`)) return;
+  try {
+    const r = await apiFetch('/api/wa/aniversariantes/disparar',{method:'POST',body:JSON.stringify({ids})});
+    alert(`✅ ${r.enviados} enviado(s), ${r.erros} erro(s).`);
+    waRenderTab();
+  } catch(e){ alert('Erro: '+e.message); }
+}
+
+async function waRenderCampanhas(c){
+  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  try {
+    const [camps, listas] = await Promise.all([apiFetch('/api/wa/campanhas'), apiFetch('/api/wa/listas')]);
+    c.innerHTML=`
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button onclick="waNovaCampanha()" class="btn btn-r btn-sm">+ Nova Campanha</button>
+      </div>
+      ${camps.length===0?'<div class="card"><p style="color:var(--muted);font-size:13px">Nenhuma campanha criada.</p></div>':
+        camps.map(camp=>`<div class="card" style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-weight:600;font-size:14px">${camp.nome}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${camp.segmento||camp.lista_nome||'—'} · ${camp.total_enviados}/${camp.total_destinatarios} enviados</div>
+            </div>
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${{RASCUNHO:'rgba(100,100,100,.2)',ENVIANDO:'rgba(59,130,246,.2)',CONCLUIDA:'rgba(34,197,94,.2)',CANCELADA:'rgba(239,68,68,.2)'}[camp.status]||'rgba(100,100,100,.2)'};color:${{RASCUNHO:'var(--muted)',ENVIANDO:'var(--blue)',CONCLUIDA:'var(--green)',CANCELADA:'#ef4444'}[camp.status]||'var(--muted)'}">${camp.status}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin:8px 0;white-space:pre-wrap;max-height:40px;overflow:hidden">${camp.mensagem}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${camp.status==='RASCUNHO'?`<button onclick="waDispararCampanha(${camp.id},'${camp.nome}')" class="btn btn-r btn-sm">🚀 Disparar</button>`:''}
+            ${camp.status==='ENVIANDO'?`<button onclick="waCancelarCampanha(${camp.id})" class="btn btn-ghost btn-sm">⏹ Cancelar</button>`:''}
+            <button onclick="waExcluirCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">Excluir</button>
+          </div>
+        </div>`).join('')}`;
+  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+}
+
+async function waNovaCampanha(){
+  const [listas] = await Promise.all([apiFetch('/api/wa/listas')]);
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">📣 Nova Campanha WhatsApp</div>
+    <div class="fg"><label class="fl">Nome da campanha</label><input class="fi" id="wc-nome" placeholder="Ex: Convite evento junho"></div>
+    <div class="fg"><label class="fl">Mensagem (use {{nome}})</label><textarea class="fi" id="wc-msg" rows="5" placeholder="Olá {{nome}}! ..."></textarea></div>
+    <div class="fg"><label class="fl">Destinatários</label><select class="fi" id="wc-dest">
+      <option value="seg:todos">Todos os alunos</option>
+      <option value="seg:ativos">Apenas ativos</option>
+      <option value="seg:atrasados">Apenas atrasados</option>
+      <option value="seg:vencendo">Vencendo</option>
+      ${listas.map(l=>`<option value="lista:${l.id}">Lista: ${l.nome} (${l.total_contatos})</option>`).join('')}
+    </select></div>
+    <div class="fg"><label class="fl">Intervalo entre mensagens (ms)</label><input class="fi" id="wc-interval" type="number" value="3000" min="1000"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="this.closest('div[style*=fixed]').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waSalvarCampanha()" class="btn btn-r" style="flex:1">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function waSalvarCampanha(){
+  const nome = document.getElementById('wc-nome').value.trim();
+  const mensagem = document.getElementById('wc-msg').value.trim();
+  const dest = document.getElementById('wc-dest').value;
+  const intervalo = parseInt(document.getElementById('wc-interval').value)||3000;
+  if(!nome||!mensagem){alert('Preencha nome e mensagem');return;}
+  const body = {nome,mensagem,intervalo_ms:intervalo};
+  if(dest.startsWith('seg:')) body.segmento=dest.replace('seg:','');
+  else body.lista_id=parseInt(dest.replace('lista:',''));
+  try{
+    await apiFetch('/api/wa/campanhas',{method:'POST',body:JSON.stringify(body)});
+    document.querySelector('div[style*="fixed"]')?.remove();
+    waRenderTab();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function waDispararCampanha(id,nome){
+  if(!confirm(`Disparar campanha "${nome}"?`)) return;
+  try{
+    const r = await apiFetch(`/api/wa/campanhas/${id}/disparar`,{method:'POST'});
+    alert(`🚀 Disparando para ${r.total} destinatário(s)!`);
+    setTimeout(()=>waRenderTab(),2000);
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function waCancelarCampanha(id){
+  await apiFetch(`/api/wa/campanhas/${id}/cancelar`,{method:'POST'});
+  waRenderTab();
+}
+
+async function waExcluirCampanha(id){
+  if(!confirm('Excluir campanha?')) return;
+  await apiFetch(`/api/wa/campanhas/${id}`,{method:'DELETE'});
+  waRenderTab();
+}
+
+async function waRenderListas(c){
+  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  try {
+    const listas = await apiFetch('/api/wa/listas');
+    c.innerHTML=`
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap">
+        <button onclick="waNovaLista()" class="btn btn-ghost btn-sm">+ Nova Lista</button>
+      </div>
+      ${listas.length===0?'<div class="card"><p style="color:var(--muted);font-size:13px">Nenhuma lista criada.</p></div>':
+        listas.map(l=>`<div class="card" style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:600">${l.nome}</div>
+              <div style="font-size:11px;color:var(--muted)">${l.total_contatos} contato(s) · ${l.descricao||''}</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="waVerLista(${l.id},'${l.nome}')" class="btn btn-ghost btn-sm">Ver</button>
+              <button onclick="waUploadLista(${l.id},'${l.nome}')" class="btn btn-ghost btn-sm">📤 Upload</button>
+              <button onclick="waExcluirLista(${l.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">Excluir</button>
+            </div>
+          </div>
+        </div>`).join('')}`;
+  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+}
+
+async function waNovaLista(){
+  const nome = prompt('Nome da lista:'); if(!nome) return;
+  const desc = prompt('Descrição (opcional):')||'';
+  await apiFetch('/api/wa/listas',{method:'POST',body:JSON.stringify({nome,descricao:desc})});
+  waRenderTab();
+}
+
+async function waExcluirLista(id){
+  if(!confirm('Excluir lista e todos os contatos?')) return;
+  await apiFetch(`/api/wa/listas/${id}`,{method:'DELETE'});
+  waRenderTab();
+}
+
+async function waVerLista(id,nome){
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.id='wa-lista-modal';
+  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-weight:700">📋 ${nome}</div>
+      <button onclick="document.getElementById('wa-lista-modal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input class="fi" id="wl-nome" placeholder="Nome" style="flex:2">
+      <input class="fi" id="wl-tel" placeholder="Telefone" style="flex:2">
+      <button onclick="waAddContato(${id})" class="btn btn-r btn-sm">+</button>
+    </div>
+    <div id="wa-contatos-lista"><div class="spinner" style="margin:10px auto"></div></div>
+  </div>`;
+  document.body.appendChild(modal);
+  waCarregarContatos(id);
+}
+
+async function waCarregarContatos(listaId){
+  const el = document.getElementById('wa-contatos-lista'); if(!el) return;
+  const contatos = await apiFetch(`/api/wa/listas/${listaId}/contatos`);
+  el.innerHTML = contatos.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum contato.</p>':
+    contatos.map(ct=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:13px;font-weight:500">${ct.nome}</div><div style="font-size:11px;color:var(--muted)">${ct.telefone}</div></div>
+      <button onclick="waExcluirContato(${ct.id},${listaId})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px">✕</button>
+    </div>`).join('');
+}
+
+async function waAddContato(listaId){
+  const nome=document.getElementById('wl-nome').value.trim();
+  const tel=document.getElementById('wl-tel').value.trim();
+  if(!nome||!tel){alert('Nome e telefone obrigatórios');return;}
+  await apiFetch(`/api/wa/listas/${listaId}/contatos`,{method:'POST',body:JSON.stringify({nome,telefone:tel})});
+  document.getElementById('wl-nome').value=''; document.getElementById('wl-tel').value='';
+  waCarregarContatos(listaId);
+}
+
+async function waExcluirContato(id,listaId){
+  await apiFetch(`/api/wa/contatos/${id}`,{method:'DELETE'});
+  waCarregarContatos(listaId);
+}
+
+function waUploadLista(id,nome){
+  const input = document.createElement('input'); input.type='file'; input.accept='.xlsx,.csv';
+  input.onchange=async()=>{
+    const fd = new FormData(); fd.append('arquivo',input.files[0]);
+    const r = await fetch(`${API}/api/wa/listas/${id}/upload`,{method:'POST',headers:{Authorization:'Bearer '+_token},body:fd});
+    const d = await r.json();
+    alert(`✅ ${d.inseridos} contato(s) importado(s)!`);
+    waRenderTab();
+  };
+  input.click();
+}
+
+async function waRenderHistorico(c){
+  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  try{
+    const envios = await apiFetch('/api/wa/envios?limit=100');
+    c.innerHTML=`<div class="card">
+      <div class="card-title">📜 Histórico de Envios</div>
+      ${envios.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum envio.</p>':
+        `<table style="width:100%;border-collapse:collapse;font-size:12px">
+          <tr style="color:var(--muted)"><th style="text-align:left;padding:4px">Nome</th><th style="padding:4px">Tipo</th><th style="padding:4px">Status</th><th style="text-align:right;padding:4px">Data</th></tr>
+          ${envios.map(e=>`<tr style="border-top:1px solid var(--border)">
+            <td style="padding:5px 4px;font-weight:500">${e.nome||e.telefone}</td>
+            <td style="padding:5px 4px;color:var(--muted)">${e.tipo}</td>
+            <td style="padding:5px 4px"><span style="color:${e.status==='ENVIADO'?'var(--green)':'#ef4444'}">${e.status}</span></td>
+            <td style="padding:5px 4px;text-align:right;color:var(--muted)">${new Date(e.criado_em).toLocaleDateString('pt-BR')}</td>
+          </tr>`).join('')}
+        </table>`}
+    </div>`;
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function waRenderConfig(c){
+  try{
+    const cfg = await apiFetch('/api/wa/config');
+    c.innerHTML=`<div class="card">
+      <div class="card-title">⚙️ Config WhatsApp</div>
+      <div class="fg"><label class="fl">Aniversário automático</label>
+        <select class="fi" id="wc-ativo">
+          <option value="1"${cfg.aniversario_ativo==='1'?' selected':''}>Ativado — envia às 8h</option>
+          <option value="0"${cfg.aniversario_ativo!=='1'?' selected':''}>Desativado</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Template de aniversário</label>
+        <textarea class="fi" id="wc-tmpl" rows="6" style="resize:vertical">${cfg.aniversario_template||''}</textarea>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Use {{nome}} para o primeiro nome do aluno</div>
+      </div>
+      <button onclick="waSalvarConfig()" class="btn btn-r btn-sm">Salvar</button>
+    </div>`;
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function waSalvarConfig(){
+  const ativo = document.getElementById('wc-ativo').value;
+  const tmpl = document.getElementById('wc-tmpl').value;
+  await apiFetch('/api/wa/config',{method:'POST',body:JSON.stringify({aniversario_ativo:ativo,aniversario_template:tmpl})});
+  alert('✅ Config salva!');
 }
 
 async function waGerarQR(){

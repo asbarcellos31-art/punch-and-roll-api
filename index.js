@@ -348,6 +348,73 @@ async function setupDB() {
       )
     `);
 
+    // ── WhatsApp MKT Tables ──
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS wa_listas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        total_contatos INT DEFAULT 0,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS wa_contatos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        lista_id INT NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        telefone VARCHAR(30) NOT NULL,
+        cpf VARCHAR(20),
+        dados_extras TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS wa_campanhas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        mensagem TEXT NOT NULL,
+        lista_id INT,
+        segmento VARCHAR(50),
+        status VARCHAR(30) DEFAULT 'RASCUNHO',
+        total_destinatarios INT DEFAULT 0,
+        total_enviados INT DEFAULT 0,
+        total_erros INT DEFAULT 0,
+        intervalo_ms INT DEFAULT 3000,
+        media_url VARCHAR(1000),
+        media_type VARCHAR(20),
+        instancia VARCHAR(50) DEFAULT 'punchandroll',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS wa_envios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        campanha_id INT,
+        nome VARCHAR(255),
+        telefone VARCHAR(30) NOT NULL,
+        mensagem TEXT NOT NULL,
+        tipo VARCHAR(50) DEFAULT 'CAMPANHA',
+        status VARCHAR(50) DEFAULT 'PENDENTE',
+        erro TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS wa_config (
+        chave VARCHAR(100) PRIMARY KEY,
+        valor TEXT,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    // Config padrão de aniversário
+    await conn.query(`
+      INSERT IGNORE INTO wa_config (chave, valor) VALUES
+      ('aniversario_ativo', '1'),
+      ('aniversario_template', '🥊 Feliz Aniversário, {{nome}}! 🎂\n\nA família Punch and Roll Fight Team deseja um dia muito especial para você!\n\nContinue na luta e nos vemos na academia! 💪\n\n— Punch and Roll Fight Team 🥊')
+    `);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -975,6 +1042,291 @@ async function enviarEmailAluno(email, nome, assunto, html) {
     console.log('Email ERRO:', e.response?.data ? JSON.stringify(e.response.data) : e.message);
   }
 }
+
+// ══════════════════════════════════════
+// WHATSAPP MKT — Helper
+// ══════════════════════════════════════
+function formatarTelWA(tel) {
+  let d = String(tel||'').replace(/\D/g,'');
+  if (d.startsWith('55') && d.length > 11) d = d.slice(2);
+  if (d.length >= 12) { const ddd=d.slice(0,2); const r=d.slice(2); if(r.startsWith(ddd)) d=r; }
+  if (d.length === 10) d = d.slice(0,2)+'9'+d.slice(2);
+  return '55'+d;
+}
+
+async function enviarWA(tel, msg, instancia) {
+  const evoUrl = process.env.WA_EVOLUTION_URL;
+  const evoKey = process.env.WA_EVOLUTION_KEY;
+  const inst = instancia || process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
+  if (!evoUrl || !evoKey) return { sucesso: false, erro: 'Evolution não configurado' };
+  const numero = formatarTelWA(tel);
+  if (numero.length < 12) return { sucesso: false, erro: `Número inválido: ${tel}` };
+  try {
+    const r = await axios.post(`${evoUrl}/message/sendText/${inst}`,
+      { number: numero, text: msg, delay: 1500 },
+      { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 30000 }
+    );
+    return { sucesso: true };
+  } catch(e) {
+    return { sucesso: false, erro: e.response?.data?.message || e.message };
+  }
+}
+
+// ── Aniversariantes ──────────────────────────────────────────────────────────
+app.get('/api/wa/aniversariantes', auth, adminOnly, async (req, res) => {
+  try {
+    const { mes, dia } = req.query;
+    const hoje = new Date();
+    const m = mes ? parseInt(mes) : hoje.getMonth()+1;
+    const d = dia ? parseInt(dia) : null;
+    let q = `SELECT id, nome, tel, nasc, status, modalidade FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=?`;
+    const p = [m];
+    if (d) { q += ' AND DAY(nasc)=?'; p.push(d); }
+    q += ' ORDER BY DAY(nasc), nome';
+    const [rows] = await db.query(q, p);
+    res.json(rows.map(r => ({...r, dia: new Date(r.nasc).getDate()})));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/aniversariantes/disparar', auth, adminOnly, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    const [[cfgRow]] = await db.query("SELECT valor FROM wa_config WHERE chave='aniversario_template'");
+    const template = cfgRow?.valor || '🥊 Feliz Aniversário, {{nome}}! A família Punch and Roll te deseja um dia incrível! 💪';
+    const [alunos] = await db.query(ids?.length ? `SELECT id,nome,tel FROM alunos WHERE id IN (${ids.map(()=>'?').join(',')})` : 'SELECT id,nome,tel FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=MONTH(CURDATE()) AND DAY(nasc)=DAY(CURDATE())', ids?.length ? ids : []);
+    let enviados=0, erros=0;
+    for (const a of alunos) {
+      if (!a.tel) { erros++; continue; }
+      const msg = template.replace(/\{\{nome\}\}/g, a.nome.split(' ')[0]);
+      const r = await enviarWA(a.tel, msg);
+      await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
+        [a.nome, a.tel, msg, 'ANIVERSARIO', r.sucesso?'ENVIADO':'ERRO', r.erro||null]);
+      if (r.sucesso) enviados++; else erros++;
+      await new Promise(x=>setTimeout(x,2000));
+    }
+    res.json({ enviados, erros });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Listas ───────────────────────────────────────────────────────────────────
+app.get('/api/wa/listas', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM wa_listas ORDER BY criado_em DESC');
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/listas', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, descricao } = req.body;
+    const [r] = await db.query('INSERT INTO wa_listas (nome,descricao) VALUES (?,?)',[nome,descricao||null]);
+    res.json({ id: r.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/wa/listas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM wa_contatos WHERE lista_id=?',[req.params.id]);
+    await db.query('DELETE FROM wa_listas WHERE id=?',[req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/wa/listas/:id/contatos', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM wa_contatos WHERE lista_id=? ORDER BY nome',[req.params.id]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/listas/:id/contatos', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, telefone, cpf } = req.body;
+    const [r] = await db.query('INSERT INTO wa_contatos (lista_id,nome,telefone,cpf) VALUES (?,?,?,?)',[req.params.id,nome,telefone,cpf||null]);
+    await db.query('UPDATE wa_listas SET total_contatos=(SELECT COUNT(*) FROM wa_contatos WHERE lista_id=?) WHERE id=?',[req.params.id,req.params.id]);
+    res.json({ id: r.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/wa/contatos/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const [[c]] = await db.query('SELECT lista_id FROM wa_contatos WHERE id=?',[req.params.id]);
+    await db.query('DELETE FROM wa_contatos WHERE id=?',[req.params.id]);
+    if (c) await db.query('UPDATE wa_listas SET total_contatos=(SELECT COUNT(*) FROM wa_contatos WHERE lista_id=?) WHERE id=?',[c.lista_id,c.lista_id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Upload CSV/XLSX para lista
+app.post('/api/wa/listas/:id/upload', auth, adminOnly, upload.single('arquivo'), async (req, res) => {
+  try {
+    const listaId = req.params.id;
+    const XLSX = require('xlsx');
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    let inseridos = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const nome = String(row[0]||'').trim();
+      const tel = String(row[1]||'').trim();
+      const cpf = String(row[2]||'').trim();
+      if (!nome || !tel) continue;
+      await db.query('INSERT IGNORE INTO wa_contatos (lista_id,nome,telefone,cpf) VALUES (?,?,?,?)',[listaId,nome,tel,cpf||null]);
+      inseridos++;
+    }
+    await db.query('UPDATE wa_listas SET total_contatos=(SELECT COUNT(*) FROM wa_contatos WHERE lista_id=?) WHERE id=?',[listaId,listaId]);
+    res.json({ inseridos });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Campanhas ────────────────────────────────────────────────────────────────
+app.get('/api/wa/campanhas', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query(`SELECT c.*, l.nome as lista_nome FROM wa_campanhas c LEFT JOIN wa_listas l ON c.lista_id=l.id ORDER BY c.criado_em DESC`);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/campanhas', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, mensagem, lista_id, segmento, intervalo_ms, media_url, media_type } = req.body;
+    const [r] = await db.query('INSERT INTO wa_campanhas (nome,mensagem,lista_id,segmento,intervalo_ms,media_url,media_type) VALUES (?,?,?,?,?,?,?)',
+      [nome,mensagem,lista_id||null,segmento||null,intervalo_ms||3000,media_url||null,media_type||null]);
+    res.json({ id: r.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/wa/campanhas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, mensagem, lista_id, segmento, intervalo_ms, media_url, media_type, status } = req.body;
+    await db.query('UPDATE wa_campanhas SET nome=?,mensagem=?,lista_id=?,segmento=?,intervalo_ms=?,media_url=?,media_type=?,status=? WHERE id=?',
+      [nome,mensagem,lista_id||null,segmento||null,intervalo_ms||3000,media_url||null,media_type||null,status||'RASCUNHO',req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/wa/campanhas/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM wa_campanhas WHERE id=?',[req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Disparar campanha
+const campanhasEmExecucao = new Set();
+app.post('/api/wa/campanhas/:id/disparar', auth, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (campanhasEmExecucao.has(id)) return res.status(400).json({ error: 'Campanha já em execução' });
+  try {
+    const [[camp]] = await db.query('SELECT * FROM wa_campanhas WHERE id=?',[id]);
+    if (!camp) return res.status(404).json({ error: 'Campanha não encontrada' });
+
+    // Monta lista de destinatários
+    let destinatarios = [];
+    if (camp.lista_id) {
+      const [rows] = await db.query('SELECT nome,telefone FROM wa_contatos WHERE lista_id=?',[camp.lista_id]);
+      destinatarios = rows;
+    } else if (camp.segmento) {
+      let q = 'SELECT nome,tel as telefone FROM alunos WHERE 1=1';
+      if (camp.segmento==='atrasados') q+=" AND status='atrasado'";
+      else if (camp.segmento==='vencendo') q+=" AND status='vencendo'";
+      else if (camp.segmento==='ativos') q+=" AND status='ativo'";
+      const [rows] = await db.query(q);
+      destinatarios = rows;
+    }
+
+    await db.query('UPDATE wa_campanhas SET status=?,total_destinatarios=?,total_enviados=0,total_erros=0 WHERE id=?',['ENVIANDO',destinatarios.length,id]);
+    res.json({ ok: true, total: destinatarios.length });
+
+    campanhasEmExecucao.add(id);
+    (async () => {
+      let enviados=0, erros=0;
+      for (const d of destinatarios) {
+        const [[c]] = await db.query('SELECT status FROM wa_campanhas WHERE id=?',[id]);
+        if (!c || c.status==='CANCELADA') break;
+        const msg = camp.mensagem.replace(/\{\{nome\}\}/g,d.nome?.split(' ')[0]||d.nome);
+        const r = await enviarWA(d.telefone, msg, camp.instancia||'punchandroll');
+        await db.query('INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
+          [id,d.nome,d.telefone,msg,'CAMPANHA',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+        if (r.sucesso) enviados++; else erros++;
+        await db.query('UPDATE wa_campanhas SET total_enviados=?,total_erros=? WHERE id=?',[enviados,erros,id]);
+        await new Promise(x=>setTimeout(x,camp.intervalo_ms||3000));
+      }
+      await db.query('UPDATE wa_campanhas SET status=? WHERE id=?',['CONCLUIDA',id]);
+      campanhasEmExecucao.delete(id);
+    })().catch(e=>{ console.error('Campanha erro:',e.message); campanhasEmExecucao.delete(id); });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/campanhas/:id/cancelar', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query("UPDATE wa_campanhas SET status='CANCELADA' WHERE id=?",[req.params.id]);
+    campanhasEmExecucao.delete(parseInt(req.params.id));
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Histórico de envios ───────────────────────────────────────────────────────
+app.get('/api/wa/envios', auth, adminOnly, async (req, res) => {
+  try {
+    const { campanha_id, tipo, limit: lim = 200 } = req.query;
+    let q = 'SELECT e.*, c.nome as campanha_nome FROM wa_envios e LEFT JOIN wa_campanhas c ON e.campanha_id=c.id WHERE 1=1';
+    const p = [];
+    if (campanha_id) { q+=' AND e.campanha_id=?'; p.push(campanha_id); }
+    if (tipo) { q+=' AND e.tipo=?'; p.push(tipo); }
+    q+=` ORDER BY e.criado_em DESC LIMIT ${parseInt(lim)}`;
+    const [rows] = await db.query(q, p);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Config WhatsApp ───────────────────────────────────────────────────────────
+app.get('/api/wa/config', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT chave,valor FROM wa_config');
+    const cfg = {};
+    rows.forEach(r => cfg[r.chave]=r.valor);
+    res.json(cfg);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/wa/config', auth, adminOnly, async (req, res) => {
+  try {
+    const entries = Object.entries(req.body);
+    for (const [chave, valor] of entries) {
+      await db.query('INSERT INTO wa_config (chave,valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?',[chave,valor,valor]);
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Cron: aniversariantes automáticos (verificação a cada hora) ───────────────
+let ultimoDiaAniversario = -1;
+setInterval(async () => {
+  try {
+    const [[cfg]] = await db.query("SELECT valor FROM wa_config WHERE chave='aniversario_ativo'");
+    if (!cfg || cfg.valor !== '1') return;
+    const agora = new Date();
+    const hora = agora.getHours();
+    const dia = agora.getDate();
+    if (hora !== 8 || dia === ultimoDiaAniversario) return;
+    ultimoDiaAniversario = dia;
+    const mes = agora.getMonth()+1;
+    const [[tmpl]] = await db.query("SELECT valor FROM wa_config WHERE chave='aniversario_template'");
+    const template = tmpl?.valor || '🥊 Feliz Aniversário, {{nome}}! Punch and Roll Fight Team te deseja um dia incrível! 💪';
+    const [alunos] = await db.query('SELECT nome,tel FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=? AND DAY(nasc)=? AND status IN (?,?)',[mes,dia,'ativo','vencendo']);
+    for (const a of alunos) {
+      if (!a.tel) continue;
+      const msg = template.replace(/\{\{nome\}\}/g,a.nome.split(' ')[0]);
+      const r = await enviarWA(a.tel, msg);
+      await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
+        [a.nome,a.tel,msg,'ANIVERSARIO',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+      await new Promise(x=>setTimeout(x,3000));
+    }
+    if (alunos.length) console.log(`[Aniversários] ${alunos.length} mensagens enviadas`);
+  } catch(e) { console.error('[Cron Aniversário]',e.message); }
+}, 3600000); // verifica a cada hora
 
 // ══════════════════════════════════════
 // WHATSAPP — STATUS E QR CODE
