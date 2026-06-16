@@ -9,55 +9,95 @@ if ('serviceWorker' in navigator) {
   const isInStandalone = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 
-  if (isInStandalone) return; // já está instalado
+  if (isInStandalone) return;
 
-  // ── CSS do banner ─────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
     #pwa-banner {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999;
-      background: #111827; border-top: 2px solid #d4111c;
-      padding: 12px 16px; display: flex; align-items: center; gap: 12px;
-      font-family: 'DM Sans', sans-serif; font-size: 13px; color: #f9fafb;
-      animation: slideUp .3s ease;
+      position: fixed;
+      bottom: 90px;
+      left: 0;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: #f9fafb;
+      transition: transform .3s ease;
+      transform: translateX(calc(-100% + 36px));
     }
-    @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
-    #pwa-banner img { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0 }
-    #pwa-banner-text { flex: 1; line-height: 1.4 }
-    #pwa-banner-text strong { display: block; font-size: 14px }
-    #pwa-banner-text span { color: #9ca3af; font-size: 12px }
+    #pwa-banner:hover, #pwa-banner.expanded {
+      transform: translateX(0);
+    }
+    #pwa-banner-tab {
+      width: 36px;
+      background: #d4111c;
+      border-radius: 0 8px 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 6px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    #pwa-banner-tab svg { display: block; }
+    #pwa-banner-body {
+      background: #111827;
+      border-top: 2px solid #d4111c;
+      border-right: 2px solid #d4111c;
+      border-bottom: 2px solid #d4111c;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px 10px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #pwa-banner img { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0 }
+    #pwa-banner-text { line-height: 1.4; white-space: nowrap; }
+    #pwa-banner-text strong { display: block; font-size: 13px }
+    #pwa-banner-text span { color: #9ca3af; font-size: 11px }
     #pwa-install-btn {
-      background: #d4111c; color: #fff; border: none; border-radius: 8px;
-      padding: 9px 16px; font-family: 'Bebas Neue', sans-serif; font-size: 16px;
-      letter-spacing: 1px; cursor: pointer; flex-shrink: 0;
+      background: #d4111c; color: #fff; border: none; border-radius: 6px;
+      padding: 7px 12px; font-family: 'Bebas Neue', sans-serif; font-size: 15px;
+      letter-spacing: 1px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
     }
     #pwa-close-btn {
-      background: none; border: none; color: #6b7280; font-size: 20px;
-      cursor: pointer; padding: 4px; flex-shrink: 0; line-height: 1;
+      background: none; border: none; color: #6b7280; font-size: 18px;
+      cursor: pointer; padding: 2px 0 2px 4px; flex-shrink: 0; line-height: 1;
     }
-    #pwa-ios-hint {
-      font-size: 12px; color: #9ca3af; flex: 1; line-height: 1.5
-    }
+    #pwa-ios-hint { font-size: 12px; color: #9ca3af; line-height: 1.5; white-space: nowrap; }
   `;
   document.head.appendChild(style);
 
-  // ── Mostra banner iOS ─────────────────────────────────────────────────────
+  function makeBanner(innerHtml) {
+    const banner = document.createElement('div');
+    banner.id = 'pwa-banner';
+    banner.innerHTML = `
+      <div id="pwa-banner-tab">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
+          <path fill="#fff" d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 13h-2v-5h2v5zm0-7h-2V6h2v2z"/>
+        </svg>
+      </div>
+      <div id="pwa-banner-body">${innerHtml}</div>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('pwa-banner-tab').onclick = () => banner.classList.toggle('expanded');
+    return banner;
+  }
+
+  // ── iOS ───────────────────────────────────────────────────────────────────
   if (isIOS) {
-    // Só mostra uma vez por sessão
     if (sessionStorage.getItem('pwa-dismissed')) return;
     setTimeout(() => {
-      const banner = document.createElement('div');
-      banner.id = 'pwa-banner';
-      banner.innerHTML = `
+      const banner = makeBanner(`
         <img src="/icon-192.png" alt="Punch and Roll">
         <span id="pwa-ios-hint">
           <strong style="color:#f9fafb">Instale o app!</strong>
-          Toque em <strong>⎙ Compartilhar</strong> e depois<br>
-          <strong>"Adicionar à Tela de Início"</strong>
+          Toque em <strong>⎙ Compartilhar</strong><br>
+          depois <strong>"Adicionar à Tela de Início"</strong>
         </span>
         <button id="pwa-close-btn" aria-label="Fechar">✕</button>
-      `;
-      document.body.appendChild(banner);
+      `);
       document.getElementById('pwa-close-btn').onclick = () => {
         banner.remove();
         sessionStorage.setItem('pwa-dismissed', '1');
@@ -66,18 +106,15 @@ if ('serviceWorker' in navigator) {
     return;
   }
 
-  // ── Banner Android (beforeinstallprompt) ──────────────────────────────────
+  // ── Android ───────────────────────────────────────────────────────────────
   let deferredPrompt = null;
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-
     if (localStorage.getItem('pwa-installed')) return;
 
-    const banner = document.createElement('div');
-    banner.id = 'pwa-banner';
-    banner.innerHTML = `
+    const banner = makeBanner(`
       <img src="/icon-192.png" alt="Punch and Roll">
       <div id="pwa-banner-text">
         <strong>Punch and Roll</strong>
@@ -85,8 +122,7 @@ if ('serviceWorker' in navigator) {
       </div>
       <button id="pwa-install-btn">INSTALAR</button>
       <button id="pwa-close-btn" aria-label="Fechar">✕</button>
-    `;
-    document.body.appendChild(banner);
+    `);
 
     document.getElementById('pwa-install-btn').onclick = async () => {
       banner.remove();
@@ -95,11 +131,9 @@ if ('serviceWorker' in navigator) {
       if (outcome === 'accepted') localStorage.setItem('pwa-installed', '1');
       deferredPrompt = null;
     };
-
     document.getElementById('pwa-close-btn').onclick = () => banner.remove();
   });
 
-  // Marca como instalado se o usuário já instalou via outra via
   window.addEventListener('appinstalled', () => {
     localStorage.setItem('pwa-installed', '1');
     const b = document.getElementById('pwa-banner');
