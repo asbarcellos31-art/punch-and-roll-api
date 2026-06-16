@@ -408,17 +408,24 @@ async function setupDB() {
         atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
-    // Colunas extras para wa_campanhas (migration segura)
-    const colsToAdd = [
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS pausada TINYINT(1) DEFAULT 0",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS data_agendada DATETIME DEFAULT NULL",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS limite_diario INT DEFAULT 0",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS enviados_hoje INT DEFAULT 0",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS data_ultimo_envio DATETIME DEFAULT NULL",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS data_inicio DATETIME DEFAULT NULL",
-      "ALTER TABLE wa_campanhas ADD COLUMN IF NOT EXISTS data_conclusao DATETIME DEFAULT NULL",
+    // Colunas extras para wa_campanhas (migration compatível MySQL 5.7+)
+    const dbName = new URL(process.env.DATABASE_URL).pathname.replace('/','');
+    const waCols = [
+      ['pausada',           'TINYINT(1) DEFAULT 0'],
+      ['data_agendada',     'DATETIME DEFAULT NULL'],
+      ['limite_diario',     'INT DEFAULT 0'],
+      ['enviados_hoje',     'INT DEFAULT 0'],
+      ['data_ultimo_envio', 'DATETIME DEFAULT NULL'],
+      ['data_inicio',       'DATETIME DEFAULT NULL'],
+      ['data_conclusao',    'DATETIME DEFAULT NULL'],
     ];
-    for (const sql of colsToAdd) { try { await conn.query(sql); } catch(_) {} }
+    for (const [col, def] of waCols) {
+      const [rows] = await conn.query(
+        `SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME='wa_campanhas' AND COLUMN_NAME=?`,
+        [dbName, col]
+      );
+      if (!rows.length) await conn.query(`ALTER TABLE wa_campanhas ADD COLUMN ${col} ${def}`);
+    }
 
     // Config padrão de aniversário
     await conn.query(`
