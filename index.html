@@ -25,6 +25,8 @@ html,body{height:100%;background:var(--black);color:var(--white);font-family:'DM
 .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;position:relative;overflow:hidden}
 .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(212,17,28,.2) 0%,transparent 70%)}
 .hero-line{position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:120px;background:linear-gradient(to bottom,var(--red),transparent)}
+.hero-logo-fundo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
+.hero-logo-fundo img{width:min(90vw,520px);height:auto;opacity:.06;filter:grayscale(1)}
 
 .logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:40px;position:relative;z-index:1;animation:fadeDown .7s ease both}
 .logo-ring{width:90px;height:90px;border-radius:50%;background:var(--panel);border:2px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:16px;box-shadow:0 0 60px rgba(212,17,28,.3)}
@@ -108,6 +110,7 @@ footer a:hover{color:var(--white)}
 <section class="hero">
   <div class="hero-bg"></div>
   <div class="hero-line"></div>
+  <div class="hero-logo-fundo"><img src="/logo.png" alt=""></div>
 
   <div class="logo-wrap">
     <div style="text-align:center">
@@ -129,7 +132,7 @@ footer a:hover{color:var(--white)}
   <div class="access-cards">
     <!-- MATRICULA -->
     <a href="/punch-and-roll-matricula.html" class="access-card card-matricula">
-      <div class="card-icon"><img src="/logo-icon.png" alt="PR" style="width:32px;height:auto"></div>
+      <div class="card-icon"><img src="/logo-icon.png" alt="PR" style="width:38px;height:38px;object-fit:contain"></div>
       <div class="card-text">
         <div class="card-title">Quero me matricular</div>
         <div class="card-desc">Boxe · Jiu-Jitsu · São José, SC</div>

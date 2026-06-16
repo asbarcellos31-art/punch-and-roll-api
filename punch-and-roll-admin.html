@@ -2078,173 +2078,150 @@ const SEGS=[{id:'todos',label:'Todos',icon:'👥',n:()=>cache.alunos.length},{id
 const TPLS_WA=[{id:'cobranca',nome:'Cobrança',txt:'Olá {nome}! 🥊 Sua mensalidade da *Punch and Roll* está em atraso. Regularize!'},{id:'vencendo',nome:'Vencimento',txt:'Olá {nome}! 🥊 Sua mensalidade vence em breve. Renove!'},{id:'livre',nome:'Livre',txt:''}];
 const TPLS_EMAIL=[{id:'newsletter',nome:'Newsletter',assunto:'Novidades da Punch and Roll',txt:'Olá {nome}...'},{id:'cobranca',nome:'Cobrança',assunto:'Mensalidade — Punch and Roll',txt:'Olá {nome}, sua mensalidade está em atraso.'},{id:'livre',nome:'Livre',assunto:'',txt:''}];
 
-let waTab = 'disparos';
+// ════════════════════════════════════════════
+// WHATSAPP MARKETING — SISTEMA COMPLETO
+// ════════════════════════════════════════════
+let waTabAtiva = 'campanhas';
+let waListasAbertas = {};
+let waCampanhas = [], waListas = [];
+
 async function renderMktWA(){
   const pg = document.getElementById('page-mkt-wa');
-  const tabs = [
-    {id:'disparos', label:'⚡ Disparos'},
-    {id:'aniversario', label:'🎂 Aniversariantes'},
-    {id:'campanhas', label:'📣 Campanhas'},
-    {id:'listas', label:'📋 Listas'},
-    {id:'historico', label:'📜 Histórico'},
-    {id:'config', label:'⚙️ Config'},
-  ];
   pg.innerHTML=`
-    <div class="card" id="wa-status-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div class="card-title" style="margin:0">📱 WhatsApp</div>
-        <button onclick="waGerarQR()" class="btn btn-ghost btn-sm">🔗 QR Code</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:18px;font-weight:700">WhatsApp Marketing</div>
+        <div style="font-size:12px;color:var(--muted)">Campanhas, automações e disparos via Evolution API</div>
       </div>
-      <div id="wa-status-body" style="display:flex;align-items:center;gap:10px">
-        <div class="spinner"></div><span style="color:var(--muted);font-size:13px">Verificando...</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div id="wa-status-badge" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">Verificando...</div>
+        <button onclick="waEnvioIndividualModal()" class="btn btn-ghost btn-sm">✉️ Envio Individual</button>
+        <button onclick="waGerarQR()" class="btn btn-ghost btn-sm">📱 QR Code</button>
+        <button onclick="waNovaCampanhaModal()" class="btn btn-r btn-sm">+ Nova Campanha</button>
       </div>
     </div>
-    <div class="day-tabs" style="margin-bottom:12px">
-      ${tabs.map(t=>`<button class="day-tab${waTab===t.id?' active':''}" onclick="waNavTo('${t.id}')">${t.label}</button>`).join('')}
+    <div id="wa-desconectado-alert" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span style="font-size:13px;color:#d97706"><strong>WhatsApp desconectado.</strong> Gere um QR Code para reconectar.</span>
+      <button onclick="waGerarQR()" class="btn btn-sm" style="background:#d97706;color:#fff;border:none">Gerar QR Code</button>
+    </div>
+    <div class="day-tabs" style="margin-bottom:16px">
+      <button class="day-tab active" id="wa-tab-campanhas" onclick="waNavTo('campanhas')">📣 Campanhas</button>
+      <button class="day-tab" id="wa-tab-listas" onclick="waNavTo('listas')">📋 Listas</button>
+      <button class="day-tab" id="wa-tab-automacoes" onclick="waNavTo('automacoes')">⚙️ Automações</button>
+      <button class="day-tab" id="wa-tab-historico" onclick="waNavTo('historico')">📜 Histórico</button>
     </div>
     <div id="wa-tab-content"></div>`;
 
+  // Status WA
   GET('/api/whatsapp/status').then(s=>{
-    const isOpen = s.status==='open';
-    document.getElementById('wa-status-body').innerHTML = isOpen
-      ? `<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span><span style="font-size:13px;font-weight:600;color:#22c55e">Conectado</span><span style="font-size:12px;color:var(--muted)">${s.nome||''} · ${(s.numero||'').replace('55','')}</span>`
-      : `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block"></span><span style="font-size:13px;font-weight:600;color:#ef4444">Desconectado</span>`;
+    const ok = s.status==='open';
+    const badge = document.getElementById('wa-status-badge');
+    const alert = document.getElementById('wa-desconectado-alert');
+    if(badge) badge.innerHTML = ok
+      ? `<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:5px"></span><span style="color:#22c55e;font-weight:600">Conectado</span> <span style="color:var(--muted)">${(s.numero||'').replace('55','').replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3')}</span>`
+      : `<span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:5px"></span><span style="color:#ef4444;font-weight:600">Desconectado</span>`;
+    if(alert) alert.style.display = ok ? 'none' : 'flex';
   }).catch(()=>{});
-  waRenderTab();
+
+  waNavTo(waTabAtiva);
 }
 
-function waNavTo(tab){ waTab=tab; document.querySelectorAll('.day-tab').forEach(b=>{b.classList.toggle('active',b.textContent.includes(tab)||b.onclick?.toString().includes(tab))}); document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.day-tab').forEach(b=>{if(b.getAttribute('onclick')?.includes(`'${tab}'`))b.classList.add('active');}); waRenderTab(); }
+function waNavTo(tab){
+  waTabAtiva = tab;
+  document.querySelectorAll('.day-tab[id^="wa-tab-"]').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById('wa-tab-'+tab);
+  if(btn) btn.classList.add('active');
+  waRenderTab();
+}
 
 async function waRenderTab(){
   const c = document.getElementById('wa-tab-content');
   if(!c) return;
-  if(waTab==='disparos') waRenderDisparos(c);
-  else if(waTab==='aniversario') waRenderAniversario(c);
-  else if(waTab==='campanhas') waRenderCampanhas(c);
-  else if(waTab==='listas') waRenderListas(c);
-  else if(waTab==='historico') waRenderHistorico(c);
-  else if(waTab==='config') waRenderConfig(c);
+  if(waTabAtiva==='campanhas') await waRenderCampanhas(c);
+  else if(waTabAtiva==='listas') await waRenderListas(c);
+  else if(waTabAtiva==='automacoes') await waRenderAutomacoes(c);
+  else if(waTabAtiva==='historico') await waRenderHistorico(c);
 }
 
-function waRenderDisparos(c){
-  c.innerHTML=`<div class="card"><div class="card-title">⚡ Disparos Rápidos</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${[{seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'🔴',label:'Cobrar',n:cache.alunos.filter(a=>a.status==='atrasado').length},
-         {seg:'vencendo',color:'var(--yellow)',bg:'rgba(245,158,11,.08)',border:'rgba(245,158,11,.25)',icon:'⚠️',label:'Avisar',n:cache.alunos.filter(a=>a.status==='vencendo').length},
-         {seg:'ativos',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✅',label:'Ativos',n:cache.alunos.filter(a=>a.status==='ativo').length},
-         {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📣',label:'Todos',n:cache.alunos.length}
-        ].map(item=>`<button onclick="waDisparoRapido('${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
-          <div style="font-size:18px;margin-bottom:4px">${item.icon}</div>
-          <div style="font-size:12px;font-weight:600;color:${item.color}">${item.label}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>
-        </button>`).join('')}
-    </div>
-  </div>`;
-}
-
-async function waDisparoRapido(seg){
-  const texto = prompt(`Mensagem para ${seg} (use {{nome}} para personalizar):`);
-  if(!texto) return;
-  const n = seg==='atrasados' ? cache.alunos.filter(a=>a.status==='atrasado').length : seg==='vencendo' ? cache.alunos.filter(a=>a.status==='vencendo').length : seg==='ativos' ? cache.alunos.filter(a=>a.status==='ativo').length : cache.alunos.length;
-  if(!confirm(`Enviar para ${n} aluno(s)?`)) return;
-  try {
-    const r = await POST('/api/marketing/enviar',{tipo:'wa',titulo:'Disparo rápido',texto,segmento:seg});
-    alert(`✅ Enviado para ${r.enviados} aluno(s)!`);
-  } catch(e){ alert('Erro: '+e.message); }
-}
-
-async function waRenderAniversario(c){
-  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
-  const hoje = new Date();
-  const m = hoje.getMonth()+1;
-  try {
-    const [hojeData, mesData] = await Promise.all([
-      GET(`/api/wa/aniversariantes?mes=${m}&dia=${hoje.getDate()}`),
-      GET(`/api/wa/aniversariantes?mes=${m}`)
-    ]);
-    c.innerHTML=`
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div class="card-title" style="margin:0">🎂 Aniversariantes de Hoje (${hojeData.length})</div>
-          ${hojeData.length>0?`<button onclick="waDispararAniversario([])" class="btn btn-r btn-sm">🥊 Disparar todos</button>`:''}
-        </div>
-        ${hojeData.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum aniversariante hoje.</p>':
-          hojeData.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-            <div><div style="font-size:13px;font-weight:500">${a.nome}</div><div style="font-size:11px;color:var(--muted)">${a.tel||'sem tel'} · ${a.modalidade||''}</div></div>
-            <button onclick="waDispararAniversario([${a.id}])" class="btn btn-ghost btn-sm">Enviar</button>
-          </div>`).join('')}
-      </div>
-      <div class="card">
-        <div class="card-title">📅 Aniversariantes do Mês</div>
-        ${mesData.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum.</p>':
-          `<table style="width:100%;border-collapse:collapse;font-size:12px">
-            <tr style="color:var(--muted)"><th style="text-align:left;padding:4px 8px">Nome</th><th style="padding:4px 8px">Dia</th><th style="padding:4px 8px">Tel</th><th></th></tr>
-            ${mesData.map(a=>`<tr style="border-top:1px solid var(--border)">
-              <td style="padding:6px 8px;font-weight:500">${a.nome}</td>
-              <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:700">${a.dia}</td>
-              <td style="padding:6px 8px;color:var(--muted)">${a.tel||'—'}</td>
-              <td style="padding:6px 8px"><button onclick="waDispararAniversario([${a.id}])" class="btn btn-ghost btn-sm">Enviar</button></td>
-            </tr>`).join('')}
-          </table>`}
-      </div>`;
-  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
-}
-
-async function waDispararAniversario(ids){
-  if(!confirm(ids.length?'Enviar mensagem para este aluno?':`Enviar para todos os aniversariantes de hoje?`)) return;
-  try {
-    const r = await POST('/api/wa/aniversariantes/disparar',{ids});
-    alert(`✅ ${r.enviados} enviado(s), ${r.erros} erro(s).`);
-    waRenderTab();
-  } catch(e){ alert('Erro: '+e.message); }
-}
-
+// ── CAMPANHAS ───────────────────────────────────────────────────────────────
 async function waRenderCampanhas(c){
-  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
-  try {
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
     const [camps, listas] = await Promise.all([GET('/api/wa/campanhas'), GET('/api/wa/listas')]);
+    waCampanhas = camps; waListas = listas;
+    const statusColor = {RASCUNHO:'var(--muted)',AGENDADA:'var(--blue)',ENVIANDO:'#f59e0b',CONCLUIDA:'var(--green)',CANCELADA:'#ef4444'};
+    const statusBg = {RASCUNHO:'rgba(100,100,100,.1)',AGENDADA:'rgba(59,130,246,.1)',ENVIANDO:'rgba(245,158,11,.1)',CONCLUIDA:'rgba(34,197,94,.1)',CANCELADA:'rgba(239,68,68,.1)'};
     c.innerHTML=`
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-        <button onclick="waNovaCampanha()" class="btn btn-r btn-sm">+ Nova Campanha</button>
-      </div>
-      ${camps.length===0?'<div class="card"><p style="color:var(--muted);font-size:13px">Nenhuma campanha criada.</p></div>':
-        camps.map(camp=>`<div class="card" style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div>
-              <div style="font-weight:600;font-size:14px">${camp.nome}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">${camp.segmento||camp.lista_nome||'—'} · ${camp.total_enviados}/${camp.total_destinatarios} enviados</div>
+      ${camps.length===0?`<div style="text-align:center;padding:60px 20px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:12px">📣</div>
+        <div style="font-size:14px;margin-bottom:16px">Nenhuma campanha criada ainda.</div>
+        <button onclick="waNovaCampanhaModal()" class="btn btn-r">+ Criar primeira campanha</button>
+      </div>`:camps.map(camp=>`
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                <span style="font-weight:700;font-size:14px">${camp.nome}</span>
+                <span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;background:${statusBg[camp.status]||statusBg.RASCUNHO};color:${statusColor[camp.status]||statusColor.RASCUNHO}">${camp.status}</span>
+                ${camp.data_agendada?`<span style="font-size:11px;color:var(--blue)">⏰ ${new Date(camp.data_agendada).toLocaleString('pt-BR')}</span>`:''}
+              </div>
+              <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:36px;overflow:hidden;margin-bottom:8px">${camp.mensagem}</div>
+              <div style="display:flex;gap:14px;font-size:11px;color:var(--muted);flex-wrap:wrap">
+                <span>👥 ${camp.total_destinatarios} dest.</span>
+                <span style="color:var(--green)">✅ ${camp.total_enviados} enviados</span>
+                ${camp.total_erros>0?`<span style="color:#ef4444">❌ ${camp.total_erros} erros</span>`:''}
+                ${camp.lista_nome?`<span>📋 ${camp.lista_nome}</span>`:''}
+                ${camp.segmento?`<span>🎯 ${camp.segmento}</span>`:''}
+              </div>
             </div>
-            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${{RASCUNHO:'rgba(100,100,100,.2)',ENVIANDO:'rgba(59,130,246,.2)',CONCLUIDA:'rgba(34,197,94,.2)',CANCELADA:'rgba(239,68,68,.2)'}[camp.status]||'rgba(100,100,100,.2)'};color:${{RASCUNHO:'var(--muted)',ENVIANDO:'var(--blue)',CONCLUIDA:'var(--green)',CANCELADA:'#ef4444'}[camp.status]||'var(--muted)'}">${camp.status}</span>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin:8px 0;white-space:pre-wrap;max-height:40px;overflow:hidden">${camp.mensagem}</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${camp.status==='RASCUNHO'?`<button onclick="waDispararCampanha(${camp.id},'${camp.nome}')" class="btn btn-r btn-sm">🚀 Disparar</button>`:''}
-            ${camp.status==='ENVIANDO'?`<button onclick="waCancelarCampanha(${camp.id})" class="btn btn-ghost btn-sm">⏹ Cancelar</button>`:''}
-            <button onclick="waExcluirCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">Excluir</button>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
+              ${(camp.status==='RASCUNHO'||camp.status==='AGENDADA')?`
+                <button onclick="waAgendarCampanha(${camp.id})" class="btn btn-ghost btn-sm" title="Agendar">⏰</button>
+                <button onclick="waDispararCampanha(${camp.id},'${camp.nome.replace(/'/g,"\\'")}','${camp.status}')" class="btn btn-r btn-sm">🚀 Disparar</button>
+              `:''}
+              ${camp.status==='ENVIANDO'&&!camp.pausada?`<button onclick="waPausarCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:#f59e0b">⏸ Pausar</button>`:''}
+              ${camp.pausada?`<button onclick="waRetomarCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:var(--blue)">▶ Retomar</button>`:''}
+              <button onclick="waExcluirCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:#ef4444" title="Excluir">🗑</button>
+            </div>
           </div>
         </div>`).join('')}`;
-  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
 }
 
-async function waNovaCampanha(){
-  const [listas] = await Promise.all([GET('/api/wa/listas')]);
+async function waNovaCampanhaModal(){
+  const listas = waListas.length ? waListas : await GET('/api/wa/listas').catch(()=>[]);
   const modal = document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">
+  modal.className='modal-overlay'; modal.id='modal-nova-campanha';
+  modal.innerHTML=`<div class="modal-box" style="max-width:500px">
+    <div class="modal-handle"></div>
     <div style="font-weight:700;font-size:16px;margin-bottom:16px">📣 Nova Campanha WhatsApp</div>
     <div class="fg"><label class="fl">Nome da campanha</label><input class="fi" id="wc-nome" placeholder="Ex: Convite evento junho"></div>
-    <div class="fg"><label class="fl">Mensagem (use {{nome}})</label><textarea class="fi" id="wc-msg" rows="5" placeholder="Olá {{nome}}! ..."></textarea></div>
     <div class="fg"><label class="fl">Destinatários</label><select class="fi" id="wc-dest">
       <option value="seg:todos">Todos os alunos</option>
       <option value="seg:ativos">Apenas ativos</option>
-      <option value="seg:atrasados">Apenas atrasados</option>
       <option value="seg:vencendo">Vencendo</option>
-      ${listas.map(l=>`<option value="lista:${l.id}">Lista: ${l.nome} (${l.total_contatos})</option>`).join('')}
+      <option value="seg:atrasados">Apenas atrasados</option>
+      ${listas.map(l=>`<option value="lista:${l.id}">📋 Lista: ${l.nome} (${l.total_contatos})</option>`).join('')}
     </select></div>
-    <div class="fg"><label class="fl">Intervalo entre mensagens (ms)</label><input class="fi" id="wc-interval" type="number" value="3000" min="1000"></div>
+    <div class="fg"><label class="fl">Mensagem (use {{nome}})</label><textarea class="fi" id="wc-msg" rows="5" placeholder="Olá {{nome}}! ..."></textarea></div>
+    <div class="fg"><label class="fl">URL de mídia (opcional — imagem/vídeo/PDF)</label><input class="fi" id="wc-media-url" placeholder="https://...jpg ou .mp4 ou .pdf"></div>
+    <div class="fg"><label class="fl">Tipo de mídia</label><select class="fi" id="wc-media-type">
+      <option value="">Sem mídia</option>
+      <option value="image">Imagem (JPG/PNG)</option>
+      <option value="video">Vídeo (MP4)</option>
+      <option value="document">Documento (PDF)</option>
+    </select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Agendar para (opcional)</label><input class="fi" id="wc-data" type="datetime-local"></div>
+      <div class="fg"><label class="fl">Intervalo entre msgs (ms)</label><input class="fi" id="wc-intervalo" type="number" value="3000" min="1000"></div>
+      <div class="fg"><label class="fl">Limite diário (0=sem limite)</label><input class="fi" id="wc-limite" type="number" value="0" min="0"></div>
+      <div class="fg"><label class="fl">Número de disparo</label><select class="fi" id="wc-instancia">
+        <option value="punchandroll">(48) 9225-9899 — Punch and Roll</option>
+      </select></div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button onclick="this.closest('div[style*=fixed]').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
-      <button onclick="waSalvarCampanha()" class="btn btn-r" style="flex:1">Salvar</button>
+      <button onclick="document.getElementById('modal-nova-campanha').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waSalvarCampanha()" class="btn btn-r" style="flex:1" id="wc-btn">Criar Campanha</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -2253,21 +2230,30 @@ async function waNovaCampanha(){
 async function waSalvarCampanha(){
   const nome = document.getElementById('wc-nome').value.trim();
   const mensagem = document.getElementById('wc-msg').value.trim();
-  const dest = document.getElementById('wc-dest').value;
-  const intervalo = parseInt(document.getElementById('wc-interval').value)||3000;
   if(!nome||!mensagem){alert('Preencha nome e mensagem');return;}
-  const body = {nome,mensagem,intervalo_ms:intervalo};
+  const dest = document.getElementById('wc-dest').value;
+  const intervalo = parseInt(document.getElementById('wc-intervalo').value)||3000;
+  const limite = parseInt(document.getElementById('wc-limite').value)||0;
+  const data = document.getElementById('wc-data').value;
+  const mediaUrl = document.getElementById('wc-media-url').value.trim();
+  const mediaType = document.getElementById('wc-media-type').value;
+  const instancia = document.getElementById('wc-instancia').value;
+  const body = {nome,mensagem,intervalo_ms:intervalo,limite_diario:limite,instancia,media_url:mediaUrl||null,media_type:mediaType||null};
+  if(data) body.data_agendada = new Date(data).toISOString().slice(0,19).replace('T',' ');
   if(dest.startsWith('seg:')) body.segmento=dest.replace('seg:','');
   else body.lista_id=parseInt(dest.replace('lista:',''));
+  const btn = document.getElementById('wc-btn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   try{
     await POST('/api/wa/campanhas',body);
-    document.querySelector('div[style*="fixed"]')?.remove();
-    waRenderTab();
-  }catch(e){alert('Erro: '+e.message);}
+    document.getElementById('modal-nova-campanha')?.remove();
+    await waRenderTab();
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent='Criar Campanha';}}
 }
 
-async function waDispararCampanha(id,nome){
-  if(!confirm(`Disparar campanha "${nome}"?`)) return;
+async function waDispararCampanha(id,nome,status){
+  if(status==='AGENDADA'){if(!confirm(`Cancelar agendamento e disparar "${nome}" agora?`))return;}
+  else if(!confirm(`Disparar campanha "${nome}"?`))return;
   try{
     const r = await POST(`/api/wa/campanhas/${id}/disparar`);
     alert(`🚀 Disparando para ${r.total} destinatário(s)!`);
@@ -2275,181 +2261,461 @@ async function waDispararCampanha(id,nome){
   }catch(e){alert('Erro: '+e.message);}
 }
 
-async function waCancelarCampanha(id){
-  await POST(`/api/wa/campanhas/${id}/cancelar`);
-  waRenderTab();
+async function waPausarCampanha(id){
+  try{ await POST(`/api/wa/campanhas/${id}/pausar`); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
+}
+
+async function waRetomarCampanha(id){
+  try{ await POST(`/api/wa/campanhas/${id}/retomar`); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
+}
+
+function waAgendarCampanha(id){
+  const modal = document.createElement('div');
+  modal.className='modal-overlay'; modal.id='modal-agendar-camp';
+  modal.innerHTML=`<div class="modal-box" style="max-width:360px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:12px">⏰ Agendar Campanha</div>
+    <div class="fg"><label class="fl">Data e hora do disparo</label><input class="fi" id="ag-data" type="datetime-local"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('modal-agendar-camp').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waConfirmarAgendamento(${id})" class="btn btn-r" style="flex:1">Agendar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function waConfirmarAgendamento(id){
+  const val = document.getElementById('ag-data')?.value;
+  if(!val){alert('Selecione uma data/hora');return;}
+  try{
+    const camp = waCampanhas.find(c=>c.id===id)||{};
+    await api('PUT',`/api/wa/campanhas/${id}`,{...camp,lista_id:camp.lista_id||undefined,data_agendada:new Date(val).toISOString().slice(0,19).replace('T',' ')});
+    document.getElementById('modal-agendar-camp')?.remove();
+    await waRenderTab();
+    alert('✅ Campanha agendada!');
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function waExcluirCampanha(id){
-  if(!confirm('Excluir campanha?')) return;
-  await DEL(`/api/wa/campanhas/${id}`);
-  waRenderTab();
+  if(!confirm('Excluir campanha e histórico de envios?')) return;
+  try{ await DEL(`/api/wa/campanhas/${id}`); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
 }
 
+// ── LISTAS ───────────────────────────────────────────────────────────────────
 async function waRenderListas(c){
-  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
-  try {
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
     const listas = await GET('/api/wa/listas');
+    waListas = listas;
     c.innerHTML=`
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button onclick="waNovaLista()" class="btn btn-ghost btn-sm">+ Nova Lista</button>
       </div>
-      ${listas.length===0?'<div class="card"><p style="color:var(--muted);font-size:13px">Nenhuma lista criada.</p></div>':
-        listas.map(l=>`<div class="card" style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-weight:600">${l.nome}</div>
-              <div style="font-size:11px;color:var(--muted)">${l.total_contatos} contato(s) · ${l.descricao||''}</div>
+      ${listas.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:8px">
+        <div style="font-size:32px;margin-bottom:8px">📋</div>
+        <div style="font-size:13px">Nenhuma lista. Clique em "+ Nova Lista" para começar.</div>
+      </div>`:listas.map(l=>`
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px" id="lista-container-${l.id}">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;background:var(--dark);transition:background .2s" onclick="waToggleLista(${l.id})" id="lista-header-${l.id}">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:34px;height:34px;border-radius:50%;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);display:flex;align-items:center;justify-content:center;font-size:16px">👥</div>
+              <div>
+                <div style="font-weight:600;font-size:14px">${l.nome}</div>
+                <div style="font-size:11px;color:var(--muted)">${l.total_contatos} contato(s)${l.descricao?' · '+l.descricao:''}</div>
+              </div>
             </div>
-            <div style="display:flex;gap:6px">
-              <button onclick="waVerLista(${l.id},'${l.nome}')" class="btn btn-ghost btn-sm">Ver</button>
-              <button onclick="waUploadLista(${l.id},'${l.nome}')" class="btn btn-ghost btn-sm">📤 Upload</button>
-              <button onclick="waExcluirLista(${l.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">Excluir</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;color:var(--muted)" id="lista-arrow-${l.id}">${waListasAbertas[l.id]?'▲':'▼'}</span>
+              <button onclick="event.stopPropagation();waExcluirLista(${l.id})" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:4px 6px">🗑</button>
             </div>
           </div>
+          <div id="lista-panel-${l.id}" style="display:${waListasAbertas[l.id]?'block':'none'};padding:16px;background:var(--panel);border-top:1px solid var(--border)">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+              <button onclick="waImportarBase(${l.id},'${l.nome.replace(/'/g,"\\'")}',${l.total_contatos})" class="btn btn-r btn-sm">📥 Importar da Base de Alunos</button>
+              <button onclick="waImportarExcel(${l.id})" class="btn btn-ghost btn-sm">📊 Importar Excel</button>
+              <button onclick="waMostrarAdicionarContato(${l.id})" class="btn btn-ghost btn-sm">+ Adicionar Contato</button>
+            </div>
+            <div id="contatos-lista-${l.id}"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Carregando...</div></div>
+          </div>
         </div>`).join('')}`;
-  } catch(e){ c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+    // Carrega contatos das listas abertas
+    for(const id of Object.keys(waListasAbertas)){
+      if(waListasAbertas[id]) waCarregarContatos(parseInt(id));
+    }
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function waToggleLista(id){
+  waListasAbertas[id] = !waListasAbertas[id];
+  const panel = document.getElementById(`lista-panel-${id}`);
+  const arrow = document.getElementById(`lista-arrow-${id}`);
+  if(panel) panel.style.display = waListasAbertas[id]?'block':'none';
+  if(arrow) arrow.textContent = waListasAbertas[id]?'▲':'▼';
+  if(waListasAbertas[id]) waCarregarContatos(id);
+}
+
+async function waCarregarContatos(listaId){
+  const el = document.getElementById(`contatos-lista-${listaId}`);
+  if(!el) return;
+  try{
+    const contatos = await GET(`/api/wa/listas/${listaId}/contatos`);
+    el.innerHTML = contatos.length===0
+      ? `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:6px">Nenhum contato. Use os botões acima para adicionar.</div>`
+      : `<div style="font-size:11px;color:var(--muted);margin-bottom:6px">${contatos.length} contato(s)</div>
+         <div style="max-height:240px;overflow-y:auto">
+           ${contatos.map(ct=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:6px;margin-bottom:3px;background:var(--dark)">
+             <div><span style="font-size:13px;font-weight:500">${ct.nome}</span><span style="font-size:11px;color:var(--muted);margin-left:8px">${ct.telefone}</span></div>
+             <button onclick="waExcluirContato(${ct.id},${listaId})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;padding:0 4px">✕</button>
+           </div>`).join('')}
+         </div>`;
+  }catch(e){el.innerHTML=`<div style="color:#ef4444;font-size:12px">Erro ao carregar contatos</div>`;}
 }
 
 async function waNovaLista(){
-  const nome = prompt('Nome da lista:'); if(!nome) return;
+  const nome = prompt('Nome da lista:'); if(!nome||!nome.trim()) return;
   const desc = prompt('Descrição (opcional):')||'';
-  await POST('/api/wa/listas',{nome,descricao:desc});
-  waRenderTab();
+  try{ await POST('/api/wa/listas',{nome:nome.trim(),descricao:desc}); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
 }
 
 async function waExcluirLista(id){
   if(!confirm('Excluir lista e todos os contatos?')) return;
-  await DEL(`/api/wa/listas/${id}`);
-  waRenderTab();
+  delete waListasAbertas[id];
+  try{ await DEL(`/api/wa/listas/${id}`); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
 }
 
-async function waVerLista(id,nome){
+function waImportarBase(listaId, listaNome, totalAtual){
   const modal = document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.id='wa-lista-modal';
-  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-weight:700">📋 ${nome}</div>
-      <button onclick="document.getElementById('wa-lista-modal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
+  modal.className='modal-overlay'; modal.id='modal-importar-base';
+  modal.innerHTML=`<div class="modal-box" style="max-width:440px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:4px">📥 Importar da Base de Alunos</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Lista: <strong>${listaNome}</strong></div>
+    <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="ib-modalidade">
+      <option value="todos">Todas as modalidades</option>
+      <option value="boxe">🥊 Boxe</option>
+      <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+      <option value="ambos">🥊🟦 Ambos</option>
+    </select></div>
+    <div class="fg"><label class="fl">Status do aluno</label><select class="fi" id="ib-status">
+      <option value="todos">Todos</option>
+      <option value="ativo">Somente ativos</option>
+      <option value="vencendo">Somente vencendo</option>
+      <option value="atrasado">Somente atrasados</option>
+    </select></div>
+    <div id="ib-preview" style="margin-bottom:12px;font-size:13px;color:var(--muted)"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="waPreviewBase()" class="btn btn-ghost btn-sm">🔍 Contar registros</button>
+      <button onclick="document.getElementById('modal-importar-base').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waFazerImportarBase(${listaId})" class="btn btn-r" style="flex:1" id="ib-btn">Importar</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input class="fi" id="wl-nome" placeholder="Nome" style="flex:2">
-      <input class="fi" id="wl-tel" placeholder="Telefone" style="flex:2">
-      <button onclick="waAddContato(${id})" class="btn btn-r btn-sm">+</button>
-    </div>
-    <div id="wa-contatos-lista"><div class="spinner" style="margin:10px auto"></div></div>
+    <div style="margin-top:10px;padding:10px;background:rgba(59,130,246,.05);border-radius:6px;font-size:11px;color:var(--muted)">ℹ️ Apenas alunos com telefone cadastrado serão importados. Duplicatas são ignoradas.</div>
   </div>`;
   document.body.appendChild(modal);
-  waCarregarContatos(id);
 }
 
-async function waCarregarContatos(listaId){
-  const el = document.getElementById('wa-contatos-lista'); if(!el) return;
-  const contatos = await GET(`/api/wa/listas/${listaId}/contatos`);
-  el.innerHTML = contatos.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum contato.</p>':
-    contatos.map(ct=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-      <div><div style="font-size:13px;font-weight:500">${ct.nome}</div><div style="font-size:11px;color:var(--muted)">${ct.telefone}</div></div>
-      <button onclick="waExcluirContato(${ct.id},${listaId})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px">✕</button>
-    </div>`).join('');
+async function waPreviewBase(){
+  const modalidade = document.getElementById('ib-modalidade')?.value;
+  const statusAluno = document.getElementById('ib-status')?.value;
+  const prev = document.getElementById('ib-preview');
+  if(prev) prev.textContent = 'Contando...';
+  try{
+    const r = await GET(`/api/wa/listas/preview-base?modalidade=${modalidade}&status_aluno=${statusAluno}`);
+    if(prev) prev.innerHTML = `<strong style="color:var(--blue)">${r.total} contato(s) encontrado(s)</strong>`;
+  }catch(e){if(prev) prev.textContent='Erro ao contar';}
 }
 
-async function waAddContato(listaId){
-  const nome=document.getElementById('wl-nome').value.trim();
-  const tel=document.getElementById('wl-tel').value.trim();
-  if(!nome||!tel){alert('Nome e telefone obrigatórios');return;}
-  await POST(`/api/wa/listas/${listaId}/contatos`,{nome,telefone:tel});
-  document.getElementById('wl-nome').value=''; document.getElementById('wl-tel').value='';
-  waCarregarContatos(listaId);
+async function waFazerImportarBase(listaId){
+  const modalidade = document.getElementById('ib-modalidade')?.value;
+  const statusAluno = document.getElementById('ib-status')?.value;
+  const btn = document.getElementById('ib-btn');
+  if(btn){btn.disabled=true;btn.textContent='Importando...';}
+  try{
+    const r = await POST(`/api/wa/listas/${listaId}/importar-base`,{modalidade,status_aluno:statusAluno});
+    document.getElementById('modal-importar-base')?.remove();
+    waListasAbertas[listaId] = true;
+    await waRenderTab();
+    alert(`✅ ${r.importados} contato(s) importado(s)!`);
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent='Importar';}}
 }
 
-async function waExcluirContato(id,listaId){
-  await DEL(`/api/wa/contatos/${id}`);
-  waCarregarContatos(listaId);
-}
-
-function waUploadLista(id,nome){
-  const input = document.createElement('input'); input.type='file'; input.accept='.xlsx,.csv';
+function waImportarExcel(listaId){
+  const input = document.createElement('input');
+  input.type='file'; input.accept='.xlsx,.xls,.csv';
   input.onchange=async()=>{
-    const fd = new FormData(); fd.append('arquivo',input.files[0]);
-    const r = await fetch(`${API}/api/wa/listas/${id}/upload`,{method:'POST',headers:{Authorization:'Bearer '+_token},body:fd});
-    const d = await r.json();
-    alert(`✅ ${d.inseridos} contato(s) importado(s)!`);
-    waRenderTab();
+    const file = input.files[0]; if(!file) return;
+    const fd = new FormData(); fd.append('arquivo',file);
+    try{
+      const r = await fetch(`${API}/api/wa/listas/${listaId}/upload`,{method:'POST',headers:{Authorization:'Bearer '+_token},body:fd});
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.error||'Erro ao importar');
+      waListasAbertas[listaId]=true;
+      await waRenderTab();
+      alert(`✅ ${d.inseridos} contato(s) importado(s)!`);
+    }catch(e){alert('Erro: '+e.message);}
   };
   input.click();
 }
 
-async function waRenderHistorico(c){
-  c.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
-  try{
-    const envios = await GET('/api/wa/envios?limit=100');
-    c.innerHTML=`<div class="card">
-      <div class="card-title">📜 Histórico de Envios</div>
-      ${envios.length===0?'<p style="color:var(--muted);font-size:13px">Nenhum envio.</p>':
-        `<table style="width:100%;border-collapse:collapse;font-size:12px">
-          <tr style="color:var(--muted)"><th style="text-align:left;padding:4px">Nome</th><th style="padding:4px">Tipo</th><th style="padding:4px">Status</th><th style="text-align:right;padding:4px">Data</th></tr>
-          ${envios.map(e=>`<tr style="border-top:1px solid var(--border)">
-            <td style="padding:5px 4px;font-weight:500">${e.nome||e.telefone}</td>
-            <td style="padding:5px 4px;color:var(--muted)">${e.tipo}</td>
-            <td style="padding:5px 4px"><span style="color:${e.status==='ENVIADO'?'var(--green)':'#ef4444'}">${e.status}</span></td>
-            <td style="padding:5px 4px;text-align:right;color:var(--muted)">${new Date(e.criado_em).toLocaleDateString('pt-BR')}</td>
-          </tr>`).join('')}
-        </table>`}
-    </div>`;
-  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
-}
-
-async function waRenderConfig(c){
-  try{
-    const cfg = await GET('/api/wa/config');
-    c.innerHTML=`<div class="card">
-      <div class="card-title">⚙️ Config WhatsApp</div>
-      <div class="fg"><label class="fl">Aniversário automático</label>
-        <select class="fi" id="wc-ativo">
-          <option value="1"${cfg.aniversario_ativo==='1'?' selected':''}>Ativado — envia às 8h</option>
-          <option value="0"${cfg.aniversario_ativo!=='1'?' selected':''}>Desativado</option>
-        </select>
-      </div>
-      <div class="fg"><label class="fl">Template de aniversário</label>
-        <textarea class="fi" id="wc-tmpl" rows="6" style="resize:vertical">${cfg.aniversario_template||''}</textarea>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">Use {{nome}} para o primeiro nome do aluno</div>
-      </div>
-      <button onclick="waSalvarConfig()" class="btn btn-r btn-sm">Salvar</button>
-    </div>`;
-  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
-}
-
-async function waSalvarConfig(){
-  const ativo = document.getElementById('wc-ativo').value;
-  const tmpl = document.getElementById('wc-tmpl').value;
-  await POST('/api/wa/config',{aniversario_ativo:ativo,aniversario_template:tmpl});
-  alert('✅ Config salva!');
-}
-
-async function waGerarQR(){
+function waMostrarAdicionarContato(listaId){
   const modal = document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;max-width:320px;width:90%;text-align:center">
-    <div style="font-size:16px;font-weight:700;margin-bottom:12px">📱 Conectar WhatsApp</div>
-    <div id="wa-qr-content"><div class="spinner" style="margin:20px auto"></div><p style="color:var(--muted);font-size:13px">Gerando QR code...</p></div>
-    <button onclick="this.closest('div[style]').remove()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Fechar</button>
+  modal.className='modal-overlay'; modal.id='modal-add-contato';
+  modal.innerHTML=`<div class="modal-box" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:16px">+ Adicionar Contato</div>
+    <div class="fg">
+      <label class="fl">Buscar na base de alunos</label>
+      <input class="fi" id="ac-busca" placeholder="Digite o nome..." oninput="waBuscarAluno(this.value,${listaId})">
+    </div>
+    <div id="ac-resultados" style="max-height:160px;overflow-y:auto;margin-bottom:12px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Ou preencha manualmente:</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Nome</label><input class="fi" id="ac-nome" placeholder="Nome completo"></div>
+      <div class="fg"><label class="fl">Telefone / WhatsApp</label><input class="fi" id="ac-tel" placeholder="(48) 9 9999-9999"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button onclick="document.getElementById('modal-add-contato').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waAdicionarContato(${listaId})" class="btn btn-r" style="flex:1">Adicionar</button>
+    </div>
   </div>`;
   document.body.appendChild(modal);
-  try {
-    const r = await GET('/api/whatsapp/qr');
-    if (r.ok && r.qr) {
-      document.getElementById('wa-qr-content').innerHTML=`
-        <img src="${r.qr}" style="width:220px;height:220px;border-radius:8px" />
-        <p style="font-size:11px;color:var(--muted);margin-top:8px">Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
-        <p style="font-size:10px;color:var(--muted)">QR expira em ~60 segundos</p>`;
+}
+
+let waBuscaTimeout = null;
+function waBuscarAluno(busca, listaId){
+  clearTimeout(waBuscaTimeout);
+  if(busca.length < 2){ document.getElementById('ac-resultados').innerHTML=''; return; }
+  waBuscaTimeout = setTimeout(async()=>{
+    const alunos = cache.alunos.filter(a=>a.nome.toLowerCase().includes(busca.toLowerCase())&&a.tel);
+    const el = document.getElementById('ac-resultados');
+    if(!el) return;
+    if(!alunos.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px">Nenhum aluno encontrado com telefone cadastrado.</div>';return;}
+    el.innerHTML=alunos.slice(0,8).map(a=>`<button onclick="document.getElementById('ac-nome').value='${a.nome.replace(/'/g,"\\'")}';document.getElementById('ac-tel').value='${a.tel}';document.getElementById('ac-resultados').innerHTML=''" 
+      style="display:block;width:100%;text-align:left;padding:8px 10px;border-radius:6px;border:1px solid var(--border);margin-bottom:4px;background:var(--dark);cursor:pointer;font-size:12px">
+      <strong>${a.nome}</strong> <span style="color:var(--muted)">${a.tel}</span>
+    </button>`).join('');
+  }, 300);
+}
+
+async function waAdicionarContato(listaId){
+  const nome = document.getElementById('ac-nome')?.value.trim();
+  const tel = document.getElementById('ac-tel')?.value.trim();
+  if(!nome||!tel){alert('Nome e telefone obrigatórios');return;}
+  try{
+    await POST(`/api/wa/listas/${listaId}/contatos`,{nome,telefone:tel});
+    document.getElementById('modal-add-contato')?.remove();
+    waListasAbertas[listaId]=true;
+    await waRenderTab();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function waExcluirContato(id, listaId){
+  try{ await DEL(`/api/wa/contatos/${id}`); waCarregarContatos(listaId); }catch(e){alert('Erro: '+e.message);}
+}
+
+// ── AUTOMAÇÕES ───────────────────────────────────────────────────────────────
+async function waRenderAutomacoes(c){
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
+    const cfg = await GET('/api/wa/config');
+    c.innerHTML=`
+      <!-- Aniversário -->
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div>
+            <div style="font-weight:700;font-size:15px">🎂 Mensagem de Aniversário</div>
+            <div style="font-size:12px;color:var(--muted)">Disparada automaticamente no horário configurado para aniversariantes do dia</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <div style="position:relative;width:40px;height:22px">
+              <input type="checkbox" id="cfg-aniv-ativo" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" ${cfg.aniversario_ativo==='1'?'checked':''} onchange="document.getElementById('cfg-aniv-toggle').style.background=this.checked?'var(--red)':'var(--border)';document.getElementById('cfg-aniv-knob').style.left=this.checked?'20px':'2px'">
+              <div id="cfg-aniv-toggle" style="position:absolute;inset:0;border-radius:11px;transition:background .2s;background:${cfg.aniversario_ativo==='1'?'var(--red)':'var(--border)'}"></div>
+              <div id="cfg-aniv-knob" style="position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:${cfg.aniversario_ativo==='1'?'20':'2'}px"></div>
+            </div>
+            <span style="font-size:13px;color:var(--muted)">${cfg.aniversario_ativo==='1'?'Ativo':'Inativo'}</span>
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="fg"><label class="fl">Horário de disparo</label><input class="fi" id="cfg-aniv-hora" type="time" value="${cfg.aniversario_horario||'08:00'}"></div>
+          <div class="fg"><label class="fl">URL de mídia (opcional)</label><input class="fi" id="cfg-aniv-media" type="text" value="${cfg.aniversario_media||''}" placeholder="https://...jpg ou .mp4"></div>
+        </div>
+        <div class="fg"><label class="fl">Template de mensagem (use {{nome}})</label><textarea class="fi" id="cfg-aniv-tmpl" rows="6" style="resize:vertical;font-family:monospace">${cfg.aniversario_template||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('aniversario')" class="btn btn-r btn-sm">Salvar configuração de aniversário</button>
+      </div>
+
+      <!-- Atrasados -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div>
+            <div style="font-weight:700;font-size:15px">⚠️ Mensagem de Cobrança (Atrasados)</div>
+            <div style="font-size:12px;color:var(--muted)">Disparada automaticamente todo dia às 9h para alunos com mensalidade em atraso</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <div style="position:relative;width:40px;height:22px">
+              <input type="checkbox" id="cfg-atr-ativo" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" ${cfg.atrasados_ativo==='1'?'checked':''} onchange="document.getElementById('cfg-atr-toggle').style.background=this.checked?'var(--red)':'var(--border)';document.getElementById('cfg-atr-knob').style.left=this.checked?'20px':'2px'">
+              <div id="cfg-atr-toggle" style="position:absolute;inset:0;border-radius:11px;transition:background .2s;background:${cfg.atrasados_ativo==='1'?'var(--red)':'var(--border)'}"></div>
+              <div id="cfg-atr-knob" style="position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:${cfg.atrasados_ativo==='1'?'20':'2'}px"></div>
+            </div>
+            <span style="font-size:13px;color:var(--muted)">${cfg.atrasados_ativo==='1'?'Ativo':'Inativo'}</span>
+          </label>
+        </div>
+        <div class="fg"><label class="fl">Template de cobrança (use {{nome}})</label><textarea class="fi" id="cfg-atr-tmpl" rows="5" style="resize:vertical;font-family:monospace">${cfg.atrasados_template||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('atrasados')" class="btn btn-r btn-sm" style="background:#f59e0b">Salvar configuração de cobrança</button>
+      </div>`;
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function waSalvarAutomacao(tipo){
+  try{
+    if(tipo==='aniversario'){
+      const ativo = document.getElementById('cfg-aniv-ativo')?.checked?'1':'0';
+      const tmpl = document.getElementById('cfg-aniv-tmpl')?.value;
+      const hora = document.getElementById('cfg-aniv-hora')?.value;
+      const media = document.getElementById('cfg-aniv-media')?.value;
+      await POST('/api/wa/config',{aniversario_ativo:ativo,aniversario_template:tmpl,aniversario_horario:hora,aniversario_media:media||''});
     } else {
-      document.getElementById('wa-qr-content').innerHTML=`<p style="color:#ef4444;font-size:13px">Erro ao gerar QR: ${r.erro||'tente novamente'}</p>`;
+      const ativo = document.getElementById('cfg-atr-ativo')?.checked?'1':'0';
+      const tmpl = document.getElementById('cfg-atr-tmpl')?.value;
+      await POST('/api/wa/config',{atrasados_ativo:ativo,atrasados_template:tmpl});
+    }
+    alert('✅ Configuração salva!');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ── HISTÓRICO ────────────────────────────────────────────────────────────────
+let waHistFiltros = {tipo:'TODOS',status:'TODOS',dataInicio:'',dataFim:'',busca:''};
+
+async function waRenderHistorico(c){
+  c.innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="fg"><label class="fl">Tipo</label><select class="fi" id="hf-tipo" onchange="waHistFiltros.tipo=this.value">
+          <option value="TODOS">Todos</option>
+          <option value="ANIVERSARIO">Aniversário</option>
+          <option value="CAMPANHA">Campanha</option>
+          <option value="INDIVIDUAL">Individual</option>
+          <option value="COBRANCA">Cobrança</option>
+        </select></div>
+        <div class="fg"><label class="fl">Status</label><select class="fi" id="hf-status" onchange="waHistFiltros.status=this.value">
+          <option value="TODOS">Todos</option>
+          <option value="ENVIADO">Enviado</option>
+          <option value="ERRO">Erro</option>
+        </select></div>
+        <div class="fg"><label class="fl">Buscar nome/tel</label><input class="fi" id="hf-busca" placeholder="Nome ou telefone..." onchange="waHistFiltros.busca=this.value"></div>
+        <div class="fg"><label class="fl">Data início</label><input class="fi" type="date" id="hf-ini" onchange="waHistFiltros.dataInicio=this.value"></div>
+        <div class="fg"><label class="fl">Data fim</label><input class="fi" type="date" id="hf-fim" onchange="waHistFiltros.dataFim=this.value"></div>
+        <div class="fg" style="display:flex;align-items:flex-end"><button onclick="waCarregarHistorico()" class="btn btn-r btn-sm" style="width:100%">🔍 Filtrar</button></div>
+      </div>
+    </div>
+    <div id="wa-hist-table"><div style="text-align:center;padding:30px"><div class="spinner"></div></div></div>`;
+  await waCarregarHistorico();
+}
+
+async function waCarregarHistorico(){
+  const el = document.getElementById('wa-hist-table');
+  if(!el) return;
+  el.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  try{
+    const p = new URLSearchParams();
+    if(waHistFiltros.tipo&&waHistFiltros.tipo!=='TODOS') p.set('tipo',waHistFiltros.tipo);
+    if(waHistFiltros.status&&waHistFiltros.status!=='TODOS') p.set('status',waHistFiltros.status);
+    if(waHistFiltros.dataInicio) p.set('data_inicio',waHistFiltros.dataInicio);
+    if(waHistFiltros.dataFim) p.set('data_fim',waHistFiltros.dataFim);
+    if(waHistFiltros.busca) p.set('busca',waHistFiltros.busca);
+    p.set('limit','300');
+    const rows = await GET(`/api/wa/envios?${p.toString()}`);
+    const tipoCor = {ANIVERSARIO:'rgba(236,72,153,.15)',CAMPANHA:'rgba(139,92,246,.15)',INDIVIDUAL:'rgba(59,130,246,.15)',COBRANCA:'rgba(245,158,11,.15)'};
+    const tipoText = {ANIVERSARIO:'#ec4899',CAMPANHA:'#8b5cf6',INDIVIDUAL:'#3b82f6',COBRANCA:'#f59e0b'};
+    el.innerHTML = rows.length===0
+      ? `<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Nenhum envio encontrado.</div>`
+      : `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${rows.length} registro(s)</div>
+         <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border)">
+         <table style="width:100%;border-collapse:collapse;font-size:12px">
+           <thead style="background:var(--dark)">
+             <tr>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Data/Hora</th>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Nome</th>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Telefone</th>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Tipo</th>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Status</th>
+               <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600">Erro</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${rows.map(e=>`<tr style="border-top:1px solid var(--border);hover:background:var(--dark)">
+               <td style="padding:7px 10px;white-space:nowrap;color:var(--muted)">${new Date(e.criado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</td>
+               <td style="padding:7px 10px;font-weight:500">${e.nome||'—'}</td>
+               <td style="padding:7px 10px;color:var(--muted)">${e.telefone}</td>
+               <td style="padding:7px 10px"><span style="font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;background:${tipoCor[e.tipo]||'rgba(100,100,100,.1)'};color:${tipoText[e.tipo]||'var(--muted)'}">${e.tipo}</span></td>
+               <td style="padding:7px 10px">${e.status==='ENVIADO'?'<span style="color:var(--green)">✅ Enviado</span>':'<span style="color:#ef4444">❌ Erro</span>'}</td>
+               <td style="padding:7px 10px;color:var(--muted);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.erro||''}</td>
+             </tr>`).join('')}
+           </tbody>
+         </table></div>`;
+  }catch(e){el.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+// ── ENVIO INDIVIDUAL ─────────────────────────────────────────────────────────
+function waEnvioIndividualModal(){
+  const modal = document.createElement('div');
+  modal.className='modal-overlay'; modal.id='modal-individual';
+  modal.innerHTML=`<div class="modal-box" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:16px">✉️ Envio Individual WhatsApp</div>
+    <div class="fg"><label class="fl">Nome do destinatário</label><input class="fi" id="ei-nome" placeholder="Nome"></div>
+    <div class="fg"><label class="fl">Telefone / WhatsApp</label><input class="fi" id="ei-tel" placeholder="(48) 9 9999-9999"></div>
+    <div class="fg"><label class="fl">Mensagem</label><textarea class="fi" id="ei-msg" rows="5" placeholder="Mensagem..."></textarea></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('modal-individual').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="waEnviarIndividual()" class="btn btn-r" style="flex:1" id="ei-btn">Enviar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function waEnviarIndividual(){
+  const nome = document.getElementById('ei-nome')?.value.trim();
+  const tel = document.getElementById('ei-tel')?.value.trim();
+  const msg = document.getElementById('ei-msg')?.value.trim();
+  if(!tel||!msg){alert('Telefone e mensagem obrigatórios');return;}
+  const btn = document.getElementById('ei-btn');
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  try{
+    await POST('/api/wa/enviar-individual',{nome,telefone:tel,mensagem:msg});
+    document.getElementById('modal-individual')?.remove();
+    alert('✅ Mensagem enviada!');
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent='Enviar';}}
+}
+
+// ── QR CODE ──────────────────────────────────────────────────────────────────
+async function waGerarQR(){
+  const modal = document.createElement('div');
+  modal.className='modal-overlay'; modal.id='modal-wa-qr';
+  modal.innerHTML=`<div class="modal-box" style="max-width:340px;text-align:center">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">📱 Conectar WhatsApp</div>
+    <div id="wa-qr-content"><div class="spinner" style="margin:20px auto"></div><p style="color:var(--muted);font-size:13px;margin-top:8px">Gerando QR Code...</p></div>
+    <button onclick="document.getElementById('modal-wa-qr').remove()" class="btn btn-ghost" style="margin-top:16px;width:100%">Fechar</button>
+  </div>`;
+  document.body.appendChild(modal);
+  try{
+    const evoUrl = '${process.env.WA_EVOLUTION_URL}';
+    const r = await GET('/api/whatsapp/qr');
+    if(r.ok && r.qr){
+      document.getElementById('wa-qr-content').innerHTML=`
+        <img src="${r.qr}" style="width:220px;height:220px;border-radius:8px;margin-bottom:8px"/>
+        <p style="font-size:12px;color:var(--muted)">Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">⏱ QR expira em ~60 segundos</p>`;
+    } else {
+      document.getElementById('wa-qr-content').innerHTML=`<p style="color:#ef4444;font-size:13px">❌ ${r.erro||'Erro ao gerar QR'}</p>`;
     }
   } catch(e) {
     document.getElementById('wa-qr-content').innerHTML=`<p style="color:#ef4444;font-size:13px">Erro de conexão</p>`;
   }
 }
+
+
 
 function renderMktEmail(){
   document.getElementById('page-mkt-email').innerHTML=`
