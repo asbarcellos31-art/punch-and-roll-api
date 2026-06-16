@@ -2767,92 +2767,685 @@ async function waGerarQR(){
 
 
 function renderMktEmail(){
-  document.getElementById('page-mkt-email').innerHTML=`
-    <div class="card"><div class="card-title">⚡ Disparos E-mail</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${[{seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'📧',label:'Cobrança',n:cache.alunos.filter(a=>a.status==='atrasado').length},
-           {seg:'todos',color:'var(--blue)',bg:'rgba(59,130,246,.08)',border:'rgba(59,130,246,.25)',icon:'📰',label:'Newsletter',n:cache.alunos.length},
-           {seg:'livre',color:'var(--green)',bg:'rgba(34,197,94,.08)',border:'rgba(34,197,94,.25)',icon:'✏️',label:'Livre',n:null}
-          ].map(item=>`<button onclick="mktNovaMsg('email','${item.seg}')" style="padding:12px;background:${item.bg};border:1px solid ${item.border};border-radius:8px;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif">
-          <div style="font-size:18px;margin-bottom:4px">${item.icon}</div>
-          <div style="font-size:12px;font-weight:600;color:${item.color}">${item.label}</div>
-          ${item.n!==null?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${item.n} aluno(s)</div>`:''}
-        </button>`).join('')}
+  const pg = document.getElementById('page-mkt-email');
+  pg.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:18px;font-weight:700">E-mail Marketing</div>
+        <div style="font-size:12px;color:var(--muted)">Campanhas, automações e disparos via SendGrid</div>
       </div>
-    </div>`;
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div id="em-status-badge" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)">Verificando...</div>
+        <button onclick="emEnvioIndividualModal()" class="btn btn-ghost btn-sm">✉️ Envio Individual</button>
+        <button onclick="emNovaCampanhaModal()" class="btn btn-r btn-sm">+ Nova Campanha</button>
+      </div>
+    </div>
+    <div class="day-tabs" style="margin-bottom:16px">
+      <button class="day-tab active" id="em-tab-campanhas" onclick="emNavTo('campanhas')">📣 Campanhas</button>
+      <button class="day-tab" id="em-tab-listas" onclick="emNavTo('listas')">📋 Listas</button>
+      <button class="day-tab" id="em-tab-templates" onclick="emNavTo('templates')">📝 Templates</button>
+      <button class="day-tab" id="em-tab-automacoes" onclick="emNavTo('automacoes')">⚙️ Automações</button>
+      <button class="day-tab" id="em-tab-historico" onclick="emNavTo('historico')">📜 Histórico</button>
+    </div>
+    <div id="em-tab-content"></div>`;
+
+  GET('/api/email/status').then(s=>{
+    const b=document.getElementById('em-status-badge');
+    if(b) b.innerHTML = s.configurado
+      ? `<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:5px"></span><span style="color:#22c55e;font-weight:600">SendGrid OK</span>`
+      : `<span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:5px"></span><span style="color:#ef4444;font-weight:600">SendGrid não configurado</span>`;
+  }).catch(()=>{});
+
+  emNavTo('campanhas');
 }
 
-let campanhas=[];
-function renderMktCampanhas(){
-  document.getElementById('page-mkt-campanhas').innerHTML=`
-    ${campanhas.length===0?'<div class="alert alert-y">Nenhuma campanha criada.</div>':''}
-    ${campanhas.map(camp=>`<div class="card">
-      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-        <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px">${camp.nome}</div></div>
-        <span class="badge ${camp.status==='ativo'?'bg':'bb'}">${camp.status}</span>
-      </div>
-      ${camp.status==='ativo'?`<div style="display:flex;gap:8px">
-        <button onclick="encerrarCampanha('${camp.id}')" class="btn btn-ghost btn-sm">Encerrar</button>
-      </div>`:''}
-    </div>`).join('')}`;
+let emTabAtiva = 'campanhas';
+function emNavTo(tab){
+  emTabAtiva=tab;
+  document.querySelectorAll('.day-tab[id^="em-tab-"]').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('em-tab-'+tab);
+  if(btn) btn.classList.add('active');
+  emRenderTab();
+}
+async function emRenderTab(){
+  const c=document.getElementById('em-tab-content');
+  if(!c) return;
+  if(emTabAtiva==='campanhas') await emRenderCampanhas(c);
+  else if(emTabAtiva==='listas') await emRenderListas(c);
+  else if(emTabAtiva==='templates') await emRenderTemplates(c);
+  else if(emTabAtiva==='automacoes') await emRenderAutomacoes(c);
+  else if(emTabAtiva==='historico') await emRenderHistorico(c);
 }
 
-function mktNovaMsg(tipo,segPre){
-  mktTipo=tipo;
-  const tpls=tipo==='wa'?TPLS_WA:TPLS_EMAIL;
-  const m=criarModal('mkt-msg-modal',tipo==='wa'?'💬 Nova Mensagem WhatsApp':'📧 Novo E-mail');
-  m.innerHTML+=`
-    <div class="fg"><label class="fl">Template</label><select class="fi" id="mkt-tpl" onchange="mktAplicarTpl()">${tpls.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}</select></div>
-    <div class="fg"><label class="fl">Destinatários</label><select class="fi" id="mkt-seg">${SEGS.map(s=>`<option value="${s.id}"${segPre===s.id?' selected':''}>${s.icon} ${s.label} (${s.n()})</option>`).join('')}</select></div>
-    ${tipo!=='wa'?'<div class="fg"><label class="fl">Assunto</label><input class="fi" id="mkt-assunto" placeholder="Assunto"></div>':''}
-    <div class="fg"><label class="fl">Mensagem</label><textarea class="fi" id="mkt-texto" rows="5" placeholder="Digite..." style="resize:vertical"></textarea></div>
+// ── CAMPANHAS ──────────────────────────────────────────────────────────────
+async function emRenderCampanhas(c){
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
+    const camps = await GET('/api/email/campanhas');
+    const scol={RASCUNHO:'var(--muted)',AGENDADA:'var(--blue)',ENVIANDO:'#f59e0b',CONCLUIDA:'var(--green)',CANCELADA:'#ef4444'};
+    const sbg={RASCUNHO:'rgba(100,100,100,.1)',AGENDADA:'rgba(59,130,246,.1)',ENVIANDO:'rgba(245,158,11,.1)',CONCLUIDA:'rgba(34,197,94,.1)',CANCELADA:'rgba(239,68,68,.1)'};
+    c.innerHTML = camps.length===0
+      ? `<div style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:36px;margin-bottom:12px">📣</div><div style="font-size:14px;margin-bottom:16px">Nenhuma campanha criada.</div><button onclick="emNovaCampanhaModal()" class="btn btn-r">+ Criar primeira campanha</button></div>`
+      : camps.map(camp=>`<div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                <span style="font-weight:700;font-size:14px">${camp.nome}</span>
+                <span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;background:${sbg[camp.status]||sbg.RASCUNHO};color:${scol[camp.status]||scol.RASCUNHO}">${camp.status}</span>
+                ${camp.template_nome?`<span style="font-size:11px;color:var(--muted)">📝 ${camp.template_nome}</span>`:''}
+                ${camp.data_agendada?`<span style="font-size:11px;color:var(--blue)">⏰ ${new Date(camp.data_agendada).toLocaleString('pt-BR')}</span>`:''}
+              </div>
+              <div style="display:flex;gap:14px;font-size:11px;color:var(--muted);flex-wrap:wrap">
+                <span>👥 ${camp.total_destinatarios} dest.</span>
+                <span style="color:var(--green)">✅ ${camp.total_enviados} enviados</span>
+                ${camp.total_erros>0?`<span style="color:#ef4444">❌ ${camp.total_erros} erros</span>`:''}
+                ${camp.aberturas>0?`<span style="color:var(--blue)">👁 ${camp.aberturas} aberturas</span>`:''}
+                ${camp.lista_nome?`<span>📋 ${camp.lista_nome}</span>`:camp.segmento?`<span>🎯 ${camp.segmento}</span>`:''}
+              </div>
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
+              ${(camp.status==='RASCUNHO'||camp.status==='AGENDADA')?`
+                <button onclick="emPreviewCampanha(${camp.id})" class="btn btn-ghost btn-sm" title="Preview">👁</button>
+                <button onclick="emEditarCampanha(${camp.id})" class="btn btn-ghost btn-sm" title="Editar">✏️</button>
+                <button onclick="emDispararCampanha(${camp.id},'${camp.nome.replace(/'/g,"\\'")}')" class="btn btn-r btn-sm">🚀 Disparar</button>
+              `:''}
+              ${camp.status==='CONCLUIDA'?`<button onclick="emVerAberturas(${camp.id},'${camp.nome.replace(/'/g,"\\'")}',${camp.total_enviados},${camp.aberturas})" class="btn btn-ghost btn-sm">📊 Relatório</button>`:''}
+              ${camp.status==='ENVIANDO'?`<button onclick="emRetomar(${camp.id})" class="btn btn-ghost btn-sm" style="color:var(--blue)">▶ Retomar</button>`:''}
+              <button onclick="emDuplicarCampanha(${camp.id})" class="btn btn-ghost btn-sm" title="Duplicar">📋</button>
+              <button onclick="emExcluirCampanha(${camp.id})" class="btn btn-ghost btn-sm" style="color:#ef4444" title="Excluir">🗑</button>
+            </div>
+          </div>
+        </div>`).join('');
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function emNovaCampanhaModal(campId){
+  const [templates, listas] = await Promise.all([GET('/api/email/templates'),GET('/api/email/listas')]).catch(()=>[[],[]]);
+  let camp = null;
+  if(campId){ try{ camp = await GET('/api/email/campanhas'); camp = camp.find(x=>x.id===campId)||null; }catch(_){} }
+  const modal = document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-nova-ecampanha';
+  modal.innerHTML=`<div class="modal-box" style="max-width:520px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">📣 ${campId?'Editar':'Nova'} Campanha E-mail</div>
+    <div class="fg"><label class="fl">Nome da campanha</label><input class="fi" id="ec-nome" value="${camp?.nome||''}" placeholder="Ex: Newsletter Junho"></div>
+    <div class="fg"><label class="fl">Template</label><select class="fi" id="ec-template">
+      <option value="">Sem template (compor abaixo)</option>
+      ${templates.map(t=>`<option value="${t.id}"${camp?.template_id==t.id?' selected':''}>${t.nome}</option>`).join('')}
+    </select></div>
+    <div class="fg"><label class="fl">Assunto (deixe vazio para usar do template)</label><input class="fi" id="ec-assunto" value="${camp?.assunto_override||''}" placeholder="Assunto do email"></div>
+    <div class="fg"><label class="fl">Destinatários</label><select class="fi" id="ec-dest">
+      <option value="seg:todos"${camp?.segmento==='todos'?' selected':''}>Todos os alunos</option>
+      <option value="seg:ativos"${camp?.segmento==='ativos'?' selected':''}>Apenas ativos</option>
+      <option value="seg:vencendo"${camp?.segmento==='vencendo'?' selected':''}>Vencendo</option>
+      <option value="seg:atrasados"${camp?.segmento==='atrasados'?' selected':''}>Apenas atrasados</option>
+      ${listas.map(l=>`<option value="lista:${l.id}"${camp?.lista_id==l.id?` selected`:''}>📋 Lista: ${l.nome} (${l.total||l.total_contatos||0})</option>`).join('')}
+    </select></div>
+    <div class="fg"><label class="fl">Remetente (email)</label><input class="fi" id="ec-from" value="${camp?.remetente||''}" placeholder="noreply@punchandroll.com.br"></div>
+    <div class="fg"><label class="fl">Nome do remetente</label><input class="fi" id="ec-from-nome" value="${camp?.nome_remetente||''}" placeholder="Punch and Roll Fight Team"></div>
+    <div class="fg"><label class="fl">Agendar envio (opcional)</label><input class="fi" id="ec-data" type="datetime-local" value="${camp?.data_agendada?new Date(camp.data_agendada).toISOString().slice(0,16):''}"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="document.getElementById('modal-nova-ecampanha').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emSalvarCampanha(${campId||'null'})" class="btn btn-r" style="flex:1" id="ec-btn">${campId?'Salvar':'Criar Campanha'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function emSalvarCampanha(campId){
+  const nome=document.getElementById('ec-nome').value.trim();
+  if(!nome){alert('Preencha o nome');return;}
+  const template_id=document.getElementById('ec-template').value||null;
+  const assunto_override=document.getElementById('ec-assunto').value.trim()||null;
+  const dest=document.getElementById('ec-dest').value;
+  const remetente=document.getElementById('ec-from').value.trim()||null;
+  const nome_remetente=document.getElementById('ec-from-nome').value.trim()||null;
+  const data_agendada=document.getElementById('ec-data').value||null;
+  const body={nome,template_id,assunto_override,remetente,nome_remetente,data_agendada};
+  if(dest.startsWith('seg:')) body.segmento=dest.replace('seg:','');
+  else body.lista_id=parseInt(dest.replace('lista:',''));
+  const btn=document.getElementById('ec-btn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  try{
+    if(campId) await PUT('/api/email/campanhas/'+campId,body);
+    else await POST('/api/email/campanhas',body);
+    document.getElementById('modal-nova-ecampanha')?.remove();
+    await emRenderTab();
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent=campId?'Salvar':'Criar Campanha';}}
+}
+
+function emEditarCampanha(id){ emNovaCampanhaModal(id); }
+
+async function emDispararCampanha(id,nome){
+  if(!confirm(`Disparar campanha "${nome}"?\n\nOs emails serão enviados agora.`)) return;
+  try{
+    await POST('/api/email/campanhas/'+id+'/disparar');
+    alert('🚀 Disparo iniciado! Acompanhe o progresso na lista de campanhas.');
+    setTimeout(()=>emRenderTab(),3000);
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function emRetomar(id){
+  try{ await POST('/api/email/campanhas/'+id+'/retomar'); alert('▶ Retomando...'); setTimeout(()=>emRenderTab(),2000); }
+  catch(e){alert('Erro: '+e.message);}
+}
+
+async function emDuplicarCampanha(id){
+  try{ await POST('/api/email/campanhas/'+id+'/duplicar'); await emRenderTab(); }
+  catch(e){alert('Erro: '+e.message);}
+}
+
+async function emExcluirCampanha(id){
+  if(!confirm('Excluir campanha?')) return;
+  try{ await DEL('/api/email/campanhas/'+id); await emRenderTab(); }
+  catch(e){alert('Erro: '+e.message);}
+}
+
+async function emPreviewCampanha(id){
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-preview';
+  modal.innerHTML=`<div class="modal-box" style="max-width:600px"><div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:12px">👁 Preview da Campanha</div>
+    <div id="em-preview-content"><div class="spinner" style="margin:20px auto"></div></div>
+    <button onclick="document.getElementById('modal-em-preview').remove()" class="btn btn-ghost" style="width:100%;margin-top:12px">Fechar</button>
+  </div>`;
+  document.body.appendChild(modal);
+  try{
+    const previews = await GET('/api/email/campanhas/'+id+'/preview');
+    const pc = document.getElementById('em-preview-content');
+    if(!pc) return;
+    pc.innerHTML = previews.map((p,i)=>`
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Exemplo ${i+1}: <strong>${p.nome}</strong> &lt;${p.email}&gt;</div>
+        <iframe srcdoc="${p.html.replace(/"/g,'&quot;')}" style="width:100%;height:300px;border:1px solid var(--border);border-radius:8px"></iframe>
+      </div>`).join('');
+  }catch(e){const pc=document.getElementById('em-preview-content');if(pc)pc.innerHTML=`<p style="color:#ef4444">Erro: ${e.message}</p>`;}
+}
+
+async function emVerAberturas(id,nome,total,aberturas){
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-aberturas';
+  modal.innerHTML=`<div class="modal-box" style="max-width:600px"><div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:12px">📊 Relatório — ${nome}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+      <div class="card" style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--green)">${total}</div><div style="font-size:10px;color:var(--muted)">ENVIADOS</div></div>
+      <div class="card" style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--blue)">${aberturas}</div><div style="font-size:10px;color:var(--muted)">ABERTURAS</div></div>
+      <div class="card" style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--red)">${total>0?Math.round(aberturas/total*100):0}%</div><div style="font-size:10px;color:var(--muted)">TAXA ABERTURA</div></div>
+    </div>
+    <div id="em-aberturas-tabela"><div class="spinner" style="margin:20px auto"></div></div>
+    <button onclick="document.getElementById('modal-em-aberturas').remove()" class="btn btn-ghost" style="width:100%;margin-top:12px">Fechar</button>
+  </div>`;
+  document.body.appendChild(modal);
+  try{
+    const rows = await GET('/api/email/campanhas/'+id+'/aberturas');
+    const el = document.getElementById('em-aberturas-tabela');
+    if(!el) return;
+    el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="padding:6px;text-align:left">Nome</th><th style="padding:6px;text-align:left">Email</th>
+        <th style="padding:6px;text-align:center">Status</th><th style="padding:6px;text-align:center">Aberturas</th><th style="padding:6px;text-align:left">1ª Abertura</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px">${r.contato_nome||'-'}</td>
+        <td style="padding:6px;color:var(--muted)">${r.contato_email}</td>
+        <td style="padding:6px;text-align:center"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${r.status==='ENVIADO'?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${r.status==='ENVIADO'?'var(--green)':'#ef4444'}">${r.status}</span></td>
+        <td style="padding:6px;text-align:center">${r.aberturas||0}</td>
+        <td style="padding:6px;color:var(--muted)">${r.aberto_em?new Date(r.aberto_em).toLocaleString('pt-BR'):'-'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }catch(e){const el=document.getElementById('em-aberturas-tabela');if(el)el.innerHTML=`<p style="color:#ef4444">Erro: ${e.message}</p>`;}
+}
+
+// ── LISTAS ─────────────────────────────────────────────────────────────────
+let emListasAbertas={};
+async function emRenderListas(c){
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
+    const listas = await GET('/api/email/listas');
+    c.innerHTML=`
+      <div style="margin-bottom:12px"><button onclick="emNovaLista()" class="btn btn-r btn-sm">+ Nova Lista</button></div>
+      ${listas.length===0?`<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">📋</div>Nenhuma lista criada.</div>`
+        :listas.map(l=>`
+        <div class="card" style="margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="emToggleLista(${l.id})" style="cursor:pointer">
+            <div>
+              <div style="font-weight:600;font-size:14px;cursor:pointer" onclick="emToggleLista(${l.id})">${l.nome}</div>
+              <div style="font-size:11px;color:var(--muted)">${l.total||l.total_contatos||0} contatos</div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button onclick="emImportarBase(${l.id},'${l.nome.replace(/'/g,"\\'")}',${l.total||0})" class="btn btn-ghost btn-sm" title="Importar da base">👥 Base</button>
+              <button onclick="emImportarExcel(${l.id})" class="btn btn-ghost btn-sm" title="Importar Excel">📊 Excel</button>
+              <button onclick="emAddContato(${l.id})" class="btn btn-ghost btn-sm" title="Adicionar">+ Contato</button>
+              <button onclick="emExcluirLista(${l.id})" class="btn btn-ghost btn-sm" style="color:#ef4444" title="Excluir">🗑</button>
+              <span style="font-size:16px;cursor:pointer" onclick="emToggleLista(${l.id})">${emListasAbertas[l.id]?'▲':'▼'}</span>
+            </div>
+          </div>
+          ${emListasAbertas[l.id]?`<div id="em-lista-contatos-${l.id}" style="margin-top:10px"><div class="spinner" style="margin:10px auto"></div></div>`:''}
+        </div>`).join('')}`;
+    listas.forEach(l=>{ if(emListasAbertas[l.id]) emCarregarContatos(l.id); });
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+function emToggleLista(id){
+  emListasAbertas[id]=!emListasAbertas[id];
+  emRenderTab();
+}
+
+async function emCarregarContatos(listaId){
+  const el=document.getElementById('em-lista-contatos-'+listaId);
+  if(!el) return;
+  try{
+    const contatos=await GET('/api/email/listas/'+listaId+'/contatos');
+    el.innerHTML=contatos.length===0?`<div style="color:var(--muted);font-size:12px;padding:8px">Nenhum contato</div>`
+      :`<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--border)"><th style="padding:5px;text-align:left">Nome</th><th style="padding:5px;text-align:left">Email</th><th style="padding:5px"></th></tr></thead>
+        <tbody>${contatos.map(ct=>`<tr style="border-bottom:1px solid rgba(0,0,0,.05)">
+          <td style="padding:5px">${ct.nome||'-'}</td>
+          <td style="padding:5px;color:var(--muted)">${ct.email}</td>
+          <td style="padding:5px"><button onclick="emExcluirContato(${ct.id},${listaId})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px">✕</button></td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  }catch(e){if(el)el.innerHTML=`<p style="color:#ef4444;font-size:12px">Erro ao carregar</p>`;}
+}
+
+async function emNovaLista(){
+  const nome=prompt('Nome da lista:');
+  if(!nome) return;
+  try{ await POST('/api/email/listas',{nome}); await emRenderTab(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+async function emExcluirLista(id){
+  if(!confirm('Excluir lista e todos os contatos?')) return;
+  try{ await DEL('/api/email/listas/'+id); await emRenderTab(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+async function emExcluirContato(id,listaId){
+  try{ await DEL('/api/email/contatos/'+id); await emCarregarContatos(listaId); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+function emImportarExcel(listaId){
+  const input=document.createElement('input'); input.type='file'; input.accept='.xlsx,.xls,.csv';
+  input.onchange=async function(){
+    const file=input.files[0]; if(!file) return;
+    const fd=new FormData(); fd.append('arquivo',file);
+    try{
+      const r=await fetch(API_URL+'/api/email/listas/'+listaId+'/upload',{method:'POST',headers:{Authorization:'Bearer '+localStorage.getItem('pr_admin_token')},body:fd});
+      const d=await r.json();
+      alert(`✅ ${d.importados} contatos importados!`);
+      await emRenderTab();
+    }catch(e){alert('Erro: '+e.message);}
+  };
+  input.click();
+}
+
+async function emImportarBase(listaId,listaNome,totalAtual){
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-importar-base';
+  modal.innerHTML=`<div class="modal-box" style="max-width:440px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">👥 Importar da Base — ${listaNome}</div>
+    <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="eib-modalidade">
+      <option value="todos">Todas</option>
+      <option value="boxe">🥊 Boxe</option>
+      <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+      <option value="ambos">🥊🟦 Ambos</option>
+    </select></div>
+    <div class="fg"><label class="fl">Status do aluno</label><select class="fi" id="eib-status">
+      <option value="todos">Todos</option>
+      <option value="ativo">✅ Ativo</option>
+      <option value="vencendo">⚠️ Vencendo</option>
+      <option value="atrasado">❌ Atrasado</option>
+    </select></div>
+    <div id="eib-preview" style="font-size:12px;color:var(--muted);padding:8px;background:var(--bg);border-radius:6px;margin-bottom:12px">
+      Clique em "Contar" para ver quantos alunos serão importados.
+    </div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('mkt-msg-modal').remove()">Cancelar</button>
-      <button class="btn btn-r" style="flex:1" onclick="mktSalvar(true)">🚀 Enviar</button>
-    </div>`;
-  document.body.appendChild(m.parentElement||m);
-  setTimeout(()=>mktAplicarTpl(),50);
+      <button onclick="emPreviewBase()" class="btn btn-ghost" style="flex:1">🔢 Contar</button>
+      <button onclick="document.getElementById('modal-em-importar-base').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emFazerImportarBase(${listaId})" class="btn btn-r" style="flex:1" id="eib-btn">Importar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
 }
 
-function mktAplicarTpl(){
-  const tpls=mktTipo==='wa'?TPLS_WA:TPLS_EMAIL;
-  const t=tpls.find(x=>x.id===document.getElementById('mkt-tpl')?.value);
-  if(!t)return;
-  const ta=document.getElementById('mkt-texto');if(ta)ta.value=t.txt||'';
-  const as=document.getElementById('mkt-assunto');if(as&&t.assunto)as.value=t.assunto||'';
+async function emPreviewBase(){
+  const mod=document.getElementById('eib-modalidade')?.value;
+  const st=document.getElementById('eib-status')?.value;
+  try{
+    const r=await GET('/api/email/listas/preview-base?modalidade='+mod+'&status_aluno='+st+'&_require_email=1');
+    const el=document.getElementById('eib-preview');
+    if(el) el.innerHTML=`<strong>${r.total}</strong> aluno(s) com email encontrados com esses filtros.`;
+  }catch(e){alert('Erro: '+e.message);}
 }
 
-function mktSalvar(enviar){
-  const texto=document.getElementById('mkt-texto')?.value?.trim();
-  if(!texto){alert('Escreva a mensagem!');return;}
-  const seg=document.getElementById('mkt-seg')?.value;
-  const tpls=mktTipo==='wa'?TPLS_WA:TPLS_EMAIL;
-  const tpl=tpls.find(x=>x.id===document.getElementById('mkt-tpl')?.value);
-  const map={todos:cache.alunos,ativos:cache.alunos.filter(a=>a.status==='ativo'),atrasados:cache.alunos.filter(a=>a.status==='atrasado'),vencendo:cache.alunos.filter(a=>a.status==='vencendo')};
-  const alvos=map[seg]||cache.alunos;
-  if(enviar&&mktTipo==='wa'&&alvos.length>0){
-    const al=alvos[0];
-    const msg=texto.replace(/{nome}/g,al.nome.split(' ')[0]);
-    window.open('https://wa.me/55'+(al.tel||'').replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
-  }
-  mktMsgs.unshift({id:Date.now(),tipo:mktTipo,titulo:tpl?.nome||'Mensagem',texto,seg,qtd:enviar?alvos.length:0});
-  document.getElementById('mkt-msg-modal').remove();
-  alert(enviar?`✅ Enviado para ${alvos.length} aluno(s)!`:'💾 Salvo!');
-  if(currentPage==='mkt-wa')renderMktWA();
-  if(currentPage==='mkt-email')renderMktEmail();
+async function emFazerImportarBase(listaId){
+  const modalidade=document.getElementById('eib-modalidade')?.value;
+  const status_aluno=document.getElementById('eib-status')?.value;
+  const btn=document.getElementById('eib-btn');
+  if(btn){btn.disabled=true;btn.textContent='Importando...';}
+  try{
+    const r=await POST('/api/email/listas/'+listaId+'/importar-base',{modalidade,status_aluno});
+    document.getElementById('modal-em-importar-base')?.remove();
+    alert(`✅ ${r.importados} novos contatos importados (${r.total} encontrados no total).`);
+    await emRenderTab();
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent='Importar';}}
 }
 
-function mktNovaCampanha(){
-  const m=criarModal('mkt-camp-modal','📣 Nova Campanha');
-  m.innerHTML+=`
-    <div class="fg"><label class="fl">Nome *</label><input class="fi" id="nc-nome" placeholder="Ex: Retenção Maio"></div>
-    <div class="fg"><label class="fl">Segmento</label><select class="fi" id="nc-seg">${SEGS.map(s=>`<option value="${s.id}">${s.icon} ${s.label}</option>`).join('')}</select></div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('mkt-camp-modal').remove()">Cancelar</button>
-      <button class="btn btn-r" style="flex:1" onclick="salvarCampanha()">✅ Criar</button>
-    </div>`;
-  document.body.appendChild(m.parentElement||m);
+function emAddContato(listaId){
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-add-contato';
+  modal.innerHTML=`<div class="modal-box" style="max-width:400px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">+ Adicionar Contato</div>
+    <div class="fg"><label class="fl">Nome</label><input class="fi" id="eac-nome" placeholder="Nome completo"></div>
+    <div class="fg"><label class="fl">Email *</label><input class="fi" id="eac-email" type="email" placeholder="email@exemplo.com"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button onclick="document.getElementById('modal-em-add-contato').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emSalvarContato(${listaId})" class="btn btn-r" style="flex:1">Adicionar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
 }
+
+async function emSalvarContato(listaId){
+  const nome=document.getElementById('eac-nome')?.value.trim();
+  const email=document.getElementById('eac-email')?.value.trim();
+  if(!email){alert('Email obrigatório');return;}
+  try{
+    await POST('/api/email/listas/'+listaId+'/contatos',{nome,email});
+    document.getElementById('modal-em-add-contato')?.remove();
+    await emRenderTab();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ── TEMPLATES ──────────────────────────────────────────────────────────────
+async function emRenderTemplates(c){
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
+    const tpls = await GET('/api/email/templates');
+    c.innerHTML=`
+      <div style="margin-bottom:12px"><button onclick="emNovoTemplateModal()" class="btn btn-r btn-sm">+ Novo Template</button></div>
+      ${tpls.length===0?`<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">📝</div>Nenhum template criado.</div>`
+        :tpls.map(t=>`<div class="card" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-weight:600;font-size:14px">${t.nome}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.assunto}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="emNovoTemplateModal(${t.id})" class="btn btn-ghost btn-sm">✏️ Editar</button>
+            <button onclick="emDuplicarTemplate(${t.id})" class="btn btn-ghost btn-sm" title="Duplicar">📋</button>
+            <button onclick="emExcluirTemplate(${t.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">🗑</button>
+          </div>
+        </div>`).join('')}`;
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+const emVars=['{{nome}}','{{nome_completo}}','{{email}}','{{modalidade}}','{{status}}'];
+
+async function emNovoTemplateModal(tplId){
+  let tpl = null;
+  if(tplId){ try{ tpl=await GET('/api/email/templates/'+tplId); }catch(_){} }
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-template';
+  modal.innerHTML=`<div class="modal-box" style="max-width:620px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">📝 ${tplId?'Editar':'Novo'} Template</div>
+    <div class="fg"><label class="fl">Nome do template</label><input class="fi" id="et-nome" value="${tpl?.nome||''}" placeholder="Ex: Newsletter Mensal"></div>
+    <div class="fg"><label class="fl">Assunto padrão</label><input class="fi" id="et-assunto" value="${tpl?.assunto||''}" placeholder="Assunto do email (suporta {{nome}})"></div>
+    <div class="fg"><label class="fl">Saudação</label><input class="fi" id="et-saudacao" value="${tpl?.saudacao||'Olá, {{nome}}!'}" placeholder="Olá, {{nome}}!"></div>
+    <div class="fg">
+      <label class="fl">Corpo do email</label>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+        ${emVars.map(v=>`<button type="button" onclick="etInsVar('${v}')" style="padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:11px;color:var(--blue)">${v}</button>`).join('')}
+      </div>
+      <textarea class="fi" id="et-corpo" rows="8" placeholder="Escreva o conteúdo do email. Use \\n para quebrar linhas.">${tpl?.corpo||''}</textarea>
+    </div>
+    <div class="fg"><label class="fl">Assinatura</label><input class="fi" id="et-assinatura" value="${tpl?.assinatura||'Punch and Roll Fight Team'}" placeholder="Punch and Roll Fight Team"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="document.getElementById('modal-em-template').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emSalvarTemplate(${tplId||'null'})" class="btn btn-r" style="flex:1" id="et-btn">${tplId?'Salvar':'Criar Template'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function etInsVar(v){
+  const ta=document.getElementById('et-corpo');
+  if(!ta) return;
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+v+ta.value.slice(e);
+  ta.selectionStart=ta.selectionEnd=s+v.length;
+  ta.focus();
+}
+
+async function emSalvarTemplate(tplId){
+  const nome=document.getElementById('et-nome').value.trim();
+  const assunto=document.getElementById('et-assunto').value.trim();
+  if(!nome||!assunto){alert('Preencha nome e assunto');return;}
+  const body={nome,assunto,saudacao:document.getElementById('et-saudacao').value,corpo:document.getElementById('et-corpo').value,assinatura:document.getElementById('et-assinatura').value};
+  const btn=document.getElementById('et-btn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  try{
+    if(tplId) await PUT('/api/email/templates/'+tplId,body);
+    else await POST('/api/email/templates',body);
+    document.getElementById('modal-em-template')?.remove();
+    await emRenderTab();
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent=tplId?'Salvar':'Criar Template';}}
+}
+
+async function emDuplicarTemplate(id){
+  try{ await POST('/api/email/templates/'+id+'/duplicar'); await emRenderTab(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+async function emExcluirTemplate(id){
+  if(!confirm('Excluir template?')) return;
+  try{ await DEL('/api/email/templates/'+id); await emRenderTab(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+// ── AUTOMAÇÕES ─────────────────────────────────────────────────────────────
+async function emRenderAutomacoes(c){
+  c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
+  try{
+    const [autos,templates] = await Promise.all([GET('/api/email/automacoes'),GET('/api/email/templates')]);
+    const icones={ANIVERSARIO:'🎂',VENCENDO:'⚠️'};
+    c.innerHTML=autos.map(a=>`<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:20px">${icones[a.tipo]||'📧'}</span>
+            <div style="font-weight:700">${a.nome}</div>
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${a.ativo?'rgba(34,197,94,.15)':'rgba(100,100,100,.1)'};color:${a.ativo?'var(--green)':'var(--muted)'};font-weight:600">${a.ativo?'ATIVO':'INATIVO'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">
+            Template: <strong>${a.template_nome||'Nenhum'}</strong> · Horário: <strong>${a.horario||'09:00'}</strong>
+            ${a.ultimo_disparo?` · Último disparo: <strong>${new Date(a.ultimo_disparo+'T12:00').toLocaleDateString('pt-BR')}</strong>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+          <button onclick="emConfigAutoModal(${JSON.stringify(a).replace(/"/g,'&quot;')},${JSON.stringify(templates).replace(/"/g,'&quot;')})" class="btn btn-ghost btn-sm">⚙️ Configurar</button>
+          <button onclick="emToggleAuto(${a.id},${a.ativo})" class="btn btn-ghost btn-sm" style="color:${a.ativo?'#f59e0b':'var(--green)'}">
+            ${a.ativo?'⏸ Pausar':'▶ Ativar'}
+          </button>
+          <button onclick="emDispararAutoAgora(${a.id},'${a.nome.replace(/'/g,"\\'")}')" class="btn btn-ghost btn-sm">🚀 Disparar agora</button>
+        </div>
+      </div>
+    </div>`).join('');
+  }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+function emConfigAutoModal(auto,templates){
+  if(typeof auto === 'string') auto = JSON.parse(auto);
+  if(typeof templates === 'string') templates = JSON.parse(templates);
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-auto-config';
+  modal.innerHTML=`<div class="modal-box" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">⚙️ Configurar — ${auto.nome}</div>
+    <div class="fg"><label class="fl">Template de email</label><select class="fi" id="eac-tpl">
+      <option value="">Nenhum</option>
+      ${templates.map(t=>`<option value="${t.id}"${auto.template_id==t.id?' selected':''}>${t.nome}</option>`).join('')}
+    </select></div>
+    <div class="fg"><label class="fl">Horário de disparo</label><input class="fi" id="eac-horario" type="time" value="${auto.horario||'09:00'}"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="document.getElementById('modal-em-auto-config').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emSalvarAuto(${auto.id})" class="btn btn-r" style="flex:1">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function emSalvarAuto(id){
+  const template_id=document.getElementById('eac-tpl')?.value||null;
+  const horario=document.getElementById('eac-horario')?.value||'09:00';
+  try{
+    await PUT('/api/email/automacoes/'+id,{template_id,horario,ativo:1});
+    document.getElementById('modal-em-auto-config')?.remove();
+    await emRenderTab();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function emToggleAuto(id,ativo){
+  try{ await PUT('/api/email/automacoes/'+id,{ativo:ativo?0:1}); await emRenderTab(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+async function emDispararAutoAgora(id,nome){
+  if(!confirm(`Disparar "${nome}" agora para os destinatários de hoje?`)) return;
+  try{
+    await POST('/api/email/automacoes/'+id+'/disparar-agora');
+    alert('🚀 Disparo iniciado em background!');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+// ── HISTÓRICO ──────────────────────────────────────────────────────────────
+async function emRenderHistorico(c){
+  c.innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px">
+        <div class="fg"><label class="fl">Tipo</label><select class="fi" id="efh-tipo">
+          <option value="">Todos</option>
+          <option value="CAMPANHA">Campanha</option>
+          <option value="ANIVERSARIO">Aniversário</option>
+          <option value="VENCENDO">Vencendo</option>
+          <option value="INDIVIDUAL">Individual</option>
+        </select></div>
+        <div class="fg"><label class="fl">Status</label><select class="fi" id="efh-status">
+          <option value="">Todos</option>
+          <option value="ENVIADO">Enviado</option>
+          <option value="ERRO">Erro</option>
+        </select></div>
+        <div class="fg"><label class="fl">Data início</label><input class="fi" id="efh-di" type="date"></div>
+        <div class="fg"><label class="fl">Data fim</label><input class="fi" id="efh-df" type="date"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div class="fg" style="flex:1;margin:0"><label class="fl">Busca (nome/email)</label><input class="fi" id="efh-busca" placeholder="..."></div>
+        <button onclick="emBuscarHistorico()" class="btn btn-r btn-sm" style="margin-bottom:1px">🔍 Filtrar</button>
+      </div>
+    </div>
+    <div id="efh-resultado"><div style="text-align:center;padding:20px;color:var(--muted)">Use os filtros acima e clique em Filtrar.</div></div>`;
+}
+
+async function emBuscarHistorico(){
+  const tipo=document.getElementById('efh-tipo')?.value||'';
+  const status=document.getElementById('efh-status')?.value||'';
+  const di=document.getElementById('efh-di')?.value||'';
+  const df=document.getElementById('efh-df')?.value||'';
+  const busca=document.getElementById('efh-busca')?.value||'';
+  const el=document.getElementById('efh-resultado');
+  if(!el) return;
+  el.innerHTML=`<div style="text-align:center;padding:20px"><div class="spinner"></div></div>`;
+  try{
+    let qs=`?tipo=${tipo}&status=${status}&data_inicio=${di}&data_fim=${df}&busca=${encodeURIComponent(busca)}`;
+    const rows=await GET('/api/email/historico'+qs);
+    const enviados=rows.filter(r=>r.status==='ENVIADO').length;
+    const erros=rows.filter(r=>r.status==='ERRO').length;
+    const aberturas=rows.reduce((s,r)=>s+(r.aberturas||0),0);
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        ${[['Total',rows.length,'var(--muted)'],['Enviados',enviados,'var(--green)'],['Erros',erros,'#ef4444'],['Aberturas',aberturas,'var(--blue)']].map(([l,n,c])=>`
+          <div class="card" style="text-align:center;padding:10px">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${c}">${n}</div>
+            <div style="font-size:10px;color:var(--muted)">${l}</div>
+          </div>`).join('')}
+      </div>
+      ${rows.length===0?`<div style="text-align:center;padding:30px;color:var(--muted)">Nenhum registro encontrado.</div>`
+        :`<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:6px;text-align:left">Data</th><th style="padding:6px;text-align:left">Nome</th>
+            <th style="padding:6px;text-align:left">Email</th><th style="padding:6px">Tipo</th>
+            <th style="padding:6px">Status</th><th style="padding:6px;text-align:center">Aberturas</th>
+          </tr></thead>
+          <tbody>${rows.map(r=>`<tr style="border-bottom:1px solid rgba(0,0,0,.05)">
+            <td style="padding:6px;white-space:nowrap">${new Date(r.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+            <td style="padding:6px">${r.contato_nome||'-'}</td>
+            <td style="padding:6px;color:var(--muted)">${r.contato_email}</td>
+            <td style="padding:6px;text-align:center"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(59,130,246,.1);color:var(--blue)">${r.tipo}</span></td>
+            <td style="padding:6px;text-align:center"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${r.status==='ENVIADO'?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${r.status==='ENVIADO'?'var(--green)':'#ef4444'}">${r.status}</span></td>
+            <td style="padding:6px;text-align:center">${r.aberturas||0}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}`;
+  }catch(e){if(el)el.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+// ── ENVIO INDIVIDUAL ───────────────────────────────────────────────────────
+async function emEnvioIndividualModal(){
+  const templates = await GET('/api/email/templates').catch(()=>[]);
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-em-individual';
+  modal.innerHTML=`<div class="modal-box" style="max-width:480px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:16px">✉️ Envio Individual de E-mail</div>
+    <div class="fg"><label class="fl">Nome do destinatário</label><input class="fi" id="ei-nome" placeholder="Nome completo"></div>
+    <div class="fg"><label class="fl">Email *</label><input class="fi" id="ei-email" type="email" placeholder="destinatario@email.com"></div>
+    <div class="fg"><label class="fl">Template (opcional)</label><select class="fi" id="ei-template" onchange="emAplicarTemplate()">
+      <option value="">Sem template</option>
+      ${templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')}
+    </select></div>
+    <div class="fg"><label class="fl">Assunto</label><input class="fi" id="ei-assunto" placeholder="Assunto do email"></div>
+    <div class="fg"><label class="fl">Mensagem</label><textarea class="fi" id="ei-corpo" rows="6" placeholder="Conteúdo do email..."></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="document.getElementById('modal-em-individual').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="emEnviarIndividual()" class="btn btn-r" style="flex:1" id="ei-btn">✉️ Enviar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  window._emTemplatesCache = templates;
+}
+
+async function emAplicarTemplate(){
+  const id=document.getElementById('ei-template')?.value;
+  if(!id) return;
+  const t=(window._emTemplatesCache||[]).find(x=>x.id==id);
+  if(!t) return;
+  const assEl=document.getElementById('ei-assunto'); if(assEl&&t.assunto) assEl.value=t.assunto;
+  try{
+    const full=await GET('/api/email/templates/'+id);
+    const cbEl=document.getElementById('ei-corpo'); if(cbEl&&full.corpo) cbEl.value=full.corpo;
+  }catch(_){}
+}
+
+async function emEnviarIndividual(){
+  const nome=document.getElementById('ei-nome')?.value.trim();
+  const email=document.getElementById('ei-email')?.value.trim();
+  const assunto=document.getElementById('ei-assunto')?.value.trim();
+  const corpo=document.getElementById('ei-corpo')?.value.trim();
+  const template_id=document.getElementById('ei-template')?.value||null;
+  if(!email){alert('Email obrigatório');return;}
+  if(!assunto&&!template_id){alert('Preencha o assunto ou selecione um template');return;}
+  const btn=document.getElementById('ei-btn');
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  try{
+    await POST('/api/email/enviar-individual',{nome,email,assunto,corpo,template_id});
+    document.getElementById('modal-em-individual')?.remove();
+    alert('✅ Email enviado com sucesso!');
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent='✉️ Enviar';}}
+}
+
 
 function salvarCampanha(){
   const nome=document.getElementById('nc-nome').value.trim();

@@ -439,6 +439,81 @@ async function setupDB() {
       ('atrasados_template', 'Olá, {{nome}}! 🥊\n\nIdentificamos que sua mensalidade da *Punch and Roll* está em atraso.\n\nPara manter seu acesso à academia, regularize sua situação:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team')
     `);
 
+
+    // ── Email MKT Tables ──────────────────────────────────────────────────────
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_templates (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(200) NOT NULL,
+      assunto VARCHAR(300) NOT NULL,
+      saudacao VARCHAR(200) DEFAULT 'Olá, {{nome}}!',
+      corpo MEDIUMTEXT,
+      assinatura VARCHAR(500) DEFAULT 'Punch and Roll Fight Team',
+      ativo TINYINT(1) DEFAULT 1,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_listas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(200) NOT NULL,
+      descricao VARCHAR(500),
+      total_contatos INT DEFAULT 0,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_contatos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      lista_id INT NOT NULL,
+      nome VARCHAR(200),
+      email VARCHAR(300) NOT NULL,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (lista_id) REFERENCES email_listas(id) ON DELETE CASCADE
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_campanhas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(200) NOT NULL,
+      template_id INT,
+      lista_id INT,
+      segmento VARCHAR(50),
+      assunto_override VARCHAR(300),
+      remetente VARCHAR(200),
+      nome_remetente VARCHAR(200),
+      status ENUM('RASCUNHO','AGENDADA','ENVIANDO','CONCLUIDA','CANCELADA') DEFAULT 'RASCUNHO',
+      total_destinatarios INT DEFAULT 0,
+      total_enviados INT DEFAULT 0,
+      total_erros INT DEFAULT 0,
+      aberturas INT DEFAULT 0,
+      data_agendada DATETIME,
+      data_inicio DATETIME,
+      data_conclusao DATETIME,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (template_id) REFERENCES email_templates(id) ON DELETE SET NULL,
+      FOREIGN KEY (lista_id) REFERENCES email_listas(id) ON DELETE SET NULL
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_envios (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      campanha_id INT,
+      contato_nome VARCHAR(200),
+      contato_email VARCHAR(300),
+      tipo ENUM('CAMPANHA','ANIVERSARIO','VENCENDO','INDIVIDUAL') DEFAULT 'CAMPANHA',
+      status ENUM('ENVIADO','ERRO') DEFAULT 'ENVIADO',
+      erro_msg TEXT,
+      aberturas INT DEFAULT 0,
+      aberto_em DATETIME,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (campanha_id) REFERENCES email_campanhas(id) ON DELETE SET NULL
+    )`);
+    await conn.query(`CREATE TABLE IF NOT EXISTS email_automacoes (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      tipo ENUM('ANIVERSARIO','VENCENDO') NOT NULL,
+      nome VARCHAR(200),
+      template_id INT,
+      ativo TINYINT(1) DEFAULT 0,
+      horario VARCHAR(5) DEFAULT '08:00',
+      ultimo_disparo DATE,
+      FOREIGN KEY (template_id) REFERENCES email_templates(id) ON DELETE SET NULL
+    )`);
+    await conn.query(`INSERT IGNORE INTO email_automacoes (tipo,nome,ativo,horario) VALUES
+      ('ANIVERSARIO','Parabéns Aniversariantes',0,'09:00'),
+      ('VENCENDO','Alerta Mensalidade Vencendo',0,'09:00')`);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -1498,17 +1573,40 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Atrasados]',e.message); }
 
-  // Campanhas agendadas
+  // Campanhas WA agendadas
   try {
     const [agendadas] = await db.query("SELECT * FROM wa_campanhas WHERE status='AGENDADA' AND data_agendada IS NOT NULL AND data_agendada <= NOW() AND pausada=0");
     for (const camp of agendadas) {
-      console.log(`[Cron] Disparando campanha agendada: ${camp.nome}`);
+      console.log(`[Cron] Disparando campanha WA agendada: ${camp.nome}`);
       try {
         const res = await axios.post(`http://localhost:${process.env.PORT||3000}/api/wa/campanhas/${camp.id}/disparar`,
           {}, { headers: { Authorization: 'Bearer '+process.env.CRON_TOKEN } });
       } catch(_) {}
     }
-  } catch(e) { console.error('[Cron Campanhas]',e.message); }
+  } catch(e) { console.error('[Cron Campanhas WA]',e.message); }
+
+  // Automações de email
+  try {
+    const [autos] = await db.query("SELECT * FROM email_automacoes WHERE ativo=1");
+    for(const auto of autos) {
+      const agora = new Date();
+      const horaAlvo = parseInt((auto.horario||'09:00').split(':')[0]);
+      const hoje = agora.toISOString().split('T')[0];
+      if(agora.getHours()===horaAlvo && auto.ultimo_disparo!==hoje) {
+        dispararEmailAutomacao(auto).catch(e=>console.error('[Cron Email Auto]',e.message));
+      }
+    }
+  } catch(e) { console.error('[Cron Email Auto]',e.message); }
+
+  // Campanhas email agendadas
+  try {
+    const [eagendadas] = await db.query("SELECT id,nome FROM email_campanhas WHERE status='AGENDADA' AND data_agendada IS NOT NULL AND data_agendada <= NOW()");
+    for(const c of eagendadas) {
+      console.log(`[Cron] Disparando campanha email agendada: ${c.nome}`);
+      dispararEmailCampanha(c.id).catch(e=>console.error('[Cron Email Campanha]',e.message));
+    }
+  } catch(e) { console.error('[Cron Email Campanhas]',e.message); }
+
 }, 3600000);
 
 // ══════════════════════════════════════
@@ -1562,6 +1660,374 @@ app.get('/api/teste-email/:destino', async (req, res) => {
     res.json({ ok: false, status: e.response?.status, erro: e.response?.data || e.message, from, para: email });
   }
 });
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EMAIL MARKETING
+// ══════════════════════════════════════════════════════════════════════════════
+
+const PUBLIC_URL = process.env.PUBLIC_URL || 'https://punch-and-roll-api-production.up.railway.app';
+
+function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId) {
+  const trackUrl = `${PUBLIC_URL}/api/email/track/open/${envioId}`;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${assunto}</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+  <tr><td style="background:#d4111c;padding:20px 32px;border-radius:12px 12px 0 0;text-align:center">
+    <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div>
+    <div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div>
+  </td></tr>
+  <tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">
+    <p style="font-size:16px;font-weight:600;color:#111827;margin:0 0 16px">${saudacao}</p>
+    <div style="font-size:14px;color:#374151;line-height:1.7;margin-bottom:24px">${(corpo||'').replace(/\n/g,'<br>')}</div>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+    <p style="font-size:13px;color:#6b7280;margin:0">${assinatura}</p>
+    <p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:#d4111c">punchandroll.com.br</a></p>
+  </td></tr>
+</table>
+</td></tr></table>
+<img src="${trackUrl}" width="1" height="1" style="display:none" alt="">
+</body></html>`;
+}
+
+function substituirVars(texto, contato) {
+  return (texto||'')
+    .replace(/\{\{nome\}\}/gi, (contato.nome||'').split(' ')[0])
+    .replace(/\{\{nome_completo\}\}/gi, contato.nome||'')
+    .replace(/\{\{email\}\}/gi, contato.email||'')
+    .replace(/\{\{modalidade\}\}/gi, contato.modalidade||'')
+    .replace(/\{\{status\}\}/gi, contato.status||'');
+}
+
+async function dispararEmailCampanha(campanhaId) {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) throw new Error('SENDGRID_API_KEY não configurado');
+  const [[camp]] = await db.query(`SELECT c.*, t.assunto, t.saudacao, t.corpo, t.assinatura
+    FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`, [campanhaId]);
+  if (!camp) throw new Error('Campanha não encontrada');
+
+  let destinatarios = [];
+  if (camp.lista_id) {
+    const [rows] = await db.query('SELECT nome,email FROM email_contatos WHERE lista_id=? AND email IS NOT NULL AND email != ""', [camp.lista_id]);
+    destinatarios = rows;
+  } else if (camp.segmento) {
+    const where = camp.segmento === 'todos' ? '' :
+      camp.segmento === 'ativos' ? "AND status='ativo'" :
+      camp.segmento === 'vencendo' ? "AND status='vencendo'" :
+      camp.segmento === 'atrasados' ? "AND status='atrasado'" : '';
+    const [rows] = await db.query(`SELECT nome,email,modalidade,status FROM alunos WHERE email IS NOT NULL AND email != '' ${where}`);
+    destinatarios = rows;
+  }
+
+  await db.query('UPDATE email_campanhas SET status=?,total_destinatarios=?,total_enviados=0,total_erros=0,aberturas=0,data_inicio=NOW() WHERE id=?',
+    ['ENVIANDO', destinatarios.length, campanhaId]);
+
+  const from = camp.remetente || process.env.EMAIL_FROM || 'noreply@punchandroll.com.br';
+  const fromName = camp.nome_remetente || 'Punch and Roll Fight Team';
+  const assunto = camp.assunto_override || camp.assunto || 'Mensagem da Punch and Roll';
+  let enviados = 0, erros = 0;
+
+  for (const d of destinatarios) {
+    const [[c2]] = await db.query('SELECT status FROM email_campanhas WHERE id=?', [campanhaId]);
+    if (!c2 || c2.status === 'CANCELADA') break;
+
+    const saudacao = substituirVars(camp.saudacao || 'Olá, {{nome}}!', d);
+    const corpo = substituirVars(camp.corpo || '', d);
+    const assuntoFinal = substituirVars(assunto, d);
+
+    const [ins] = await db.query('INSERT INTO email_envios (campanha_id,contato_nome,contato_email,tipo,status) VALUES (?,?,?,?,?)',
+      [campanhaId, d.nome, d.email, 'CAMPANHA', 'ENVIADO']);
+    const envioId = ins.insertId;
+
+    const html = gerarHtmlEmail(assuntoFinal, saudacao, corpo, camp.assinatura || 'Punch and Roll Fight Team', envioId);
+    try {
+      await axios.post('https://api.sendgrid.com/v3/mail/send', {
+        personalizations: [{ to: [{ email: d.email, name: d.nome||'' }] }],
+        from: { email: from, name: fromName },
+        subject: assuntoFinal,
+        content: [{ type: 'text/html', value: html }],
+      }, { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, timeout: 15000 });
+      enviados++;
+    } catch(e) {
+      await db.query('UPDATE email_envios SET status=?,erro_msg=? WHERE id=?', ['ERRO', e.response?.data?.errors?.[0]?.message || e.message, envioId]);
+      erros++;
+    }
+    await db.query('UPDATE email_campanhas SET total_enviados=?,total_erros=? WHERE id=?', [enviados, erros, campanhaId]);
+    await new Promise(x => setTimeout(x, 200));
+  }
+  await db.query('UPDATE email_campanhas SET status=?,data_conclusao=NOW() WHERE id=?', ['CONCLUIDA', campanhaId]);
+}
+
+// Tracking pixel (sem auth)
+app.get('/api/email/track/open/:id', async (req, res) => {
+  const gif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
+  res.set({'Content-Type':'image/gif','Cache-Control':'no-store'}).end(gif);
+  db.query('UPDATE email_envios SET aberturas=aberturas+1,aberto_em=COALESCE(aberto_em,NOW()) WHERE id=?',[req.params.id]).catch(()=>{});
+  db.query('UPDATE email_campanhas SET aberturas=aberturas+1 WHERE id=(SELECT campanha_id FROM email_envios WHERE id=?)',[req.params.id]).catch(()=>{});
+});
+
+// Status
+app.get('/api/email/status', auth, adminOnly, (req, res) => {
+  res.json({ configurado: !!process.env.SENDGRID_API_KEY, from: process.env.EMAIL_FROM||'noreply@punchandroll.com.br' });
+});
+
+// Templates CRUD
+app.get('/api/email/templates', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query('SELECT id,nome,assunto,saudacao,assinatura,ativo,criado_em FROM email_templates ORDER BY nome');
+  res.json(rows);
+});
+app.get('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
+  const [[r]] = await db.query('SELECT * FROM email_templates WHERE id=?',[req.params.id]);
+  res.json(r||{});
+});
+app.post('/api/email/templates', auth, adminOnly, async (req, res) => {
+  const {nome,assunto,saudacao,corpo,assinatura} = req.body;
+  const [r] = await db.query('INSERT INTO email_templates (nome,assunto,saudacao,corpo,assinatura) VALUES (?,?,?,?,?)',
+    [nome,assunto,saudacao||'Olá, {{nome}}!',corpo||'',assinatura||'Punch and Roll Fight Team']);
+  res.json({id:r.insertId});
+});
+app.put('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
+  const {nome,assunto,saudacao,corpo,assinatura,ativo} = req.body;
+  await db.query('UPDATE email_templates SET nome=?,assunto=?,saudacao=?,corpo=?,assinatura=?,ativo=? WHERE id=?',
+    [nome,assunto,saudacao,corpo,assinatura,ativo??1,req.params.id]);
+  res.json({ok:true});
+});
+app.delete('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
+  await db.query('DELETE FROM email_templates WHERE id=?',[req.params.id]);
+  res.json({ok:true});
+});
+app.post('/api/email/templates/:id/duplicar', auth, adminOnly, async (req, res) => {
+  const [[t]] = await db.query('SELECT * FROM email_templates WHERE id=?',[req.params.id]);
+  if(!t) return res.status(404).json({error:'Não encontrado'});
+  const [r] = await db.query('INSERT INTO email_templates (nome,assunto,saudacao,corpo,assinatura) VALUES (?,?,?,?,?)',
+    [t.nome+' - Cópia',t.assunto,t.saudacao,t.corpo,t.assinatura]);
+  res.json({id:r.insertId});
+});
+
+// Listas CRUD
+app.get('/api/email/listas', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query(`SELECT l.*, (SELECT COUNT(*) FROM email_contatos WHERE lista_id=l.id) as total FROM email_listas l ORDER BY l.nome`);
+  res.json(rows);
+});
+app.post('/api/email/listas', auth, adminOnly, async (req, res) => {
+  const [r] = await db.query('INSERT INTO email_listas (nome,descricao) VALUES (?,?)',[req.body.nome,req.body.descricao||null]);
+  res.json({id:r.insertId});
+});
+app.delete('/api/email/listas/:id', auth, adminOnly, async (req, res) => {
+  await db.query('DELETE FROM email_listas WHERE id=?',[req.params.id]);
+  res.json({ok:true});
+});
+app.get('/api/email/listas/:id/contatos', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query('SELECT * FROM email_contatos WHERE lista_id=? ORDER BY nome',[req.params.id]);
+  res.json(rows);
+});
+app.post('/api/email/listas/:id/contatos', auth, adminOnly, async (req, res) => {
+  const {nome,email} = req.body;
+  if(!email) return res.status(400).json({error:'Email obrigatório'});
+  const [r] = await db.query('INSERT INTO email_contatos (lista_id,nome,email) VALUES (?,?,?)',[req.params.id,nome||null,email]);
+  res.json({id:r.insertId});
+});
+app.delete('/api/email/contatos/:id', auth, adminOnly, async (req, res) => {
+  await db.query('DELETE FROM email_contatos WHERE id=?',[req.params.id]);
+  res.json({ok:true});
+});
+// Upload Excel lista
+app.post('/api/email/listas/:id/upload', auth, adminOnly, upload.single('arquivo'), async (req, res) => {
+  try {
+    const xlsx = require('xlsx');
+    const wb = xlsx.read(req.file.buffer, {type:'buffer'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = xlsx.utils.sheet_to_json(ws);
+    let importados = 0;
+    for (const row of data) {
+      const keys = Object.keys(row).map(k=>k.toLowerCase());
+      const emailKey = Object.keys(row).find(k=>k.toLowerCase().includes('email'));
+      const nomeKey = Object.keys(row).find(k=>k.toLowerCase().includes('nome'));
+      const email = emailKey ? String(row[emailKey]).trim() : null;
+      const nome = nomeKey ? String(row[nomeKey]).trim() : null;
+      if(!email||!email.includes('@')) continue;
+      await db.query('INSERT IGNORE INTO email_contatos (lista_id,nome,email) VALUES (?,?,?)',[req.params.id,nome,email]);
+      importados++;
+    }
+    res.json({ok:true,importados});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+// Importar da base de alunos
+app.post('/api/email/listas/:id/importar-base', auth, adminOnly, async (req, res) => {
+  try {
+    const {modalidade,status_aluno} = req.body;
+    let where = "email IS NOT NULL AND email != ''";
+    if(modalidade && modalidade !== 'todos') where += ` AND modalidade='${modalidade}'`;
+    if(status_aluno && status_aluno !== 'todos') where += ` AND status='${status_aluno}'`;
+    const [alunos] = await db.query(`SELECT nome,email FROM alunos WHERE ${where}`);
+    let importados = 0;
+    for (const a of alunos) {
+      const [ex] = await db.query('SELECT id FROM email_contatos WHERE lista_id=? AND email=?',[req.params.id,a.email]);
+      if(!ex.length){ await db.query('INSERT INTO email_contatos (lista_id,nome,email) VALUES (?,?,?)',[req.params.id,a.nome,a.email]); importados++; }
+    }
+    res.json({ok:true,importados,total:alunos.length});
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+app.get('/api/email/listas/preview-base', auth, adminOnly, async (req, res) => {
+  const {modalidade,status_aluno} = req.query;
+  let where = "email IS NOT NULL AND email != ''";
+  if(modalidade && modalidade !== 'todos') where += ` AND modalidade='${modalidade}'`;
+  if(status_aluno && status_aluno !== 'todos') where += ` AND status='${status_aluno}'`;
+  const [[r]] = await db.query(`SELECT COUNT(*) as n FROM alunos WHERE ${where}`);
+  res.json({total:r.n});
+});
+
+// Campanhas CRUD
+app.get('/api/email/campanhas', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query(`SELECT c.*,t.nome as template_nome,l.nome as lista_nome FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id LEFT JOIN email_listas l ON l.id=c.lista_id ORDER BY c.criado_em DESC`);
+  res.json(rows);
+});
+app.post('/api/email/campanhas', auth, adminOnly, async (req, res) => {
+  const {nome,template_id,lista_id,segmento,assunto_override,remetente,nome_remetente,data_agendada} = req.body;
+  const status = data_agendada ? 'AGENDADA' : 'RASCUNHO';
+  const [r] = await db.query('INSERT INTO email_campanhas (nome,template_id,lista_id,segmento,assunto_override,remetente,nome_remetente,data_agendada,status) VALUES (?,?,?,?,?,?,?,?,?)',
+    [nome,template_id||null,lista_id||null,segmento||null,assunto_override||null,remetente||null,nome_remetente||null,data_agendada||null,status]);
+  res.json({id:r.insertId});
+});
+app.put('/api/email/campanhas/:id', auth, adminOnly, async (req, res) => {
+  const {nome,template_id,lista_id,segmento,assunto_override,remetente,nome_remetente,data_agendada} = req.body;
+  const status = data_agendada ? 'AGENDADA' : 'RASCUNHO';
+  await db.query('UPDATE email_campanhas SET nome=?,template_id=?,lista_id=?,segmento=?,assunto_override=?,remetente=?,nome_remetente=?,data_agendada=?,status=? WHERE id=? AND status IN ("RASCUNHO","AGENDADA")',
+    [nome,template_id||null,lista_id||null,segmento||null,assunto_override||null,remetente||null,nome_remetente||null,data_agendada||null,status,req.params.id]);
+  res.json({ok:true});
+});
+app.delete('/api/email/campanhas/:id', auth, adminOnly, async (req, res) => {
+  await db.query('DELETE FROM email_campanhas WHERE id=?',[req.params.id]);
+  res.json({ok:true});
+});
+app.post('/api/email/campanhas/:id/duplicar', auth, adminOnly, async (req, res) => {
+  const [[c]] = await db.query('SELECT * FROM email_campanhas WHERE id=?',[req.params.id]);
+  if(!c) return res.status(404).json({error:'Não encontrado'});
+  const [r] = await db.query('INSERT INTO email_campanhas (nome,template_id,lista_id,segmento,assunto_override,remetente,nome_remetente) VALUES (?,?,?,?,?,?,?)',
+    [c.nome+' - Cópia',c.template_id,c.lista_id,c.segmento,c.assunto_override,c.remetente,c.nome_remetente]);
+  res.json({id:r.insertId});
+});
+app.get('/api/email/campanhas/:id/preview', auth, adminOnly, async (req, res) => {
+  const [[camp]] = await db.query(`SELECT c.*,t.assunto,t.saudacao,t.corpo,t.assinatura FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`,[req.params.id]);
+  if(!camp) return res.status(404).json({error:'Não encontrada'});
+  const exemplos = [{nome:'João Silva',email:'joao@exemplo.com',modalidade:'boxe'},{nome:'Maria Costa',email:'maria@exemplo.com',modalidade:'jiujitsu'}];
+  const previews = exemplos.map(d => ({
+    nome: d.nome, email: d.email,
+    html: gerarHtmlEmail(substituirVars(camp.assunto_override||camp.assunto||'',d), substituirVars(camp.saudacao||'Olá, {{nome}}!',d), substituirVars(camp.corpo||'',d), camp.assinatura||'', 0)
+  }));
+  res.json(previews);
+});
+app.get('/api/email/campanhas/:id/aberturas', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query('SELECT * FROM email_envios WHERE campanha_id=? ORDER BY criado_em DESC',[req.params.id]);
+  res.json(rows);
+});
+app.post('/api/email/campanhas/:id/disparar', auth, adminOnly, async (req, res) => {
+  const id = parseInt(req.params.id);
+  res.json({ok:true,msg:'Disparo iniciado em background'});
+  dispararEmailCampanha(id).catch(e=>console.error('[Email Campanha]',e.message));
+});
+app.post('/api/email/campanhas/:id/retomar', auth, adminOnly, async (req, res) => {
+  await db.query('UPDATE email_campanhas SET status=? WHERE id=?',['ENVIANDO',req.params.id]);
+  res.json({ok:true});
+  dispararEmailCampanha(parseInt(req.params.id)).catch(e=>console.error('[Email Retomar]',e.message));
+});
+
+// Envio individual
+app.post('/api/email/enviar-individual', auth, adminOnly, async (req, res) => {
+  const key = process.env.SENDGRID_API_KEY;
+  if(!key) return res.status(400).json({error:'SENDGRID_API_KEY não configurado'});
+  const {nome,email,assunto,corpo,template_id} = req.body;
+  if(!email) return res.status(400).json({error:'Email obrigatório'});
+  let assuntoFinal = assunto, corpoFinal = corpo, saudacao = `Olá, ${nome||''}!`, assinatura = 'Punch and Roll Fight Team';
+  if(template_id){
+    const [[t]] = await db.query('SELECT * FROM email_templates WHERE id=?',[template_id]);
+    if(t){ assuntoFinal=assunto||t.assunto; corpoFinal=corpo||t.corpo; saudacao=substituirVars(t.saudacao||'Olá, {{nome}}!',{nome}); assinatura=t.assinatura||assinatura; }
+  }
+  const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[nome||email,email,'INDIVIDUAL','ENVIADO']);
+  const html = gerarHtmlEmail(assuntoFinal||'Mensagem', saudacao, substituirVars(corpoFinal||'',{nome,email}), assinatura, ins.insertId);
+  try {
+    await axios.post('https://api.sendgrid.com/v3/mail/send',{
+      personalizations:[{to:[{email,name:nome||''}]}],
+      from:{email:process.env.EMAIL_FROM||'noreply@punchandroll.com.br',name:'Punch and Roll Fight Team'},
+      subject:assuntoFinal||'Mensagem Punch and Roll',
+      content:[{type:'text/html',value:html}]
+    },{headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},timeout:15000});
+    res.json({ok:true});
+  } catch(e){
+    await db.query('UPDATE email_envios SET status=?,erro_msg=? WHERE id=?',['ERRO',e.response?.data?.errors?.[0]?.message||e.message,ins.insertId]);
+    res.status(500).json({error:e.response?.data?.errors?.[0]?.message||e.message});
+  }
+});
+
+// Histórico
+app.get('/api/email/historico', auth, adminOnly, async (req, res) => {
+  const {tipo,status,data_inicio,data_fim,busca,campanha_id} = req.query;
+  let q = 'SELECT e.*,c.nome as campanha_nome FROM email_envios e LEFT JOIN email_campanhas c ON c.id=e.campanha_id WHERE 1=1';
+  const p = [];
+  if(tipo) { q+=' AND e.tipo=?'; p.push(tipo); }
+  if(status) { q+=' AND e.status=?'; p.push(status); }
+  if(campanha_id) { q+=' AND e.campanha_id=?'; p.push(campanha_id); }
+  if(data_inicio) { q+=' AND e.criado_em>=?'; p.push(data_inicio); }
+  if(data_fim) { q+=' AND DATE(e.criado_em)<=?'; p.push(data_fim); }
+  if(busca) { q+=' AND (e.contato_nome LIKE ? OR e.contato_email LIKE ?)'; p.push('%'+busca+'%','%'+busca+'%'); }
+  q+=' ORDER BY e.criado_em DESC LIMIT 500';
+  const [rows] = await db.query(q,p);
+  res.json(rows);
+});
+
+// Automações
+app.get('/api/email/automacoes', auth, adminOnly, async (req, res) => {
+  const [rows] = await db.query('SELECT a.*,t.nome as template_nome FROM email_automacoes a LEFT JOIN email_templates t ON t.id=a.template_id ORDER BY a.id');
+  res.json(rows);
+});
+app.put('/api/email/automacoes/:id', auth, adminOnly, async (req, res) => {
+  const {ativo,template_id,horario} = req.body;
+  await db.query('UPDATE email_automacoes SET ativo=?,template_id=?,horario=? WHERE id=?',[ativo?1:0,template_id||null,horario||'09:00',req.params.id]);
+  res.json({ok:true});
+});
+app.post('/api/email/automacoes/:id/disparar-agora', auth, adminOnly, async (req, res) => {
+  const [[auto]] = await db.query('SELECT * FROM email_automacoes WHERE id=?',[req.params.id]);
+  if(!auto) return res.status(404).json({error:'Não encontrada'});
+  res.json({ok:true,msg:'Disparo em background'});
+  dispararEmailAutomacao(auto).catch(e=>console.error('[Email Auto]',e.message));
+});
+
+async function dispararEmailAutomacao(auto) {
+  const key = process.env.SENDGRID_API_KEY;
+  if(!key || !auto.template_id) return;
+  const [[tpl]] = await db.query('SELECT * FROM email_templates WHERE id=?',[auto.template_id]);
+  if(!tpl) return;
+  const hoje = new Date();
+  const mes = hoje.getMonth()+1, dia = hoje.getDate();
+  let alunos = [];
+  if(auto.tipo === 'ANIVERSARIO') {
+    [alunos] = await db.query("SELECT nome,email,modalidade,status FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=? AND DAY(nasc)=? AND email IS NOT NULL AND email!='' AND status IN ('ativo','vencendo')",[mes,dia]);
+  } else if(auto.tipo === 'VENCENDO') {
+    [alunos] = await db.query("SELECT nome,email,modalidade,status FROM alunos WHERE status='vencendo' AND email IS NOT NULL AND email!=''");
+  }
+  await db.query('UPDATE email_automacoes SET ultimo_disparo=CURDATE() WHERE id=?',[auto.id]);
+  for(const a of alunos) {
+    const saud = substituirVars(tpl.saudacao||'Olá, {{nome}}!',a);
+    const corp = substituirVars(tpl.corpo||'',a);
+    const assunto = substituirVars(tpl.assunto,a);
+    const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[a.nome,a.email,auto.tipo,'ENVIADO']);
+    const html = gerarHtmlEmail(assunto,saud,corp,tpl.assinatura||'Punch and Roll Fight Team',ins.insertId);
+    try {
+      await axios.post('https://api.sendgrid.com/v3/mail/send',{
+        personalizations:[{to:[{email:a.email,name:a.nome}]}],
+        from:{email:process.env.EMAIL_FROM||'noreply@punchandroll.com.br',name:'Punch and Roll Fight Team'},
+        subject:assunto,content:[{type:'text/html',value:html}]
+      },{headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},timeout:15000});
+    } catch(e){
+      await db.query('UPDATE email_envios SET status=?,erro_msg=? WHERE id=?',['ERRO',e.message,ins.insertId]);
+    }
+    await new Promise(x=>setTimeout(x,300));
+  }
+}
+
 
 // ══════════════════════════════════════
 // HEALTH CHECK
