@@ -113,8 +113,16 @@ textarea.fi{resize:none}
 <body>
 
 <div id="login-screen" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:500">
-  <div style="width:64px;height:64px;background:var(--panel);border-radius:50%;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:14px;box-shadow:0 0 40px rgba(212,17,28,.2)">🥊</div>
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:4px">PUNCH AND ROLL</div>
+  <div style="margin-bottom:18px;text-align:center">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;line-height:1">
+      <span style="color:#111">PUNCH </span><span style="background:#d4111c;color:#fff;padding:1px 6px;border-radius:3px;font-size:28px;vertical-align:middle">and</span><span style="color:#111"> ROLL</span>
+    </div>
+    <div style="font-size:11px;color:#555;letter-spacing:4px;text-transform:uppercase;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <span style="display:inline-block;width:24px;height:2px;background:#d4111c"></span>
+      FIGHT TEAM
+      <span style="display:inline-block;width:24px;height:2px;background:#d4111c"></span>
+    </div>
+  </div>
   <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px">Administração</div>
   <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:340px">
     <div class="fg"><label class="fl">E-mail</label><input class="fi" id="l-email" type="email" placeholder="admin@punchandroll.com.br" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -129,8 +137,14 @@ textarea.fi{resize:none}
 <aside class="sidebar" id="sidebar">
   <div class="sb-logo">
     <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;flex:1" title="Voltar ao início">
-      <div class="sb-logo-ico">🥊</div>
-      <div><div class="sb-brand">Punch and Roll</div><div class="sb-sub">Fight Team</div></div>
+      <div style="line-height:1">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">
+          <span style="color:#111">PUNCH </span><span style="background:#d4111c;color:#fff;padding:0 4px;border-radius:2px;font-size:13px;vertical-align:middle">and</span><span style="color:#111"> ROLL</span>
+        </div>
+        <div style="font-size:9px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;display:flex;align-items:center;gap:4px;margin-top:2px">
+          <span style="display:inline-block;width:12px;height:1px;background:#d4111c"></span>FIGHT TEAM<span style="display:inline-block;width:12px;height:1px;background:#d4111c"></span>
+        </div>
+      </div>
     </a>
     <button class="sb-close" onclick="closeSB()">✕</button>
   </div>
@@ -2080,8 +2094,15 @@ const SEGS=[{id:'todos',label:'Todos',icon:'👥',n:()=>cache.alunos.length},{id
 const TPLS_WA=[{id:'cobranca',nome:'Cobrança',txt:'Olá {nome}! 🥊 Sua mensalidade da *Punch and Roll* está em atraso. Regularize!'},{id:'vencendo',nome:'Vencimento',txt:'Olá {nome}! 🥊 Sua mensalidade vence em breve. Renove!'},{id:'livre',nome:'Livre',txt:''}];
 const TPLS_EMAIL=[{id:'newsletter',nome:'Newsletter',assunto:'Novidades da Punch and Roll',txt:'Olá {nome}...'},{id:'cobranca',nome:'Cobrança',assunto:'Mensalidade — Punch and Roll',txt:'Olá {nome}, sua mensalidade está em atraso.'},{id:'livre',nome:'Livre',assunto:'',txt:''}];
 
-function renderMktWA(){
-  document.getElementById('page-mkt-wa').innerHTML=`
+async function renderMktWA(){
+  const pg = document.getElementById('page-mkt-wa');
+  pg.innerHTML=`
+    <div class="card" id="wa-status-card">
+      <div class="card-title">📱 Status WhatsApp</div>
+      <div id="wa-status-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="spinner"></div><span style="color:var(--muted);font-size:13px">Verificando...</span>
+      </div>
+    </div>
     <div class="card"><div class="card-title">⚡ Disparos Rápidos</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${[{seg:'atrasados',color:'#f87171',bg:'rgba(212,17,28,.12)',border:'rgba(212,17,28,.3)',icon:'🔴',label:'Cobrar',n:cache.alunos.filter(a=>a.status==='atrasado').length},
@@ -2095,6 +2116,45 @@ function renderMktWA(){
         </button>`).join('')}
       </div>
     </div>`;
+
+  // Carrega status WA
+  try {
+    const s = await apiFetch('/api/whatsapp/status');
+    const isOpen = s.status === 'open';
+    document.getElementById('wa-status-body').innerHTML = isOpen
+      ? `<span style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0"></span>
+         <span style="font-size:13px;font-weight:600;color:#22c55e">Conectado</span>
+         <span style="font-size:12px;color:var(--muted)">${s.nome || ''} · ${s.numero ? s.numero.replace('55','').replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3') : ''}</span>`
+      : `<span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;flex-shrink:0"></span>
+         <span style="font-size:13px;font-weight:600;color:#ef4444">Desconectado</span>
+         <button onclick="waGerarQR()" class="btn btn-r btn-sm" style="margin-left:8px">🔗 Conectar via QR</button>`;
+  } catch(e) {
+    document.getElementById('wa-status-body').innerHTML = `<span style="font-size:13px;color:var(--muted)">Erro ao verificar status</span><button onclick="waGerarQR()" class="btn btn-r btn-sm" style="margin-left:8px">🔗 Gerar QR</button>`;
+  }
+}
+
+async function waGerarQR(){
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:var(--panel);border-radius:12px;padding:24px;max-width:320px;width:90%;text-align:center">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">📱 Conectar WhatsApp</div>
+    <div id="wa-qr-content"><div class="spinner" style="margin:20px auto"></div><p style="color:var(--muted);font-size:13px">Gerando QR code...</p></div>
+    <button onclick="this.closest('div[style]').remove()" style="margin-top:16px;padding:8px 20px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Fechar</button>
+  </div>`;
+  document.body.appendChild(modal);
+  try {
+    const r = await apiFetch('/api/whatsapp/qr');
+    if (r.ok && r.qr) {
+      document.getElementById('wa-qr-content').innerHTML=`
+        <img src="${r.qr}" style="width:220px;height:220px;border-radius:8px" />
+        <p style="font-size:11px;color:var(--muted);margin-top:8px">Abra o WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
+        <p style="font-size:10px;color:var(--muted)">QR expira em ~60 segundos</p>`;
+    } else {
+      document.getElementById('wa-qr-content').innerHTML=`<p style="color:#ef4444;font-size:13px">Erro ao gerar QR: ${r.erro||'tente novamente'}</p>`;
+    }
+  } catch(e) {
+    document.getElementById('wa-qr-content').innerHTML=`<p style="color:#ef4444;font-size:13px">Erro de conexão</p>`;
+  }
 }
 
 function renderMktEmail(){

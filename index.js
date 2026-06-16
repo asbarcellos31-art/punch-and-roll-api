@@ -977,6 +977,33 @@ async function enviarEmailAluno(email, nome, assunto, html) {
 }
 
 // ══════════════════════════════════════
+// WHATSAPP — STATUS E QR CODE
+// ══════════════════════════════════════
+app.get('/api/whatsapp/status', auth, adminOnly, async (req, res) => {
+  const evoUrl = process.env.WA_EVOLUTION_URL;
+  const evoKey = process.env.WA_EVOLUTION_KEY;
+  const evoInstance = process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
+  if (!evoUrl || !evoKey) return res.json({ ok: false, status: 'not_configured' });
+  try {
+    const r = await axios.get(`${evoUrl}/instance/fetchInstances`, { headers: { apikey: evoKey } });
+    const inst = (r.data || []).find(i => i.name === evoInstance);
+    if (!inst) return res.json({ ok: false, status: 'not_found' });
+    res.json({ ok: true, status: inst.connectionStatus, numero: inst.ownerJid?.replace('@s.whatsapp.net',''), nome: inst.profileName });
+  } catch(e) { res.json({ ok: false, status: 'error', erro: e.message }); }
+});
+
+app.get('/api/whatsapp/qr', auth, adminOnly, async (req, res) => {
+  const evoUrl = process.env.WA_EVOLUTION_URL;
+  const evoKey = process.env.WA_EVOLUTION_KEY;
+  const evoInstance = process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
+  if (!evoUrl || !evoKey) return res.json({ ok: false, erro: 'Evolution não configurado' });
+  try {
+    const r = await axios.get(`${evoUrl}/instance/connect/${evoInstance}`, { headers: { apikey: evoKey } });
+    res.json({ ok: true, qr: r.data.base64, code: r.data.code });
+  } catch(e) { res.json({ ok: false, erro: e.message }); }
+});
+
+// ══════════════════════════════════════
 // TESTE DE EMAIL (debug)
 // ══════════════════════════════════════
 app.get('/api/teste-email/:destino', async (req, res) => {
