@@ -426,6 +426,8 @@ async function setupDB() {
       );
       if (!rows.length) await conn.query(`ALTER TABLE wa_campanhas ADD COLUMN ${col} ${def}`);
     }
+    // Garante que media_url suporte base64 (MEDIUMTEXT)
+    await conn.query(`ALTER TABLE wa_campanhas MODIFY COLUMN media_url MEDIUMTEXT`).catch(()=>{});
 
     // Config padrão de aniversário
     await conn.query(`
@@ -1102,9 +1104,13 @@ async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
   const numero = formatarTelWA(tel);
   if (numero.length < 12) return { sucesso: false, erro: `Número inválido: ${tel}` };
   try {
-    const type = mediaType === 'image' ? 'sendMedia' : mediaType === 'video' ? 'sendMedia' : 'sendMedia';
-    await axios.post(`${evoUrl}/message/${type}/${inst}`,
-      { number: numero, mediatype: mediaType, mimetype: mediaType==='image'?'image/jpeg':mediaType==='video'?'video/mp4':'application/pdf', media: mediaUrl, caption: caption||'' },
+    // suporta base64 data URI ou URL externa
+    const isBase64 = mediaUrl.startsWith('data:');
+    const media = isBase64 ? mediaUrl.replace(/^data:[^;]+;base64,/, '') : mediaUrl;
+    const mimeMap = { image: 'image/jpeg', video: 'video/mp4', document: 'application/pdf' };
+    const mimetype = isBase64 ? (mediaUrl.match(/^data:([^;]+);/)||[])[1] || mimeMap[mediaType] : mimeMap[mediaType];
+    await axios.post(`${evoUrl}/message/sendMedia/${inst}`,
+      { number: numero, mediatype: mediaType, mimetype, media, caption: caption||'' },
       { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 60000 }
     );
     return { sucesso: true };

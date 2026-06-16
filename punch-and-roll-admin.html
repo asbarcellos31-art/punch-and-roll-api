@@ -2192,6 +2192,7 @@ async function waNovaCampanhaModal(){
   const listas = waListas.length ? waListas : await GET('/api/wa/listas').catch(()=>[]);
   const modal = document.createElement('div');
   modal.className='modal-overlay open'; modal.id='modal-nova-campanha';
+  const emojis = ['🥊','🥋','🔥','💪','🏆','⭐','✅','👊','🤜','🎯','📢','🎉','❤️','👋','💬','📅','⚡','🙏'];
   modal.innerHTML=`<div class="modal-box" style="max-width:500px">
     <div class="modal-handle"></div>
     <div style="font-weight:700;font-size:16px;margin-bottom:16px">📣 Nova Campanha WhatsApp</div>
@@ -2203,14 +2204,24 @@ async function waNovaCampanhaModal(){
       <option value="seg:atrasados">Apenas atrasados</option>
       ${listas.map(l=>`<option value="lista:${l.id}">📋 Lista: ${l.nome} (${l.total_contatos})</option>`).join('')}
     </select></div>
-    <div class="fg"><label class="fl">Mensagem (use {{nome}})</label><textarea class="fi" id="wc-msg" rows="5" placeholder="Olá {{nome}}! ..."></textarea></div>
-    <div class="fg"><label class="fl">URL de mídia (opcional — imagem/vídeo/PDF)</label><input class="fi" id="wc-media-url" placeholder="https://...jpg ou .mp4 ou .pdf"></div>
-    <div class="fg"><label class="fl">Tipo de mídia</label><select class="fi" id="wc-media-type">
-      <option value="">Sem mídia</option>
-      <option value="image">Imagem (JPG/PNG)</option>
-      <option value="video">Vídeo (MP4)</option>
-      <option value="document">Documento (PDF)</option>
-    </select></div>
+    <div class="fg">
+      <label class="fl">Mensagem (use {{nome}})</label>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+        ${emojis.map(e=>`<button type="button" onclick="wcInsEmoji('${e}')" style="padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:16px;line-height:1">${e}</button>`).join('')}
+      </div>
+      <textarea class="fi" id="wc-msg" rows="5" placeholder="Olá {{nome}}! ..."></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">Mídia anexada (opcional)</label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px;border:2px dashed var(--border);border-radius:8px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+        <span style="font-size:22px">📎</span>
+        <span style="font-size:12px;color:var(--muted)">Clique para anexar imagem, vídeo ou PDF</span>
+        <input type="file" id="wc-arquivo" accept="image/*,video/mp4,.pdf" style="display:none" onchange="wcPreviewArquivo(this)">
+      </label>
+      <div id="wc-preview" style="margin-top:8px;display:none"></div>
+      <input type="hidden" id="wc-media-url">
+      <input type="hidden" id="wc-media-type">
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="fg"><label class="fl">Agendar para (opcional)</label><input class="fi" id="wc-data" type="datetime-local"></div>
       <div class="fg"><label class="fl">Intervalo entre msgs (ms)</label><input class="fi" id="wc-intervalo" type="number" value="3000" min="1000"></div>
@@ -2225,6 +2236,44 @@ async function waNovaCampanhaModal(){
     </div>
   </div>`;
   document.body.appendChild(modal);
+}
+
+function wcInsEmoji(e){
+  const ta=document.getElementById('wc-msg');
+  if(!ta)return;
+  const s=ta.selectionStart,en=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+e+ta.value.slice(en);
+  ta.selectionStart=ta.selectionEnd=s+e.length;
+  ta.focus();
+}
+
+function wcPreviewArquivo(input){
+  const file=input.files[0]; if(!file)return;
+  const preview=document.getElementById('wc-preview');
+  const urlEl=document.getElementById('wc-media-url');
+  const typeEl=document.getElementById('wc-media-type');
+  const isImg=file.type.startsWith('image/');
+  const isVid=file.type.startsWith('video/');
+  const isPdf=file.type==='application/pdf';
+  typeEl.value=isImg?'image':isVid?'video':'document';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    urlEl.value=e.target.result;
+    preview.style.display='block';
+    preview.innerHTML=isImg
+      ?`<div style="position:relative;display:inline-block"><img src="${e.target.result}" style="max-height:120px;border-radius:8px;border:1px solid var(--border)"><button onclick="wcRemoverArquivo()" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">✕</button></div>`
+      :isVid?`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"><span style="font-size:24px">🎥</span><span style="font-size:12px">${file.name}</span><button onclick="wcRemoverArquivo()" style="margin-left:auto;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px">✕</button></div>`
+      :`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"><span style="font-size:24px">📄</span><span style="font-size:12px">${file.name}</span><button onclick="wcRemoverArquivo()" style="margin-left:auto;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px">✕</button></div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function wcRemoverArquivo(){
+  document.getElementById('wc-arquivo').value='';
+  document.getElementById('wc-media-url').value='';
+  document.getElementById('wc-media-type').value='';
+  document.getElementById('wc-preview').style.display='none';
+  document.getElementById('wc-preview').innerHTML='';
 }
 
 async function waSalvarCampanha(){
