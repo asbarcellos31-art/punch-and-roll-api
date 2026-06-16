@@ -448,9 +448,13 @@ async function setupDB() {
       saudacao VARCHAR(200) DEFAULT 'Olá, {{nome}}!',
       corpo MEDIUMTEXT,
       assinatura VARCHAR(500) DEFAULT 'Punch and Roll Fight Team',
+      cor_cabecalho VARCHAR(20) DEFAULT '#d4111c',
       ativo TINYINT(1) DEFAULT 1,
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    // migration: add cor_cabecalho if not exists (MySQL 5.7 compat)
+    const [_etchk] = await conn.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='email_templates' AND COLUMN_NAME='cor_cabecalho'`);
+    if(!_etchk.length) await conn.query(`ALTER TABLE email_templates ADD COLUMN cor_cabecalho VARCHAR(20) DEFAULT '#d4111c'`);
     await conn.query(`CREATE TABLE IF NOT EXISTS email_listas (
       id INT AUTO_INCREMENT PRIMARY KEY,
       nome VARCHAR(200) NOT NULL,
@@ -1668,7 +1672,7 @@ app.get('/api/teste-email/:destino', async (req, res) => {
 
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://punch-and-roll-api-production.up.railway.app';
 
-function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos) {
+function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, cor='#d4111c') {
   const CC = {
     amarelo:{bg:'#fffbeb',border:'#f59e0b',titulo:'#92400e'},
     azul:{bg:'#eff6ff',border:'#3b82f6',titulo:'#1e40af'},
@@ -1702,15 +1706,15 @@ function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos) {
   return saudHtml + blocos.map(rb).join('\n') + assHtml;
 }
 
-function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId) {
+function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId, cor='#d4111c') {
   const trackUrl = `${PUBLIC_URL}/api/email/track/open/${envioId}`;
-  const header = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${assunto}</title></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#d4111c;padding:20px 32px;border-radius:12px 12px 0 0;text-align:center"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></td></tr><tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">`;
-  const footer = `<p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:#d4111c">punchandroll.com.br</a></p></td></tr></table></td></tr></table><img src="${trackUrl}" width="1" height="1" style="display:none" alt=""></body></html>`;
+  const header = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${assunto}</title></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:${cor};padding:20px 32px;border-radius:12px 12px 0 0;text-align:center"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></td></tr><tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">`;
+  const footer = `<p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:${cor}">punchandroll.com.br</a></p></td></tr></table></td></tr></table><img src="${trackUrl}" width="1" height="1" style="display:none" alt=""></body></html>`;
 
   if (corpo && corpo.startsWith('BLOCKS:')) {
     try {
       const blocos = JSON.parse(corpo.slice('BLOCKS:'.length));
-      return header + gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos) + footer;
+      return header + gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, cor) + footer;
     } catch(_) {}
   }
 
@@ -1734,7 +1738,7 @@ function substituirVars(texto, contato) {
 async function dispararEmailCampanha(campanhaId) {
   const key = process.env.SENDGRID_API_KEY;
   if (!key) throw new Error('SENDGRID_API_KEY não configurado');
-  const [[camp]] = await db.query(`SELECT c.*, t.assunto, t.saudacao, t.corpo, t.assinatura
+  const [[camp]] = await db.query(`SELECT c.*, t.assunto, t.saudacao, t.corpo, t.assinatura, t.cor_cabecalho
     FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`, [campanhaId]);
   if (!camp) throw new Error('Campanha não encontrada');
 
@@ -1771,7 +1775,7 @@ async function dispararEmailCampanha(campanhaId) {
       [campanhaId, d.nome, d.email, 'CAMPANHA', 'ENVIADO']);
     const envioId = ins.insertId;
 
-    const html = gerarHtmlEmail(assuntoFinal, saudacao, corpo, camp.assinatura || 'Punch and Roll Fight Team', envioId);
+    const html = gerarHtmlEmail(assuntoFinal, saudacao, corpo, camp.assinatura || 'Punch and Roll Fight Team', envioId, camp.cor_cabecalho || '#d4111c');
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send', {
         personalizations: [{ to: [{ email: d.email, name: d.nome||'' }] }],
@@ -1805,7 +1809,7 @@ app.get('/api/email/status', auth, adminOnly, (req, res) => {
 
 // Templates CRUD
 app.get('/api/email/templates', auth, adminOnly, async (req, res) => {
-  const [rows] = await db.query('SELECT id,nome,assunto,saudacao,assinatura,ativo,criado_em FROM email_templates ORDER BY nome');
+  const [rows] = await db.query('SELECT id,nome,assunto,saudacao,assinatura,cor_cabecalho,ativo,criado_em FROM email_templates ORDER BY nome');
   res.json(rows);
 });
 app.get('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
@@ -1813,15 +1817,15 @@ app.get('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
   res.json(r||{});
 });
 app.post('/api/email/templates', auth, adminOnly, async (req, res) => {
-  const {nome,assunto,saudacao,corpo,assinatura} = req.body;
-  const [r] = await db.query('INSERT INTO email_templates (nome,assunto,saudacao,corpo,assinatura) VALUES (?,?,?,?,?)',
-    [nome,assunto,saudacao||'Olá, {{nome}}!',corpo||'',assinatura||'Punch and Roll Fight Team']);
+  const {nome,assunto,saudacao,corpo,assinatura,cor_cabecalho} = req.body;
+  const [r] = await db.query('INSERT INTO email_templates (nome,assunto,saudacao,corpo,assinatura,cor_cabecalho) VALUES (?,?,?,?,?,?)',
+    [nome,assunto,saudacao||'Olá, {{nome}}!',corpo||'',assinatura||'Punch and Roll Fight Team',cor_cabecalho||'#d4111c']);
   res.json({id:r.insertId});
 });
 app.put('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
-  const {nome,assunto,saudacao,corpo,assinatura,ativo} = req.body;
-  await db.query('UPDATE email_templates SET nome=?,assunto=?,saudacao=?,corpo=?,assinatura=?,ativo=? WHERE id=?',
-    [nome,assunto,saudacao,corpo,assinatura,ativo??1,req.params.id]);
+  const {nome,assunto,saudacao,corpo,assinatura,cor_cabecalho,ativo} = req.body;
+  await db.query('UPDATE email_templates SET nome=?,assunto=?,saudacao=?,corpo=?,assinatura=?,cor_cabecalho=?,ativo=? WHERE id=?',
+    [nome,assunto,saudacao,corpo,assinatura,cor_cabecalho||'#d4111c',ativo??1,req.params.id]);
   res.json({ok:true});
 });
 app.delete('/api/email/templates/:id', auth, adminOnly, async (req, res) => {
@@ -1940,12 +1944,12 @@ app.post('/api/email/campanhas/:id/duplicar', auth, adminOnly, async (req, res) 
   res.json({id:r.insertId});
 });
 app.get('/api/email/campanhas/:id/preview', auth, adminOnly, async (req, res) => {
-  const [[camp]] = await db.query(`SELECT c.*,t.assunto,t.saudacao,t.corpo,t.assinatura FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`,[req.params.id]);
+  const [[camp]] = await db.query(`SELECT c.*,t.assunto,t.saudacao,t.corpo,t.assinatura,t.cor_cabecalho FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`,[req.params.id]);
   if(!camp) return res.status(404).json({error:'Não encontrada'});
   const exemplos = [{nome:'João Silva',email:'joao@exemplo.com',modalidade:'boxe'},{nome:'Maria Costa',email:'maria@exemplo.com',modalidade:'jiujitsu'}];
   const previews = exemplos.map(d => ({
     nome: d.nome, email: d.email,
-    html: gerarHtmlEmail(substituirVars(camp.assunto_override||camp.assunto||'',d), substituirVars(camp.saudacao||'Olá, {{nome}}!',d), substituirVars(camp.corpo||'',d), camp.assinatura||'', 0)
+    html: gerarHtmlEmail(substituirVars(camp.assunto_override||camp.assunto||'',d), substituirVars(camp.saudacao||'Olá, {{nome}}!',d), substituirVars(camp.corpo||'',d), camp.assinatura||'', 0, camp.cor_cabecalho||'#d4111c')
   }));
   res.json(previews);
 });
@@ -1970,13 +1974,13 @@ app.post('/api/email/enviar-individual', auth, adminOnly, async (req, res) => {
   if(!key) return res.status(400).json({error:'SENDGRID_API_KEY não configurado'});
   const {nome,email,assunto,corpo,template_id} = req.body;
   if(!email) return res.status(400).json({error:'Email obrigatório'});
-  let assuntoFinal = assunto, corpoFinal = corpo, saudacao = `Olá, ${nome||''}!`, assinatura = 'Punch and Roll Fight Team';
+  let assuntoFinal = assunto, corpoFinal = corpo, saudacao = `Olá, ${nome||''}!`, assinatura = 'Punch and Roll Fight Team', corCab = '#d4111c';
   if(template_id){
     const [[t]] = await db.query('SELECT * FROM email_templates WHERE id=?',[template_id]);
-    if(t){ assuntoFinal=assunto||t.assunto; corpoFinal=corpo||t.corpo; saudacao=substituirVars(t.saudacao||'Olá, {{nome}}!',{nome}); assinatura=t.assinatura||assinatura; }
+    if(t){ assuntoFinal=assunto||t.assunto; corpoFinal=corpo||t.corpo; saudacao=substituirVars(t.saudacao||'Olá, {{nome}}!',{nome}); assinatura=t.assinatura||assinatura; corCab=t.cor_cabecalho||'#d4111c'; }
   }
   const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[nome||email,email,'INDIVIDUAL','ENVIADO']);
-  const html = gerarHtmlEmail(assuntoFinal||'Mensagem', saudacao, substituirVars(corpoFinal||'',{nome,email}), assinatura, ins.insertId);
+  const html = gerarHtmlEmail(assuntoFinal||'Mensagem', saudacao, substituirVars(corpoFinal||'',{nome,email}), assinatura, ins.insertId, corCab);
   try {
     await axios.post('https://api.sendgrid.com/v3/mail/send',{
       personalizations:[{to:[{email,name:nome||''}]}],
@@ -2043,7 +2047,7 @@ async function dispararEmailAutomacao(auto) {
     const corp = substituirVars(tpl.corpo||'',a);
     const assunto = substituirVars(tpl.assunto,a);
     const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[a.nome,a.email,auto.tipo,'ENVIADO']);
-    const html = gerarHtmlEmail(assunto,saud,corp,tpl.assinatura||'Punch and Roll Fight Team',ins.insertId);
+    const html = gerarHtmlEmail(assunto,saud,corp,tpl.assinatura||'Punch and Roll Fight Team',ins.insertId,tpl.cor_cabecalho||'#d4111c');
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send',{
         personalizations:[{to:[{email:a.email,name:a.nome}]}],
