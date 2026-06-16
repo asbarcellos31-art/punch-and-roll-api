@@ -2700,7 +2700,7 @@ async function waGerarQR(){
   </div>`;
   document.body.appendChild(modal);
   try{
-    const evoUrl = '${process.env.WA_EVOLUTION_URL}';
+
     const r = await GET('/api/whatsapp/qr');
     if(r.ok && r.qr){
       document.getElementById('wa-qr-content').innerHTML=`

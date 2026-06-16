@@ -1521,8 +1521,12 @@ app.get('/api/whatsapp/qr', auth, adminOnly, async (req, res) => {
   if (!evoUrl || !evoKey) return res.json({ ok: false, erro: 'Evolution não configurado' });
   try {
     const r = await axios.get(`${evoUrl}/instance/connect/${evoInstance}`, { headers: { apikey: evoKey } });
-    res.json({ ok: true, qr: r.data.base64, code: r.data.code });
-  } catch(e) { res.json({ ok: false, erro: e.message }); }
+    const d = r.data;
+    const qr = d.base64 || d.qrcode?.base64 || d.qr?.base64 || null;
+    const code = d.code || d.qrcode?.code || d.qr?.code || null;
+    if (!qr) return res.json({ ok: false, erro: 'QR não retornado pela Evolution API', raw: d });
+    res.json({ ok: true, qr, code });
+  } catch(e) { res.json({ ok: false, erro: e.response?.data?.message || e.message }); }
 });
 
 // ══════════════════════════════════════
