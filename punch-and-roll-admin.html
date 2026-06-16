@@ -3162,89 +3162,305 @@ async function emSalvarContato(listaId){
 }
 
 // ── TEMPLATES ──────────────────────────────────────────────────────────────
+// ── EMAIL TEMPLATE BLOCK EDITOR ────────────────────────────────────────────
+const ET_PFX='BLOCKS:';
+window._etBlocos=[];
+window._etTplId=null;
+function etGId(){return Math.random().toString(36).slice(2,9);}
+function etSer(){return ET_PFX+JSON.stringify(window._etBlocos);}
+function etDeser(c){if(!c||!c.startsWith(ET_PFX))return null;try{return JSON.parse(c.slice(ET_PFX.length));}catch{return null;}}
+
+const ET_CC={amarelo:{bg:'#fffbeb',border:'#f59e0b',titulo:'#92400e',label:'Amarelo'},azul:{bg:'#eff6ff',border:'#3b82f6',titulo:'#1e40af',label:'Azul'},verde:{bg:'#f0fdf4',border:'#22c55e',titulo:'#166534',label:'Verde'},vermelho:{bg:'#fef2f2',border:'#ef4444',titulo:'#991b1b',label:'Vermelho'}};
+
+function etHtmlB(b){
+  switch(b.tipo){
+    case 'texto': return `<div style="margin:0 0 12px 0;color:#333;font-size:15px;line-height:1.7;">${b.conteudo||''}</div>`;
+    case 'callout':{const c=ET_CC[b.cor]||ET_CC.amarelo;return `<div style="background:${c.bg};border-left:4px solid ${c.border};border-radius:6px;padding:14px 18px;margin:16px 0;">${b.titulo?`<p style="margin:0 0 6px 0;font-weight:bold;color:${c.titulo};font-size:14px;">${b.titulo}</p>`:''}<p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">${(b.conteudo||'').replace(/\n/g,'<br>')}</p></div>`;}
+    case 'botao':{const cp={whatsapp:'#25d366',site:'#d4111c',link:'#6366f1'};const bg=b.corFundo||cp[b.tipoBotao]||'#d4111c',ct=b.corTexto||'#fff',al=b.alinhamento||'center';const fw=b.larguraTotal?'display:block;width:100%;box-sizing:border-box;':'display:inline-block;';const ico=b.mostrarIcone!==false?(b.tipoBotao==='whatsapp'?'💬 ':b.tipoBotao==='site'?'🌐 ':'🔗 '):'';return `<div style="text-align:${al};margin:20px 0;"><a href="${b.url||'#'}" style="${fw}background:${bg};color:${ct};text-decoration:none;padding:${b.paddingVertical||'12px'} ${b.paddingHorizontal||'28px'};border-radius:${b.borderRadius||'6px'};font-size:${b.tamanhoFonte||'15px'};font-weight:${b.fontWeight||'600'};font-family:${b.fonte||'Arial,sans-serif'};">${ico}${b.texto||'Botão'}</a></div>`;}
+    case 'rodape':{const su=b.site?(b.site.startsWith('http')?b.site:'https://'+b.site):'';const wu=b.telefone?`https://wa.me/55${b.telefone.replace(/\D/g,'')}`:''  ;return `<div style="background:#f8faff;padding:28px 24px;text-align:center;border-top:1px solid #e5eaf5;"><div style="font-weight:800;font-size:16px;color:#d4111c;letter-spacing:2px;margin-bottom:4px">${b.empresa||'PUNCH AND ROLL'}</div><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:8px;">${su?`<a href="${su}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">🌐 ${b.site}</a>`:''}${wu?`<a href="${wu}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">💬 WhatsApp</a>`:''}${b.email?`<a href="mailto:${b.email}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">📧 ${b.email}</a>`:''}</div>${b.endereco?`<p style="font-size:11px;color:#aaa;margin:4px 0 0;">${b.endereco}</p>`:''}<p style="font-size:11px;color:#aaa;margin:8px 0 0;">Para cancelar, responda com "DESCADASTRAR".</p></div>`;}
+    default: return '';
+  }
+}
+
+function etGerarHtml(saudacao, assinatura, blocos){
+  const s=saudacao?`<div style="font-size:17px;font-weight:bold;color:#d4111c;margin-bottom:16px;">${saudacao}</div>`:'';
+  const a=assinatura?`<div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;color:#555;font-size:14px;white-space:pre-line;">${assinatura}</div>`:'';
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);"><div style="background:#d4111c;padding:24px 32px;text-align:center;"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></div><div style="padding:32px;color:#333;line-height:1.7;font-size:15px;">${s}${blocos.map(etHtmlB).join('')}${a}</div></div></body></html>`;
+}
+
+function etAtualizarPreview(){
+  const iframe=document.getElementById('et-preview-iframe');
+  if(!iframe) return;
+  etSyncTexto();
+  const saud=(document.getElementById('et-saudacao')?.value||'Olá, {{nome}}!').replace(/\{\{nome\}\}/g,'Maria');
+  const ass=document.getElementById('et-assinatura')?.value||'Punch and Roll Fight Team';
+  iframe.srcdoc=etGerarHtml(saud,ass,window._etBlocos);
+}
+
+function etSyncTexto(){
+  window._etBlocos.forEach((b,i)=>{
+    if(b.tipo==='texto'){const el=document.getElementById(`et-b-${i}-c`);if(el)b.conteudo=el.innerHTML;}
+  });
+}
+
+function etRenderBE(b,i,tot){
+  const cor={texto:'#f3f4f6',callout:'#fffbeb',botao:'#eef2ff',rodape:'#f1f5f9'};
+  const lbl={texto:'📝 Texto',callout:'🟡 Destaque (callout)',botao:'🔗 Botão de ação',rodape:'🏢 Rodapé'};
+  const hdr=`<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:${cor[b.tipo]||'#f3f4f6'};border-bottom:1px solid #e5e7eb;border-radius:8px 8px 0 0"><span style="flex:1;font-size:12px;font-weight:600;color:#374151">${lbl[b.tipo]||b.tipo}</span><button onmousedown="event.preventDefault();etMov(${i},'up')" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;padding:3px;font-size:13px;opacity:${i===0?.3:1}" title="Mover para cima">↑</button><button onmousedown="event.preventDefault();etMov(${i},'down')" ${i===tot-1?'disabled':''} style="background:none;border:none;cursor:pointer;padding:3px;font-size:13px;opacity:${i===tot-1?.3:1}" title="Mover para baixo">↓</button><button onmousedown="event.preventDefault();etRem(${i})" style="background:none;border:none;cursor:pointer;padding:3px;color:#ef4444;font-size:13px" title="Remover">🗑</button></div>`;
+  let body='';
+  switch(b.tipo){
+    case 'texto':
+      body=`<div style="padding:8px">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:4px 6px;background:#f9fafb;border:1px solid #e5e7eb;border-bottom:none;border-radius:4px 4px 0 0">
+    <button type="button" onmousedown="event.preventDefault();etCmd('bold')" title="Negrito" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-weight:700;font-size:12px;line-height:1.5">B</button>
+    <button type="button" onmousedown="event.preventDefault();etCmd('italic')" title="Itálico" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-style:italic;font-size:12px;line-height:1.5">I</button>
+    <button type="button" onmousedown="event.preventDefault();etCmd('underline')" title="Sublinhado" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;text-decoration:underline;font-size:12px;line-height:1.5">U</button>
+    <span style="width:1px;height:16px;background:#d1d5db;margin:0 2px"></span>
+    <button type="button" onmousedown="event.preventDefault();etCmd('justifyLeft')" title="Esquerda" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:12px;line-height:1.5">⇤</button>
+    <button type="button" onmousedown="event.preventDefault();etCmd('justifyCenter')" title="Centro" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:12px;line-height:1.5">☰</button>
+    <button type="button" onmousedown="event.preventDefault();etCmd('justifyRight')" title="Direita" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:12px;line-height:1.5">⇥</button>
+    <span style="width:1px;height:16px;background:#d1d5db;margin:0 2px"></span>
+    <button type="button" onmousedown="event.preventDefault();etCmd('insertUnorderedList')" title="Lista" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:12px;line-height:1.5">•</button>
+    <button type="button" onmousedown="event.preventDefault();etCmd('insertOrderedList')" title="Numerada" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:12px;line-height:1.5">1.</button>
+    <span style="width:1px;height:16px;background:#d1d5db;margin:0 2px"></span>
+    <select onchange="etCmd('fontName',this.value);this.value=''" style="font-size:11px;border:1px solid #d1d5db;border-radius:3px;padding:2px 3px;height:22px;cursor:pointer;background:#fff" title="Fonte (selecione o texto primeiro)"><option value="">Fonte</option><option value="Arial,sans-serif">Arial</option><option value="Helvetica,Arial,sans-serif">Helvetica</option><option value="'Times New Roman',serif">Times New Roman</option><option value="Georgia,serif">Georgia</option><option value="Verdana,sans-serif">Verdana</option><option value="'Courier New',monospace">Courier New</option></select>
+    <select onchange="etFontSize(this.value);this.value=''" style="font-size:11px;border:1px solid #d1d5db;border-radius:3px;padding:2px 3px;height:22px;cursor:pointer;background:#fff" title="Tamanho (selecione o texto primeiro)"><option value="">Tam.</option><option value="12px">12px</option><option value="13px">13px</option><option value="14px">14px</option><option value="15px">15px</option><option value="16px">16px</option><option value="18px">18px</option><option value="20px">20px</option><option value="24px">24px</option><option value="28px">28px</option></select>
+    <span style="width:1px;height:16px;background:#d1d5db;margin:0 2px"></span>
+    <input type="color" onchange="etCmd('foreColor',this.value)" style="width:22px;height:22px;padding:1px;border:1px solid #d1d5db;border-radius:3px;cursor:pointer" title="Cor do texto">
+    <button type="button" onmousedown="event.preventDefault();etLink()" title="Inserir link" style="padding:2px 7px;background:#fff;border:1px solid #d1d5db;border-radius:3px;cursor:pointer;font-size:11px;line-height:1.5">🔗</button>
+  </div>
+  <div id="et-b-${i}-c" contenteditable="true" oninput="etBI(${i})" style="min-height:70px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:0 0 4px 4px;background:#fff;font-size:14px;line-height:1.6;outline:none">${b.conteudo||''}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">${['{{nome}}','{{modalidade}}','{{status}}','{{email}}'].map(v=>`<button type="button" onclick="etInsVB(${i},'${v}')" style="padding:1px 7px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;cursor:pointer;font-size:10px;color:#6366f1">${v}</button>`).join('')}</div>
+</div>`;
+      break;
+    case 'callout':
+      body=`<div style="padding:10px">
+  <div style="display:flex;gap:6px;margin-bottom:8px">${Object.entries(ET_CC).map(([cor,c])=>`<button type="button" onmousedown="event.preventDefault();etUpd(${i},'cor','${cor}');etRB()" style="flex:1;padding:5px 3px;border:2px solid ${b.cor===cor?c.border:'transparent'};background:${c.bg};color:${c.titulo};border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">${c.label}</button>`).join('')}</div>
+  <input class="fi" placeholder="Título (opcional)" value="${(b.titulo||'').replace(/"/g,'&quot;')}" oninput="etUpd(${i},'titulo',this.value)" style="margin-bottom:6px">
+  <textarea class="fi" rows="3" placeholder="Texto de destaque. Use {{nome}}, etc." oninput="etUpd(${i},'conteudo',this.value)">${b.conteudo||''}</textarea>
+</div>`;
+      break;
+    case 'botao':
+      body=`<div style="padding:10px">
+  <div style="display:flex;gap:6px;margin-bottom:8px">${[['whatsapp','💬 WhatsApp'],['site','🌐 Site'],['link','🔗 Link']].map(([t,l])=>`<button type="button" onmousedown="event.preventDefault();etUpd(${i},'tipoBotao','${t}');etRB()" style="flex:1;padding:5px 3px;border:2px solid ${b.tipoBotao===t?'#6366f1':'#e5e7eb'};background:${b.tipoBotao===t?'#eef2ff':'#fff'};border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;color:${b.tipoBotao===t?'#4f46e5':'#374151'}">${l}</button>`).join('')}</div>
+  <input class="fi" placeholder="Texto do botão" value="${(b.texto||'').replace(/"/g,'&quot;')}" oninput="etUpd(${i},'texto',this.value)" style="margin-bottom:6px">
+  <input class="fi" placeholder="URL (https://...)" value="${(b.url||'').replace(/"/g,'&quot;')}" oninput="etUpd(${i},'url',this.value)" style="margin-bottom:8px;font-family:monospace;font-size:12px">
+  <details style="border:1px solid #e0e7ff;border-radius:6px;background:#f8f9ff">
+    <summary style="cursor:pointer;padding:6px 10px;font-size:11px;font-weight:600;color:#4f46e5;user-select:none">🎨 Personalizar aparência do botão</summary>
+    <div style="padding:10px;border-top:1px solid #e0e7ff;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label style="font-size:11px;color:#6b7280">Cor de fundo</label><div style="display:flex;gap:3px;margin-top:2px"><input type="color" value="${b.corFundo||'#d4111c'}" onchange="etUpd(${i},'corFundo',this.value)" style="width:28px;height:26px;padding:1px;border:1px solid #d1d5db;border-radius:3px;cursor:pointer"><input class="fi" value="${b.corFundo||''}" placeholder="auto" oninput="etUpd(${i},'corFundo',this.value)" style="font-size:11px;padding:3px 5px;height:26px;font-family:monospace"></div></div>
+      <div><label style="font-size:11px;color:#6b7280">Cor do texto</label><div style="display:flex;gap:3px;margin-top:2px"><input type="color" value="${b.corTexto||'#ffffff'}" onchange="etUpd(${i},'corTexto',this.value)" style="width:28px;height:26px;padding:1px;border:1px solid #d1d5db;border-radius:3px;cursor:pointer"><input class="fi" value="${b.corTexto||''}" placeholder="#ffffff" oninput="etUpd(${i},'corTexto',this.value)" style="font-size:11px;padding:3px 5px;height:26px;font-family:monospace"></div></div>
+      <div><label style="font-size:11px;color:#6b7280">Alinhamento</label><select class="fi" onchange="etUpd(${i},'alinhamento',this.value)" style="font-size:11px;height:26px;padding:3px 5px;margin-top:2px"><option value="center"${(b.alinhamento||'center')==='center'?' selected':''}>Centro</option><option value="left"${b.alinhamento==='left'?' selected':''}>Esquerda</option><option value="right"${b.alinhamento==='right'?' selected':''}>Direita</option></select></div>
+      <div><label style="font-size:11px;color:#6b7280">Cantos</label><select class="fi" onchange="etUpd(${i},'borderRadius',this.value)" style="font-size:11px;height:26px;padding:3px 5px;margin-top:2px"><option value="0">Quadrado</option><option value="4px">Pouco (4px)</option><option value="6px"${(b.borderRadius||'6px')==='6px'?' selected':''}>Normal (6px)</option><option value="10px">Médio (10px)</option><option value="20px">Arredondado</option><option value="999px">Pílula</option></select></div>
+      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" ${b.larguraTotal?'checked':''} onchange="etUpd(${i},'larguraTotal',this.checked)"> Largura total</label></div>
+      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" ${b.mostrarIcone!==false?'checked':''} onchange="etUpd(${i},'mostrarIcone',this.checked)"> Mostrar ícone</label></div>
+    </div>
+  </details>
+</div>`;
+      break;
+    case 'rodape':
+      body=`<div style="padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+  <div><label style="font-size:11px;color:#6b7280">Empresa</label><input class="fi" value="${(b.empresa||'').replace(/"/g,'&quot;')}" placeholder="Punch and Roll" oninput="etUpd(${i},'empresa',this.value)" style="margin-top:2px"></div>
+  <div><label style="font-size:11px;color:#6b7280">Telefone</label><input class="fi" value="${(b.telefone||'').replace(/"/g,'&quot;')}" placeholder="(48) 99999-9999" oninput="etUpd(${i},'telefone',this.value)" style="margin-top:2px"></div>
+  <div><label style="font-size:11px;color:#6b7280">Email</label><input class="fi" value="${(b.email||'').replace(/"/g,'&quot;')}" placeholder="contato@punchandroll.com.br" oninput="etUpd(${i},'email',this.value)" style="margin-top:2px"></div>
+  <div><label style="font-size:11px;color:#6b7280">Site</label><input class="fi" value="${(b.site||'').replace(/"/g,'&quot;')}" placeholder="punchandroll.com.br" oninput="etUpd(${i},'site',this.value)" style="margin-top:2px"></div>
+  <div style="grid-column:span 2"><label style="font-size:11px;color:#6b7280">Endereço</label><input class="fi" value="${(b.endereco||'').replace(/"/g,'&quot;')}" placeholder="São José, SC" oninput="etUpd(${i},'endereco',this.value)" style="margin-top:2px"></div>
+</div>`;
+      break;
+  }
+  return `<div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px;overflow:hidden">${hdr}${body}</div>`;
+}
+
+function etRB(){
+  const c=document.getElementById('et-blocos-c');
+  if(!c) return;
+  const tot=window._etBlocos.length;
+  c.innerHTML=tot===0
+    ?`<div style="text-align:center;padding:24px;color:var(--muted);border:2px dashed var(--border);border-radius:8px"><div style="font-size:28px;margin-bottom:6px">📧</div>Nenhum bloco. Use os botões abaixo.</div>`
+    :window._etBlocos.map((b,i)=>etRenderBE(b,i,tot)).join('');
+  etAtualizarPreview();
+}
+
+function etAdd(tipo){
+  const id=etGId();let b;
+  switch(tipo){
+    case 'texto': b={id,tipo:'texto',conteudo:''}; break;
+    case 'callout': b={id,tipo:'callout',cor:'amarelo',titulo:'',conteudo:''}; break;
+    case 'botao': b={id,tipo:'botao',tipoBotao:'site',texto:'Falar com a gente',url:'https://punchandroll.com.br'}; break;
+    case 'rodape': b={id,tipo:'rodape',empresa:'Punch and Roll Fight Team',endereco:'São José, SC',email:'contato@punchandroll.com.br',telefone:'',site:'punchandroll.com.br'}; break;
+    default: return;
+  }
+  window._etBlocos.push(b); etRB();
+}
+
+function etMov(idx,dir){
+  etSyncTexto();
+  const b=window._etBlocos,t=dir==='up'?idx-1:idx+1;
+  if(t<0||t>=b.length) return;
+  [b[idx],b[t]]=[b[t],b[idx]]; etRB();
+}
+
+function etRem(idx){ window._etBlocos.splice(idx,1); etRB(); }
+
+function etUpd(idx,field,value){
+  if(window._etBlocos[idx]) window._etBlocos[idx][field]=value;
+  etAtualizarPreview();
+}
+
+function etBI(idx){
+  const el=document.getElementById(`et-b-${idx}-c`);
+  if(el&&window._etBlocos[idx]) window._etBlocos[idx].conteudo=el.innerHTML;
+  etAtualizarPreview();
+}
+
+function etCmd(cmd,val){
+  document.execCommand(cmd,false,val||null);
+  const f=document.activeElement;
+  if(f&&f.contentEditable==='true'){const m=f.id.match(/^et-b-(\d+)-c$/);if(m&&window._etBlocos[+m[1]])window._etBlocos[+m[1]].conteudo=f.innerHTML;}
+  etAtualizarPreview();
+}
+
+function etFontSize(px){
+  if(!px) return;
+  document.execCommand('fontSize',false,'7');
+  const f=document.activeElement;
+  if(f&&f.contentEditable==='true'){
+    f.querySelectorAll('font[size="7"]').forEach(fn=>{const s=document.createElement('span');s.style.fontSize=px;s.innerHTML=fn.innerHTML;fn.replaceWith(s);});
+    const m=f.id.match(/^et-b-(\d+)-c$/);if(m&&window._etBlocos[+m[1]])window._etBlocos[+m[1]].conteudo=f.innerHTML;
+  }
+  etAtualizarPreview();
+}
+
+function etLink(){
+  const f=document.activeElement;if(!f||f.contentEditable!=='true'){alert('Clique no editor de texto primeiro.');return;}
+  const sel=window.getSelection();if(!sel||!sel.rangeCount||sel.getRangeAt(0).collapsed){alert('Selecione o texto que quer transformar em link.');return;}
+  const url=prompt('URL do link:','https://');if(!url) return;
+  document.execCommand('createLink',false,url);
+  etBI(+(f.id.match(/^et-b-(\d+)-c$/)||['','0'])[1]);
+}
+
+function etInsVB(idx,v){
+  const el=document.getElementById(`et-b-${idx}-c`);if(!el) return;
+  el.focus();document.execCommand('insertText',false,v);
+  if(window._etBlocos[idx]) window._etBlocos[idx].conteudo=el.innerHTML;
+  etAtualizarPreview();
+}
+
 async function emRenderTemplates(c){
   c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
   try{
-    const tpls = await GET('/api/email/templates');
+    const tpls=await GET('/api/email/templates');
     c.innerHTML=`
       <div style="margin-bottom:12px"><button onclick="emNovoTemplateModal()" class="btn btn-r btn-sm">+ Novo Template</button></div>
-      ${tpls.length===0?`<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">📝</div>Nenhum template criado.</div>`
+      ${tpls.length===0
+        ?`<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">📝</div>Nenhum template criado.</div>`
         :tpls.map(t=>`<div class="card" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <div>
+          <div style="min-width:0;flex:1">
             <div style="font-weight:600;font-size:14px">${t.nome}</div>
-            <div style="font-size:11px;color:var(--muted)">${t.assunto}</div>
+            <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.assunto}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0">
-            <button onclick="emNovoTemplateModal(${t.id})" class="btn btn-ghost btn-sm">✏️ Editar</button>
+            <button onclick="emPrevTpl(${t.id})" class="btn btn-ghost btn-sm" title="Pré-visualizar">👁</button>
+            <button onclick="emNovoTemplateModal(${t.id})" class="btn btn-ghost btn-sm" title="Editar">✏️</button>
             <button onclick="emDuplicarTemplate(${t.id})" class="btn btn-ghost btn-sm" title="Duplicar">📋</button>
-            <button onclick="emExcluirTemplate(${t.id})" class="btn btn-ghost btn-sm" style="color:#ef4444">🗑</button>
+            <button onclick="emExcluirTemplate(${t.id})" class="btn btn-ghost btn-sm" style="color:#ef4444" title="Excluir">🗑</button>
           </div>
         </div>`).join('')}`;
   }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
 }
 
-const emVars=['{{nome}}','{{nome_completo}}','{{email}}','{{modalidade}}','{{status}}'];
-
-async function emNovoTemplateModal(tplId){
-  let tpl = null;
-  if(tplId){ try{ tpl=await GET('/api/email/templates/'+tplId); }catch(_){} }
-  const modal=document.createElement('div');
-  modal.className='modal-overlay open'; modal.id='modal-em-template';
-  modal.innerHTML=`<div class="modal-box" style="max-width:620px">
-    <div class="modal-handle"></div>
-    <div style="font-weight:700;font-size:16px;margin-bottom:16px">📝 ${tplId?'Editar':'Novo'} Template</div>
-    <div class="fg"><label class="fl">Nome do template</label><input class="fi" id="et-nome" value="${tpl?.nome||''}" placeholder="Ex: Newsletter Mensal"></div>
-    <div class="fg"><label class="fl">Assunto padrão</label><input class="fi" id="et-assunto" value="${tpl?.assunto||''}" placeholder="Assunto do email (suporta {{nome}})"></div>
-    <div class="fg"><label class="fl">Saudação</label><input class="fi" id="et-saudacao" value="${tpl?.saudacao||'Olá, {{nome}}!'}" placeholder="Olá, {{nome}}!"></div>
-    <div class="fg">
-      <label class="fl">Corpo do email</label>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
-        ${emVars.map(v=>`<button type="button" onclick="etInsVar('${v}')" style="padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:11px;color:var(--blue)">${v}</button>`).join('')}
-      </div>
-      <textarea class="fi" id="et-corpo" rows="8" placeholder="Escreva o conteúdo do email. Use \\n para quebrar linhas.">${tpl?.corpo||''}</textarea>
+async function emPrevTpl(id){
+  const tpl=await GET('/api/email/templates/'+id).catch(()=>null);if(!tpl) return;
+  const blocos=etDeser(tpl.corpo);
+  const html=blocos?etGerarHtml(tpl.saudacao||'Olá, {{nome}}!',tpl.assinatura||'Punch and Roll Fight Team',blocos):tpl.corpo||'';
+  const modal=document.createElement('div');modal.className='modal-overlay open';
+  modal.innerHTML=`<div class="modal-box" style="max-width:660px;padding:0;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border)">
+      <div><strong>${tpl.nome}</strong><span style="font-size:11px;color:var(--muted);margin-left:8px">Assunto: ${tpl.assunto}</span></div>
+      <button onclick="this.closest('.modal-overlay').remove()" class="btn btn-ghost btn-sm">✕</button>
     </div>
-    <div class="fg"><label class="fl">Assinatura</label><input class="fi" id="et-assinatura" value="${tpl?.assinatura||'Punch and Roll Fight Team'}" placeholder="Punch and Roll Fight Team"></div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button onclick="document.getElementById('modal-em-template').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
-      <button onclick="emSalvarTemplate(${tplId||'null'})" class="btn btn-r" style="flex:1" id="et-btn">${tplId?'Salvar':'Criar Template'}</button>
+    <div style="padding:12px;background:var(--panel)">
+      <iframe srcdoc="${html.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="width:100%;height:440px;border:1px solid var(--border);border-radius:6px" sandbox="allow-same-origin"></iframe>
     </div>
   </div>`;
   document.body.appendChild(modal);
 }
 
-function etInsVar(v){
-  const ta=document.getElementById('et-corpo');
-  if(!ta) return;
-  const s=ta.selectionStart,e=ta.selectionEnd;
-  ta.value=ta.value.slice(0,s)+v+ta.value.slice(e);
-  ta.selectionStart=ta.selectionEnd=s+v.length;
-  ta.focus();
+async function emNovoTemplateModal(tplId){
+  document.getElementById('modal-em-template')?.remove();
+  let tpl=null;
+  if(tplId){try{tpl=await GET('/api/email/templates/'+tplId);}catch(_){}}
+  if(tpl){const bl=etDeser(tpl.corpo);window._etBlocos=bl||[{id:etGId(),tipo:'texto',conteudo:tpl.corpo||''}];}
+  else{window._etBlocos=[{id:etGId(),tipo:'texto',conteudo:''}];}
+  window._etTplId=tplId||null;
+  const modal=document.createElement('div');
+  modal.className='modal-overlay open';modal.id='modal-em-template';
+  modal.style.cssText='align-items:stretch;padding:0';
+  modal.innerHTML=`<div style="background:var(--panel);width:100%;max-width:1200px;display:flex;flex-direction:column;height:100vh;max-height:100vh">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;flex-wrap:wrap">
+      <span style="font-size:15px">📝</span>
+      <strong style="font-size:14px;white-space:nowrap">${tplId?'Editar':'Novo'} Template</strong>
+      <input class="fi" id="et-nome" value="${(tpl?.nome||'').replace(/"/g,'&quot;')}" placeholder="Nome do template" style="flex:1;min-width:160px;max-width:260px">
+      <input class="fi" id="et-assunto" value="${(tpl?.assunto||'').replace(/"/g,'&quot;')}" placeholder="Assunto do email" style="flex:1;min-width:160px;max-width:300px">
+      <button onclick="document.getElementById('modal-em-template').remove()" class="btn btn-ghost btn-sm">Cancelar</button>
+      <button onclick="emSalvarTemplate(${tplId||'null'})" class="btn btn-r btn-sm" id="et-btn">${tplId?'Salvar Alterações':'Criar Template'}</button>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+      <div style="flex:1;overflow-y:auto;padding:14px;min-width:0;display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label class="fl">Saudação</label><input class="fi" id="et-saudacao" value="${(tpl?.saudacao||'Olá, {{nome}}!').replace(/"/g,'&quot;')}" placeholder="Olá, {{nome}}!" oninput="etAtualizarPreview()"></div>
+          <div class="fg"><label class="fl">Assinatura</label><input class="fi" id="et-assinatura" value="${(tpl?.assinatura||'Punch and Roll Fight Team').replace(/"/g,'&quot;')}" placeholder="Punch and Roll Fight Team" oninput="etAtualizarPreview()"></div>
+        </div>
+        <div id="et-blocos-c"></div>
+        <div style="border:2px dashed var(--border);border-radius:8px;padding:10px;background:var(--bg)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-align:center;margin-bottom:8px">+ Adicionar bloco</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <button onclick="etAdd('texto')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px"><span style="font-size:16px">📝</span>Texto</button>
+            <button onclick="etAdd('callout')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#fffbeb;border-color:#f59e0b"><span style="font-size:16px">🟡</span>Destaque</button>
+            <button onclick="etAdd('botao')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#eef2ff;border-color:#818cf8"><span style="font-size:16px">🔗</span>Botão</button>
+            <button onclick="etAdd('rodape')" class="btn btn-ghost btn-sm" style="flex-direction:column;height:52px;gap:3px;font-size:11px;background:#f1f5f9;border-color:#94a3b8"><span style="font-size:16px">🏢</span>Rodapé</button>
+          </div>
+        </div>
+      </div>
+      <div style="width:360px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:#f4f4f4;min-height:0">
+        <div style="padding:8px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0">👁 Preview (com dados de exemplo)</div>
+        <iframe id="et-preview-iframe" style="flex:1;border:none;background:#f4f4f4;min-height:0" sandbox="allow-same-origin"></iframe>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  etRB();
 }
 
+function etInsVar(v){/* legacy compat */}
+
 async function emSalvarTemplate(tplId){
-  const nome=document.getElementById('et-nome').value.trim();
-  const assunto=document.getElementById('et-assunto').value.trim();
+  etSyncTexto();
+  const nome=document.getElementById('et-nome')?.value.trim();
+  const assunto=document.getElementById('et-assunto')?.value.trim();
   if(!nome||!assunto){alert('Preencha nome e assunto');return;}
-  const body={nome,assunto,saudacao:document.getElementById('et-saudacao').value,corpo:document.getElementById('et-corpo').value,assinatura:document.getElementById('et-assinatura').value};
+  const saudacao=document.getElementById('et-saudacao')?.value||'Olá, {{nome}}!';
+  const assinatura=document.getElementById('et-assinatura')?.value||'Punch and Roll Fight Team';
+  const corpo=etSer();
   const btn=document.getElementById('et-btn');
   if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   try{
-    if(tplId) await PUT('/api/email/templates/'+tplId,body);
-    else await POST('/api/email/templates',body);
+    if(tplId) await PUT('/api/email/templates/'+tplId,{nome,assunto,saudacao,corpo,assinatura});
+    else await POST('/api/email/templates',{nome,assunto,saudacao,corpo,assinatura});
     document.getElementById('modal-em-template')?.remove();
     await emRenderTab();
-  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent=tplId?'Salvar':'Criar Template';}}
+  }catch(e){alert('Erro: '+e.message);if(btn){btn.disabled=false;btn.textContent=tplId?'Salvar Alterações':'Criar Template';}}
 }
 
 async function emDuplicarTemplate(id){
-  try{ await POST('/api/email/templates/'+id+'/duplicar'); await emRenderTab(); }
-  catch(e){ alert('Erro: '+e.message); }
+  try{await POST('/api/email/templates/'+id+'/duplicar');await emRenderTab();}
+  catch(e){alert('Erro: '+e.message);}
 }
 
 async function emExcluirTemplate(id){
   if(!confirm('Excluir template?')) return;
-  try{ await DEL('/api/email/templates/'+id); await emRenderTab(); }
-  catch(e){ alert('Erro: '+e.message); }
+  try{await DEL('/api/email/templates/'+id);await emRenderTab();}
+  catch(e){alert('Erro: '+e.message);}
 }
 
 // ── AUTOMAÇÕES ─────────────────────────────────────────────────────────────

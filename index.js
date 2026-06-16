@@ -1668,29 +1668,58 @@ app.get('/api/teste-email/:destino', async (req, res) => {
 
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://punch-and-roll-api-production.up.railway.app';
 
+function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos) {
+  const CC = {
+    amarelo:{bg:'#fffbeb',border:'#f59e0b',titulo:'#92400e'},
+    azul:{bg:'#eff6ff',border:'#3b82f6',titulo:'#1e40af'},
+    verde:{bg:'#f0fdf4',border:'#22c55e',titulo:'#166534'},
+    vermelho:{bg:'#fef2f2',border:'#ef4444',titulo:'#991b1b'}
+  };
+  const rb = (b) => {
+    switch(b.tipo) {
+      case 'texto': return `<div style="margin:0 0 12px 0;color:#333;font-size:15px;line-height:1.7;">${b.conteudo||''}</div>`;
+      case 'callout': {
+        const c=CC[b.cor]||CC.amarelo;
+        return `<div style="background:${c.bg};border-left:4px solid ${c.border};border-radius:6px;padding:14px 18px;margin:16px 0;">${b.titulo?`<p style="margin:0 0 6px 0;font-weight:bold;color:${c.titulo};font-size:14px;">${b.titulo}</p>`:''}<p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">${(b.conteudo||'').replace(/\n/g,'<br>')}</p></div>`;
+      }
+      case 'botao': {
+        const cp={whatsapp:'#25d366',site:'#d4111c',link:'#6366f1'};
+        const bg=b.corFundo||cp[b.tipoBotao]||'#d4111c', ct=b.corTexto||'#fff', al=b.alinhamento||'center';
+        const fw=b.larguraTotal?'display:block;width:100%;box-sizing:border-box;':'display:inline-block;';
+        const ico=b.mostrarIcone!==false?(b.tipoBotao==='whatsapp'?'💬 ':b.tipoBotao==='site'?'🌐 ':'🔗 '):'';
+        return `<div style="text-align:${al};margin:20px 0;"><a href="${b.url||'#'}" style="${fw}background:${bg};color:${ct};text-decoration:none;padding:${b.paddingVertical||'12px'} ${b.paddingHorizontal||'28px'};border-radius:${b.borderRadius||'6px'};font-size:${b.tamanhoFonte||'15px'};font-weight:${b.fontWeight||'600'};font-family:${b.fonte||'Arial,sans-serif'};">${ico}${b.texto||'Botão'}</a></div>`;
+      }
+      case 'rodape': {
+        const su=b.site?(b.site.startsWith('http')?b.site:'https://'+b.site):'';
+        const wu=b.telefone?`https://wa.me/55${b.telefone.replace(/\D/g,'')}`:''
+        return `<div style="background:#f8faff;padding:28px 24px;text-align:center;border-top:1px solid #e5eaf5;"><div style="font-weight:800;font-size:16px;color:#d4111c;letter-spacing:2px;margin-bottom:4px">${b.empresa||'PUNCH AND ROLL'}</div><div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:8px;">${su?`<a href="${su}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">🌐 ${b.site}</a>`:''}${wu?`<a href="${wu}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">💬 WhatsApp</a>`:''}${b.email?`<a href="mailto:${b.email}" style="font-size:12px;color:#d4111c;text-decoration:none;font-weight:600;">📧 ${b.email}</a>`:''}</div>${b.endereco?`<p style="font-size:11px;color:#aaa;margin:4px 0 0;">${b.endereco}</p>`:''}<p style="font-size:11px;color:#aaa;margin:8px 0 0;">Para cancelar, responda com "DESCADASTRAR".</p></div>`;
+      }
+      default: return '';
+    }
+  };
+  const saudHtml = saudacao ? `<p style="font-size:16px;font-weight:600;color:#111827;margin:0 0 16px">${saudacao}</p>` : '';
+  const assHtml = assinatura ? `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"><p style="font-size:13px;color:#6b7280;margin:0;white-space:pre-line">${assinatura}</p>` : '';
+  return saudHtml + blocos.map(rb).join('\n') + assHtml;
+}
+
 function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId) {
   const trackUrl = `${PUBLIC_URL}/api/email/track/open/${envioId}`;
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${assunto}</title></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-  <tr><td style="background:#d4111c;padding:20px 32px;border-radius:12px 12px 0 0;text-align:center">
-    <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div>
-    <div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div>
-  </td></tr>
-  <tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">
-    <p style="font-size:16px;font-weight:600;color:#111827;margin:0 0 16px">${saudacao}</p>
-    <div style="font-size:14px;color:#374151;line-height:1.7;margin-bottom:24px">${(corpo||'').replace(/\n/g,'<br>')}</div>
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-    <p style="font-size:13px;color:#6b7280;margin:0">${assinatura}</p>
-    <p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:#d4111c">punchandroll.com.br</a></p>
-  </td></tr>
-</table>
-</td></tr></table>
-<img src="${trackUrl}" width="1" height="1" style="display:none" alt="">
-</body></html>`;
+  const header = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${assunto}</title></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#d4111c;padding:20px 32px;border-radius:12px 12px 0 0;text-align:center"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></td></tr><tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">`;
+  const footer = `<p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:#d4111c">punchandroll.com.br</a></p></td></tr></table></td></tr></table><img src="${trackUrl}" width="1" height="1" style="display:none" alt=""></body></html>`;
+
+  if (corpo && corpo.startsWith('BLOCKS:')) {
+    try {
+      const blocos = JSON.parse(corpo.slice('BLOCKS:'.length));
+      return header + gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos) + footer;
+    } catch(_) {}
+  }
+
+  return header +
+    `<p style="font-size:16px;font-weight:600;color:#111827;margin:0 0 16px">${saudacao}</p>` +
+    `<div style="font-size:14px;color:#374151;line-height:1.7;margin-bottom:24px">${(corpo||'').replace(/\n/g,'<br>')}</div>` +
+    `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">` +
+    `<p style="font-size:13px;color:#6b7280;margin:0">${assinatura}</p>` +
+    footer;
 }
 
 function substituirVars(texto, contato) {
