@@ -714,13 +714,14 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
     const d = req.body;
     const cortesia = d.cortesia ? 1 : 0;
     const cortesiaMotivo = d.cortesia_motivo || null;
+    const nd = (v) => v || null; // datas/strings vazias viram NULL
     await db.query(`
       UPDATE alunos SET nome=?,cpf=?,nasc=?,sexo=?,tel=?,email=?,endereco=?,cidade=?,cep=?,
       emerg_nome=?,emerg_tel=?,parentesco=?,saude=?,alergia=?,modalidade=?,nivel=?,
       plano_id=?,plano=?,valor=?,inicio=?,vencimento=?,pagto=?,aulas_liberadas=?,obs=?,status=?,
       cortesia=?,cortesia_motivo=?
       WHERE id=?
-    `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade,d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.pagto,JSON.stringify(d.aulasLiberadas||[]),d.obs,d.status,cortesia,cortesiaMotivo,req.params.id]);
+    `, [d.nome,nd(d.cpf),nd(d.nasc),nd(d.sexo),d.tel,nd(d.email),nd(d.end),d.cidade||'São José',nd(d.cep),nd(d.emergNome),nd(d.emergTel),nd(d.parentesco),nd(d.saude),nd(d.alergia),d.modalidade,d.nivel||'iniciante',nd(d.planoId),nd(d.plano),d.valor||0,nd(d.inicio),nd(d.venc),d.pagto||'pix',JSON.stringify(d.aulasLiberadas||[]),nd(d.obs),d.status||'ativo',cortesia,cortesiaMotivo,req.params.id]);
     res.json({ message: 'Aluno atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
