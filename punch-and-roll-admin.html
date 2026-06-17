@@ -483,15 +483,17 @@ function showEmpty(el, msg) { el.innerHTML='<div class="loading">'+msg+'</div>';
 
 function renderDashboard() {
   const pg = document.getElementById('page-dashboard');
-  const ativos = cache.alunos.filter(a=>a.status==='ativo').length;
-  const atrasados = cache.alunos.filter(a=>a.status==='atrasado').length;
-  const vencendo = cache.alunos.filter(a=>a.status==='vencendo').length;
+  const pagantes = cache.alunos.filter(a=>!a.cortesia);
+  const ativos = pagantes.filter(a=>a.status==='ativo').length;
+  const atrasados = pagantes.filter(a=>a.status==='atrasado').length;
+  const vencendo = pagantes.filter(a=>a.status==='vencendo').length;
+  const cortesias = cache.alunos.filter(a=>a.cortesia).length;
   pg.innerHTML = `
     <div class="grid4">
-      <div class="kpi kg"><div class="kpi-label">Alunos Ativos</div><div class="kpi-val">${ativos}</div></div>
+      <div class="kpi kg"><div class="kpi-label">Pagantes Ativos</div><div class="kpi-val">${ativos}</div></div>
       <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados}</div></div>
       <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo}</div></div>
-      <div class="kpi kb"><div class="kpi-label">Total Alunos</div><div class="kpi-val">${cache.alunos.length}</div></div>
+      <div class="kpi kb"><div class="kpi-label">Total Pagantes</div><div class="kpi-val">${pagantes.length}${cortesias>0?`<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,.5);margin-left:6px">+ ${cortesias} cortesia${cortesias>1?'s':''}</span>`:''}</div></div>
     </div>
     ${atrasados>0?`<div class="alert alert-r">🔴 ${atrasados} aluno(s) com mensalidade em atraso</div>`:''}
     ${vencendo>0?`<div class="alert alert-y">⚠️ ${vencendo} aluno(s) com mensalidade vencendo em breve</div>`:''}
@@ -967,9 +969,9 @@ function renderFinTab(){
 }
 
 function renderFinGeral(){
-  const ativos=cache.alunos.filter(a=>a.status==='ativo');
-  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
+  const ativos=cache.alunos.filter(a=>a.status==='ativo'&&!a.cortesia);
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado'&&!a.cortesia);
+  const vencendo=cache.alunos.filter(a=>a.status==='vencendo'&&!a.cortesia);
   const nAtivos=ativos.length;
   const ticketMedio=nAtivos>0?ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0)/nAtivos:0;
   const agora=new Date();
@@ -1427,9 +1429,10 @@ async function confirmarMovimento(id,tipo){
 }
 
 function renderFinInadimplencia(){
-  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado'&&!a.cortesia);
+  const pagantes=cache.alunos.filter(a=>!a.cortesia);
   const valorAberto=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-  const taxaAdim=cache.alunos.length>0?Math.round((cache.alunos.length-atrasados.length)/cache.alunos.length*100):100;
+  const taxaAdim=pagantes.length>0?Math.round((pagantes.length-atrasados.length)/pagantes.length*100):100;
   document.getElementById('fin-content').innerHTML=`
     <div class="grid2">
       <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados.length}</div><div class="kpi-sub">${fmtR(valorAberto)} em aberto</div></div>

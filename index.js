@@ -1056,13 +1056,19 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
 // ══════════════════════════════════════
 app.get('/api/dashboard', auth, adminOnly, async (req, res) => {
   try {
-    const [[ativos]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='ativo'");
-    const [[atrasados]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='atrasado'");
-    const [[vencendo]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='vencendo'");
+    const [[ativos]]    = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='ativo'    AND (cortesia IS NULL OR cortesia=0)");
+    const [[atrasados]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='atrasado' AND (cortesia IS NULL OR cortesia=0)");
+    const [[vencendo]]  = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='vencendo' AND (cortesia IS NULL OR cortesia=0)");
+    const [[cortesias]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE cortesia=1");
     const [[receitaMes]] = await db.query("SELECT COALESCE(SUM(valor),0) as total FROM pagamentos WHERE status='pago' AND MONTH(data_pagamento)=MONTH(NOW()) AND YEAR(data_pagamento)=YEAR(NOW())");
     const [[checkinsHoje]] = await db.query("SELECT COUNT(*) as n FROM checkins WHERE data_checkin=CURDATE()");
     res.json({
-      alunos: { ativos: ativos.n, atrasados: atrasados.n, vencendo: vencendo.n, total: ativos.n+atrasados.n+vencendo.n },
+      alunos: {
+        ativos: ativos.n, atrasados: atrasados.n, vencendo: vencendo.n,
+        total: ativos.n + atrasados.n + vencendo.n,
+        cortesias: cortesias.n,
+        pagantes: ativos.n + atrasados.n + vencendo.n,
+      },
       receita_mes: receitaMes.total,
       checkins_hoje: checkinsHoje.n,
     });
@@ -2080,7 +2086,7 @@ async function dispararEmailAutomacao(auto) {
 app.get('/api/health', async (req, res) => {
   try {
     const [aulas] = await db.query('SELECT COUNT(*) as n FROM aulas');
-    const [alunos] = await db.query('SELECT COUNT(*) as n FROM alunos');
+    const [alunos] = await db.query('SELECT COUNT(*) as n FROM alunos WHERE (cortesia IS NULL OR cortesia=0)');
     res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0', aulas: aulas[0].n, alunos: alunos[0].n });
   } catch(e) { res.json({ status: 'ok', app: 'Punch and Roll API', version: '1.1.0' }); }
 });
