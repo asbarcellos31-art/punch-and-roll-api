@@ -159,6 +159,8 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN cortesia TINYINT DEFAULT 0"); } catch(e){}
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN cortesia_motivo VARCHAR(300)"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN categoria VARCHAR(50) DEFAULT 'outro'"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN arquivo LONGBLOB"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN mimetype VARCHAR(100)"); } catch(e){}
@@ -452,9 +454,11 @@ async function setupDB() {
       ativo TINYINT(1) DEFAULT 1,
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
-    // migration: add cor_cabecalho if not exists (MySQL 5.7 compat)
+    // migrations (MySQL 5.7 compat)
     const [_etchk] = await conn.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='email_templates' AND COLUMN_NAME='cor_cabecalho'`);
     if(!_etchk.length) await conn.query(`ALTER TABLE email_templates ADD COLUMN cor_cabecalho VARCHAR(20) DEFAULT '#d4111c'`);
+    const [_etfk] = await conn.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='email_templates' AND COLUMN_NAME='cor_fundo_cab'`);
+    if(!_etfk.length) await conn.query(`ALTER TABLE email_templates ADD COLUMN cor_fundo_cab VARCHAR(20) DEFAULT '#ffffff'`);
     await conn.query(`CREATE TABLE IF NOT EXISTS email_listas (
       id INT AUTO_INCREMENT PRIMARY KEY,
       nome VARCHAR(200) NOT NULL,
@@ -708,12 +712,15 @@ app.post('/api/alunos', auth, adminOnly, async (req, res) => {
 app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     const d = req.body;
+    const cortesia = d.cortesia ? 1 : 0;
+    const cortesiaMotivo = d.cortesia_motivo || null;
     await db.query(`
       UPDATE alunos SET nome=?,cpf=?,nasc=?,sexo=?,tel=?,email=?,endereco=?,cidade=?,cep=?,
       emerg_nome=?,emerg_tel=?,parentesco=?,saude=?,alergia=?,modalidade=?,nivel=?,
-      plano_id=?,plano=?,valor=?,inicio=?,vencimento=?,pagto=?,aulas_liberadas=?,obs=?,status=?
+      plano_id=?,plano=?,valor=?,inicio=?,vencimento=?,pagto=?,aulas_liberadas=?,obs=?,status=?,
+      cortesia=?,cortesia_motivo=?
       WHERE id=?
-    `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade,d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.pagto,JSON.stringify(d.aulasLiberadas||[]),d.obs,d.status,req.params.id]);
+    `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade,d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.pagto,JSON.stringify(d.aulasLiberadas||[]),d.obs,d.status,cortesia,cortesiaMotivo,req.params.id]);
     res.json({ message: 'Aluno atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1565,7 +1572,7 @@ setInterval(async () => {
       ultimoDiaAtrasados = dia;
       const [[tmplAtr]] = await db.query("SELECT valor FROM wa_config WHERE chave='atrasados_template'");
       const template = tmplAtr?.valor || 'Olá, {{nome}}! Sua mensalidade da *Punch and Roll* está em atraso. Regularize: 📱 (48) 98463-9257';
-      const [alunos] = await db.query("SELECT nome,tel FROM alunos WHERE status='atrasado' AND tel IS NOT NULL AND tel != ''");
+      const [alunos] = await db.query("SELECT nome,tel FROM alunos WHERE status='atrasado' AND (cortesia IS NULL OR cortesia=0) AND tel IS NOT NULL AND tel != ''");
       for (const a of alunos) {
         const msg = template.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
         const r = await enviarWA(a.tel, msg);
@@ -1672,6 +1679,8 @@ app.get('/api/teste-email/:destino', async (req, res) => {
 
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://punch-and-roll-api-production.up.railway.app';
 
+function autoTextColor(hex){try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return(0.299*r+0.587*g+0.114*b)>128?'#111827':'#ffffff';}catch{return'#111827';}}
+
 function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, cor='#d4111c') {
   const CC = {
     amarelo:{bg:'#fffbeb',border:'#f59e0b',titulo:'#92400e'},
@@ -1706,15 +1715,17 @@ function gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, cor='#d4111c') {
   return saudHtml + blocos.map(rb).join('\n') + assHtml;
 }
 
-function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId, cor='#d4111c') {
+function gerarHtmlEmail(assunto, saudacao, corpo, assinatura, envioId, corFundo='#ffffff', corAnd='#d4111c') {
   const trackUrl = `${PUBLIC_URL}/api/email/track/open/${envioId}`;
-  const header = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${assunto}</title></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:${cor};padding:20px 32px;border-radius:12px 12px 0 0;text-align:center"><div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">PUNCH AND ROLL</div><div style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:2px">FIGHT TEAM</div></td></tr><tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">`;
-  const footer = `<p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:${cor}">punchandroll.com.br</a></p></td></tr></table></td></tr></table><img src="${trackUrl}" width="1" height="1" style="display:none" alt=""></body></html>`;
+  const tc = autoTextColor(corFundo);
+  const cabHtml = `<td style="background:${corFundo};padding:20px 32px;border-radius:12px 12px 0 0;text-align:center;border-bottom:4px solid ${corAnd}"><div style="font-size:26px;font-weight:900;letter-spacing:3px;line-height:1"><span style="color:${tc}">PUNCH </span><span style="color:${corAnd}">AND</span><span style="color:${tc}"> ROLL</span></div><div style="color:${tc};opacity:0.5;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-top:5px">FIGHT TEAM</div></td>`;
+  const header = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${assunto}</title></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr>${cabHtml}</tr><tr><td style="background:#fff;padding:32px;border-radius:0 0 12px 12px">`;
+  const footer = `<p style="font-size:12px;color:#9ca3af;margin:12px 0 0">São José, SC · <a href="https://punchandroll.com.br" style="color:${corAnd}">punchandroll.com.br</a></p></td></tr></table></td></tr></table><img src="${trackUrl}" width="1" height="1" style="display:none" alt=""></body></html>`;
 
   if (corpo && corpo.startsWith('BLOCKS:')) {
     try {
       const blocos = JSON.parse(corpo.slice('BLOCKS:'.length));
-      return header + gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, cor) + footer;
+      return header + gerarHtmlDeBlocosEmail(saudacao, assinatura, blocos, corAnd) + footer;
     } catch(_) {}
   }
 
@@ -1738,7 +1749,7 @@ function substituirVars(texto, contato) {
 async function dispararEmailCampanha(campanhaId) {
   const key = process.env.SENDGRID_API_KEY;
   if (!key) throw new Error('SENDGRID_API_KEY não configurado');
-  const [[camp]] = await db.query(`SELECT c.*, t.assunto, t.saudacao, t.corpo, t.assinatura, t.cor_cabecalho
+  const [[camp]] = await db.query(`SELECT c.*, t.assunto, t.saudacao, t.corpo, t.assinatura, t.cor_cabecalho, t.cor_fundo_cab
     FROM email_campanhas c LEFT JOIN email_templates t ON t.id=c.template_id WHERE c.id=?`, [campanhaId]);
   if (!camp) throw new Error('Campanha não encontrada');
 
@@ -1775,7 +1786,7 @@ async function dispararEmailCampanha(campanhaId) {
       [campanhaId, d.nome, d.email, 'CAMPANHA', 'ENVIADO']);
     const envioId = ins.insertId;
 
-    const html = gerarHtmlEmail(assuntoFinal, saudacao, corpo, camp.assinatura || 'Punch and Roll Fight Team', envioId, camp.cor_cabecalho || '#d4111c');
+    const html = gerarHtmlEmail(assuntoFinal, saudacao, corpo, camp.assinatura || 'Punch and Roll Fight Team', envioId, camp.cor_fundo_cab||'#ffffff', camp.cor_cabecalho || '#d4111c');
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send', {
         personalizations: [{ to: [{ email: d.email, name: d.nome||'' }] }],
@@ -1949,7 +1960,7 @@ app.get('/api/email/campanhas/:id/preview', auth, adminOnly, async (req, res) =>
   const exemplos = [{nome:'João Silva',email:'joao@exemplo.com',modalidade:'boxe'},{nome:'Maria Costa',email:'maria@exemplo.com',modalidade:'jiujitsu'}];
   const previews = exemplos.map(d => ({
     nome: d.nome, email: d.email,
-    html: gerarHtmlEmail(substituirVars(camp.assunto_override||camp.assunto||'',d), substituirVars(camp.saudacao||'Olá, {{nome}}!',d), substituirVars(camp.corpo||'',d), camp.assinatura||'', 0, camp.cor_cabecalho||'#d4111c')
+    html: gerarHtmlEmail(substituirVars(camp.assunto_override||camp.assunto||'',d), substituirVars(camp.saudacao||'Olá, {{nome}}!',d), substituirVars(camp.corpo||'',d), camp.assinatura||'', 0, camp.cor_fundo_cab||'#ffffff', camp.cor_cabecalho||'#d4111c')
   }));
   res.json(previews);
 });
@@ -1974,13 +1985,13 @@ app.post('/api/email/enviar-individual', auth, adminOnly, async (req, res) => {
   if(!key) return res.status(400).json({error:'SENDGRID_API_KEY não configurado'});
   const {nome,email,assunto,corpo,template_id} = req.body;
   if(!email) return res.status(400).json({error:'Email obrigatório'});
-  let assuntoFinal = assunto, corpoFinal = corpo, saudacao = `Olá, ${nome||''}!`, assinatura = 'Punch and Roll Fight Team', corCab = '#d4111c';
+  let assuntoFinal = assunto, corpoFinal = corpo, saudacao = `Olá, ${nome||''}!`, assinatura = 'Punch and Roll Fight Team', corCab = '#d4111c', corFundoCab = '#ffffff';
   if(template_id){
     const [[t]] = await db.query('SELECT * FROM email_templates WHERE id=?',[template_id]);
-    if(t){ assuntoFinal=assunto||t.assunto; corpoFinal=corpo||t.corpo; saudacao=substituirVars(t.saudacao||'Olá, {{nome}}!',{nome}); assinatura=t.assinatura||assinatura; corCab=t.cor_cabecalho||'#d4111c'; }
+    if(t){ assuntoFinal=assunto||t.assunto; corpoFinal=corpo||t.corpo; saudacao=substituirVars(t.saudacao||'Olá, {{nome}}!',{nome}); assinatura=t.assinatura||assinatura; corCab=t.cor_cabecalho||'#d4111c'; corFundoCab=t.cor_fundo_cab||'#ffffff'; }
   }
   const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[nome||email,email,'INDIVIDUAL','ENVIADO']);
-  const html = gerarHtmlEmail(assuntoFinal||'Mensagem', saudacao, substituirVars(corpoFinal||'',{nome,email}), assinatura, ins.insertId, corCab);
+  const html = gerarHtmlEmail(assuntoFinal||'Mensagem', saudacao, substituirVars(corpoFinal||'',{nome,email}), assinatura, ins.insertId, corFundoCab, corCab);
   try {
     await axios.post('https://api.sendgrid.com/v3/mail/send',{
       personalizations:[{to:[{email,name:nome||''}]}],
@@ -2047,7 +2058,7 @@ async function dispararEmailAutomacao(auto) {
     const corp = substituirVars(tpl.corpo||'',a);
     const assunto = substituirVars(tpl.assunto,a);
     const [ins] = await db.query('INSERT INTO email_envios (contato_nome,contato_email,tipo,status) VALUES (?,?,?,?)',[a.nome,a.email,auto.tipo,'ENVIADO']);
-    const html = gerarHtmlEmail(assunto,saud,corp,tpl.assinatura||'Punch and Roll Fight Team',ins.insertId,tpl.cor_cabecalho||'#d4111c');
+    const html = gerarHtmlEmail(assunto,saud,corp,tpl.assinatura||'Punch and Roll Fight Team',ins.insertId,tpl.cor_fundo_cab||'#ffffff',tpl.cor_cabecalho||'#d4111c');
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send',{
         personalizations:[{to:[{email:a.email,name:a.nome}]}],

@@ -268,6 +268,15 @@ textarea.fi{resize:none}
   </div>
   <div style="font-size:11px;color:var(--muted);background:var(--panel2);padding:8px 10px;border-radius:6px;margin-bottom:12px">Login: e-mail ou primeiro nome · Senha padrão: 123</div>
   <div class="fg"><label class="fl">Observações</label><textarea class="fi" id="a-obs" rows="2" placeholder="Informações adicionais..."></textarea></div>
+  <div style="background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.25);border-radius:8px;padding:12px;margin-bottom:4px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="a-cortesia" style="width:16px;height:16px;accent-color:#facc15">
+      <span style="font-size:13px;font-weight:600;color:#facc15">🎁 Cortesia — isentar de pagamento</span>
+    </label>
+    <div id="a-cortesia-motivo-wrap" style="margin-top:8px;display:none">
+      <input class="fi" id="a-cortesia-motivo" placeholder="Motivo da cortesia (ex: esposa do professor, patrocinador...)" style="font-size:12px">
+    </div>
+  </div>
   <div class="modal-foot">
     <button class="btn btn-ghost" onclick="fecharModalAluno()">Cancelar</button>
     <button class="btn btn-r" id="btn-salvar-aluno" onclick="salvarAluno()">💾 Salvar</button>
@@ -535,8 +544,8 @@ function filtrarAlunos() {
   el.innerHTML = lista.map(a=>`
     <div class="item">
       <div class="item-top">
-        <div><div class="item-name">${a.nome}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${a.modalidade==='boxe'?'🥊 Boxe':a.modalidade==='jiujitsu'?'🟦 Jiu-Jitsu':'🥊🟦 Ambos'} · ${a.nivel||'Iniciante'}</div></div>
-        ${badgeStatus(a.status)}
+        <div><div class="item-name">${a.nome}${a.cortesia?` <span style="font-size:10px;background:rgba(250,204,21,.18);color:#facc15;border:1px solid rgba(250,204,21,.35);border-radius:4px;padding:1px 5px;font-weight:600;vertical-align:middle">🎁 Cortesia</span>`:''}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${a.modalidade==='boxe'?'🥊 Boxe':a.modalidade==='jiujitsu'?'🟦 Jiu-Jitsu':'🥊🟦 Ambos'} · ${a.nivel||'Iniciante'}</div></div>
+        ${a.cortesia?'':badgeStatus(a.status)}
       </div>
       <div class="item-meta">📱 ${a.tel||'—'}${a.email?' · ✉️ '+a.email:''}</div>
       <div style="background:var(--panel);border-radius:6px;padding:8px;margin-bottom:8px;display:flex;justify-content:space-between">
@@ -566,6 +575,10 @@ function abrirModalAluno(id) {
     document.getElementById('a-emerg-tel').value=a.emergTel||a.emerg_tel||'';
     document.getElementById('a-saude').value=a.saude||''; document.getElementById('a-alergia').value=a.alergia||'';
     document.getElementById('a-obs').value=a.obs||'';
+    const cortesiaChk = document.getElementById('a-cortesia');
+    cortesiaChk.checked = !!(a.cortesia);
+    document.getElementById('a-cortesia-motivo').value = a.cortesia_motivo||'';
+    document.getElementById('a-cortesia-motivo-wrap').style.display = a.cortesia ? 'block' : 'none';
     if(a.nasc) document.getElementById('a-nasc').value=a.nasc;
     if(a.sexo) document.getElementById('a-sexo').value=a.sexo;
     if(a.parentesco) document.getElementById('a-parentesco').value=a.parentesco;
@@ -580,11 +593,20 @@ function abrirModalAluno(id) {
   } else {
     document.getElementById('a-modalidade').value='';
     document.getElementById('a-plano').innerHTML='<option value="">Selecione a modalidade</option>';
+    document.getElementById('a-cortesia').checked = false;
+    document.getElementById('a-cortesia-motivo').value = '';
+    document.getElementById('a-cortesia-motivo-wrap').style.display = 'none';
   }
   document.getElementById('modal-aluno').classList.add('open');
 }
 
 function fecharModalAluno() { document.getElementById('modal-aluno').classList.remove('open'); editingAlunoId=null; }
+
+document.addEventListener('change', e => {
+  if(e.target.id === 'a-cortesia') {
+    document.getElementById('a-cortesia-motivo-wrap').style.display = e.target.checked ? 'block' : 'none';
+  }
+});
 
 function atualizarPlanos() {
   const mod = document.getElementById('a-modalidade').value;
@@ -621,7 +643,8 @@ async function salvarAluno() {
   const plano=todos.find(p=>p.id===planoId);
   const btn=document.getElementById('btn-salvar-aluno');
   btn.textContent='Salvando...'; btn.disabled=true;
-  const dados={nome,senha:senha||'123',cpf:document.getElementById('a-cpf').value||'',nasc:document.getElementById('a-nasc').value||'',sexo:document.getElementById('a-sexo').value||'',tel,email:document.getElementById('a-email').value||'',end:document.getElementById('a-end').value||'',cidade:document.getElementById('a-cidade').value||'São José',cep:document.getElementById('a-cep').value||'',emergNome:document.getElementById('a-emerg-nome').value||'',emergTel:document.getElementById('a-emerg-tel').value||'',parentesco:document.getElementById('a-parentesco').value||'',saude:document.getElementById('a-saude').value||'',alergia:document.getElementById('a-alergia').value||'',modalidade,nivel:document.getElementById('a-nivel').value||'iniciante',planoId,plano:plano?.nome||'',valor:plano?.valor||0,inicio:document.getElementById('a-inicio').value||todayStr,venc:document.getElementById('a-venc').value||'',pagto:document.getElementById('a-pagto').value||'pix',obs:document.getElementById('a-obs').value||'',status:'ativo'};
+  const cortesia = document.getElementById('a-cortesia').checked;
+  const dados={nome,senha:senha||'123',cpf:document.getElementById('a-cpf').value||'',nasc:document.getElementById('a-nasc').value||'',sexo:document.getElementById('a-sexo').value||'',tel,email:document.getElementById('a-email').value||'',end:document.getElementById('a-end').value||'',cidade:document.getElementById('a-cidade').value||'São José',cep:document.getElementById('a-cep').value||'',emergNome:document.getElementById('a-emerg-nome').value||'',emergTel:document.getElementById('a-emerg-tel').value||'',parentesco:document.getElementById('a-parentesco').value||'',saude:document.getElementById('a-saude').value||'',alergia:document.getElementById('a-alergia').value||'',modalidade,nivel:document.getElementById('a-nivel').value||'iniciante',planoId,plano:plano?.nome||'',valor:plano?.valor||0,inicio:document.getElementById('a-inicio').value||todayStr,venc:document.getElementById('a-venc').value||'',pagto:document.getElementById('a-pagto').value||'pix',obs:document.getElementById('a-obs').value||'',status:'ativo',cortesia,cortesia_motivo:cortesia?document.getElementById('a-cortesia-motivo').value.trim()||null:null};
   try {
     if(editingAlunoId) await PUT('/api/alunos/'+editingAlunoId,dados);
     else await POST('/api/alunos',dados);
