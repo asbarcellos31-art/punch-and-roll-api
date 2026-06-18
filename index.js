@@ -2879,6 +2879,13 @@ function agendarRelatorioSemanal() {
 // TRACKING INTERNO (invisível no painel)
 // ══════════════════════════════════════
 
+// Disparo manual do relatório semanal (uso interno)
+app.get('/api/_report-now', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  await enviarRelatorioSemanal();
+  res.json({ ok: true });
+});
+
 // Ping de visualização de página — chamado silenciosamente pelo frontend
 app.post('/api/_pv', async (req, res) => {
   try {
