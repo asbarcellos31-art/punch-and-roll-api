@@ -549,6 +549,23 @@ async function setupDB() {
       )
     `);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS welcome_pending (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NOT NULL,
+        token VARCHAR(64) UNIQUE NOT NULL,
+        nome VARCHAR(200),
+        email VARCHAR(200),
+        tel VARCHAR(30),
+        plano VARCHAR(200),
+        valor DECIMAL(10,2),
+        modalidade VARCHAR(30),
+        status VARCHAR(20) DEFAULT 'pendente',
+        enviado_em DATETIME NULL,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -809,10 +826,20 @@ app.post('/api/alunos/publico', async (req, res) => {
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,obs,status,senha,origem)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [d.nome,d.cpf,d.nasc,d.sexo,d.tel,d.email,d.end,d.cidade||'São José',d.cep,d.emergNome,d.emergTel,d.parentesco,d.saude,d.alergia,d.modalidade,d.nivel,d.planoId,d.plano,d.valor,d.inicio,d.venc,d.payMethod,d.obs,'aguardando_pagamento',senhaHash,'auto-cadastro']);
+    const alunoId = result.insertId;
+
+    // Notifica admin no WA
     await notificarWA(process.env.WA_ADMIN_NUM||'554898463-9257',`🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Plano:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}`);
-    await notificarWA(d.tel,`Olá ${d.nome.split(' ')[0]}! 🥊 Sua matrícula na *Punch and Roll Fight Team* foi recebida!\n\nPlano: *${d.plano}*\nEntraremos em contato para confirmar o pagamento.\n\nSua senha de acesso ao portal: *123*`);
-    await enviarEmailAdmin('🥊 Nova Matrícula Online',`<h2>${d.nome}</h2><p>Plano: ${d.plano}</p><p>Pagamento: ${d.payMethod}</p><p>Tel: ${d.tel}</p>`);
-    res.json({ id: result.insertId, message: 'Matrícula recebida!' });
+
+    // Cria pending e dispara boas-vindas automaticamente
+    const wpToken = require('crypto').randomBytes(24).toString('hex');
+    await db.query(
+      'INSERT INTO welcome_pending (aluno_id,token,nome,email,tel,plano,valor,modalidade) VALUES (?,?,?,?,?,?,?,?)',
+      [alunoId, wpToken, d.nome, d.email, d.tel, d.plano, d.valor||0, d.modalidade]
+    );
+    dispararBoasVindas(wpToken).catch(e => console.error('Boas-vindas error:', e.message));
+
+    res.json({ id: alunoId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2781,6 +2808,212 @@ app.put('/api/shop/pedidos/:id/status', auth, adminOnly, async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+// ══════════════════════════════════════
+// BOAS-VINDAS — FLUXO DE APROVAÇÃO
+// ══════════════════════════════════════
+
+const OWNER_EMAIL = 'asbarcellos31@gmail.com';
+const API_BASE    = process.env.API_URL || 'https://punch-and-roll-api-production.up.railway.app';
+const SITE_BASE   = 'https://punchandroll.com.br';
+
+function gerarEmailBoasVindas(d) {
+  const nomeFirst = (d.nome||'').split(' ')[0];
+  const modLabel  = d.modalidade === 'boxe' ? 'Boxe' : d.modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : 'Boxe + Jiu-Jitsu';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden">
+  <div style="background:#d4111c;padding:32px 24px;text-align:center">
+    <div style="font-size:36px;margin-bottom:8px">🥊</div>
+    <h1 style="color:#fff;font-size:26px;letter-spacing:3px;margin:0">PUNCH AND ROLL</h1>
+    <p style="color:rgba(255,255,255,.8);font-size:12px;margin:6px 0 0;letter-spacing:1px">FIGHT TEAM · SÃO JOSÉ, SC</p>
+  </div>
+  <div style="padding:32px 28px">
+    <h2 style="color:#111;font-size:22px;margin:0 0 12px">Bem-vindo, ${nomeFirst}! 🎉</h2>
+    <p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">
+      Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi confirmada. Estamos muito felizes em ter você na equipe!
+    </p>
+
+    <!-- PLANO -->
+    <div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin-bottom:24px">
+      <p style="color:#888;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 12px">SEU PLANO</p>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Modalidade</td><td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${modLabel}</td></tr>
+        <tr><td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Plano</td><td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${d.plano||modLabel}</td></tr>
+        <tr><td style="color:#555;font-size:13px;padding:8px 0 0">Mensalidade</td><td style="color:#d4111c;font-size:16px;font-weight:bold;text-align:right;padding:8px 0 0">R$ ${Number(d.valor||0).toFixed(0)}/mês</td></tr>
+      </table>
+    </div>
+
+    <!-- PORTAL -->
+    <div style="background:#fff8f8;border:1px solid #ffd0d0;border-radius:10px;padding:20px;margin-bottom:24px">
+      <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 6px">📱 Acesse o Portal do Aluno</p>
+      <p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 16px">Pelo portal você acompanha suas aulas, histórico de treinos, mensalidades e recados da equipe.</p>
+      <p style="color:#555;font-size:13px;margin:0 0 4px"><strong>Site:</strong> <a href="${SITE_BASE}/punch-and-roll-portal.html" style="color:#d4111c">${SITE_BASE}/punch-and-roll-portal.html</a></p>
+      <p style="color:#555;font-size:13px;margin:0 0 16px"><strong>Login:</strong> seu e-mail ou primeiro nome &nbsp;|&nbsp; <strong>Senha inicial:</strong> 123</p>
+      <div style="text-align:center">
+        <a href="${SITE_BASE}/punch-and-roll-portal.html" style="background:#d4111c;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:bold;letter-spacing:1px;display:inline-block">ACESSAR PORTAL</a>
+      </div>
+    </div>
+
+    <!-- CHECK-IN -->
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:20px;margin-bottom:24px">
+      <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 6px">✅ Como fazer Check-in na aula</p>
+      <ol style="color:#444;font-size:13px;line-height:1.9;margin:0;padding-left:18px">
+        <li>Acesse o Portal do Aluno</li>
+        <li>Clique na aba <strong>"Minhas Aulas"</strong></li>
+        <li>Selecione a aula do dia</li>
+        <li>Clique em <strong>"Fazer Check-in"</strong></li>
+      </ol>
+      <p style="color:#666;font-size:12px;margin:10px 0 0">⏰ O check-in fica disponível a partir de 30 minutos antes do início da aula.</p>
+    </div>
+
+    <!-- MANUAL -->
+    <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin-bottom:24px">
+      <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 6px">📋 Manual de Conduta</p>
+      <p style="color:#555;font-size:13px;line-height:1.6;margin:0">O Manual de Conduta da Punch and Roll está em anexo neste email. Leia com atenção — ele traz nossas regras, valores e tudo que você precisa saber para aproveitar ao máximo seus treinos.</p>
+    </div>
+
+    <!-- CONTATO -->
+    <div style="border-top:1px solid #eee;padding-top:20px">
+      <p style="color:#888;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px">FALE COM A GENTE</p>
+      <p style="color:#444;font-size:13px;line-height:1.8;margin:0">📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC<br>💬 (48) 98463-9257<br>🌐 punchandroll.com.br</p>
+    </div>
+  </div>
+  <div style="background:#111;padding:14px 24px;text-align:center">
+    <p style="color:#555;font-size:11px;margin:0">Punch and Roll Fight Team · São José, SC · <a href="${SITE_BASE}" style="color:#d4111c">punchandroll.com.br</a></p>
+  </div>
+</div>
+</body></html>`;
+}
+
+function gerarMsgWABoasVindas(d) {
+  const nomeFirst = (d.nome||'').split(' ')[0];
+  return `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nQualquer dúvida, fala com a gente!\n📞 (48) 98463-9257\n\nBora treinar! 💪`;
+}
+
+function gerarManualAnexo() {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Manual de Conduta — Punch and Roll</title>
+<style>body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:32px;color:#333}h1{color:#d4111c;letter-spacing:2px}h2{color:#111;border-bottom:2px solid #d4111c;padding-bottom:4px}ul{line-height:2}.ok{color:#16a34a}.no{color:#d4111c}</style></head>
+<body>
+<h1>MANUAL DE CONDUTA</h1>
+<p><strong>Punch and Roll Fight Team · São José, SC · 2026</strong></p>
+<p><em>"Mais que uma academia. Uma família."</em></p>
+<p>Nossa missão é desenvolver <strong>disciplina</strong>, respeito, confiança e saúde — dentro e fora dos tatames. Todos devem respeitar as regras abaixo.</p>
+<h2>Valores</h2>
+<ul><li>Respeito</li><li>Disciplina</li><li>Humildade</li><li>Honestidade</li><li>Pontualidade</li><li>Organização</li><li>Espírito Esportivo</li><li>Companheirismo</li><li>Evolução</li></ul>
+<h2>Higiene Pessoal</h2>
+<ul><li class="ok">✓ Tomar banho antes das aulas</li><li class="ok">✓ Uniforme e kimono sempre limpos</li><li class="ok">✓ Luvas e bandagens higienizadas</li><li class="ok">✓ Unhas cortadas (mãos e pés)</li><li class="ok">✓ Desodorante obrigatório</li><li class="no">✗ Não treinar com uniforme sujo ou odor excessivo</li><li class="no">✗ Não treinar com lesões infecciosas</li></ul>
+<h2>Tatame</h2>
+<ul><li class="ok">✓ Entrar sempre descalço</li><li class="ok">✓ Manter o tatame limpo</li><li class="no">✗ Proibido calçados no tatame</li><li class="no">✗ Proibido comer sobre o tatame</li><li class="no">✗ Proibido jogar lixo no chão</li></ul>
+<h2>Organização dos Materiais</h2>
+<p><strong>⚡ USOU → GUARDOU → ORGANIZOU</strong></p>
+<ul><li>Luvas e bandagens: pendurar no local indicado</li><li>Escudos e aparadores: empilhar na prateleira</li><li>Cones e acessórios: devolver ao cesto correto</li><li>Colchonetes: reposicionar ao final da aula</li></ul>
+<h2>Banheiro</h2>
+<ul><li class="ok">✓ Dar sempre a descarga</li><li class="ok">✓ Lavar as mãos com sabão</li><li class="ok">✓ Papel na lixeira — nunca no vaso</li><li class="ok">✓ Fechar as torneiras</li><li class="no">✗ Não jogar papel no vaso (entope!)</li></ul>
+<h2>Conduta Geral</h2>
+<ul><li>Celular no silencioso durante o treino</li><li>Linguagem respeitosa sempre</li><li>Proibido fumar nas dependências</li><li>Proibido álcool e drogas</li><li>Pontualidade: chegar 10 min antes</li></ul>
+<p style="margin-top:32px;border-top:1px solid #ccc;padding-top:16px;color:#888;font-size:12px">O descumprimento reiterado poderá resultar em advertência, suspensão ou desligamento da equipe.<br>Punch and Roll Fight Team · punchandroll.com.br · (48) 98463-9257</p>
+</body></html>`;
+}
+
+async function dispararBoasVindas(wpToken) {
+  const [rows] = await db.query('SELECT * FROM welcome_pending WHERE token=? AND status="pendente"', [wpToken]);
+  if (!rows.length) return { ok: false, msg: 'Já enviado ou não encontrado' };
+  const p = rows[0];
+  const d = { nome: p.nome, email: p.email, tel: p.tel, plano: p.plano, valor: p.valor, modalidade: p.modalidade };
+
+  const emailHtml   = gerarEmailBoasVindas(d);
+  const waMensagem  = gerarMsgWABoasVindas(d);
+  const manualHtml  = gerarManualAnexo();
+  const manualB64   = Buffer.from(manualHtml, 'utf8').toString('base64');
+
+  // Email para o aluno com manual em anexo
+  let emailOk = false;
+  if (p.email && process.env.SENDGRID_API_KEY) {
+    try {
+      await axios.post('https://api.sendgrid.com/v3/mail/send', {
+        personalizations: [{ to: [{ email: p.email, name: p.nome }] }],
+        from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Fight Team' },
+        subject: `🥊 Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`,
+        content: [{ type: 'text/html', value: emailHtml }],
+        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.html', type: 'text/html', disposition: 'attachment' }],
+      }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
+      emailOk = true;
+    } catch(e) { console.error('Email bv error:', e.message); }
+  }
+
+  // WhatsApp para o aluno
+  let waOk = false;
+  try {
+    await notificarWA(p.tel, waMensagem);
+    waOk = true;
+  } catch(e) { console.error('WA bv error:', e.message); }
+
+  // Registra no histórico de email
+  try {
+    const [camp] = await db.query(
+      `INSERT INTO email_campanhas (nome,assunto,html,status,qtd_enviados,enviado_em) VALUES (?,?,?,?,1,NOW())`,
+      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailHtml, 'enviado']
+    );
+    await db.query(
+      'INSERT INTO email_envios (campanha_id,email,nome,status,enviado_em) VALUES (?,?,?,?,NOW())',
+      [camp.insertId, p.email, p.nome, emailOk ? 'enviado' : 'erro']
+    );
+  } catch(e) {}
+
+  // Registra no histórico de WA MKT
+  try {
+    const [waCamp] = await db.query(
+      `INSERT INTO marketing_msgs (tipo,titulo,texto,segmento,status,qtd_enviados) VALUES (?,?,?,?,?,1)`,
+      ['whatsapp', `Boas-vindas — ${p.nome}`, waMensagem, 'individual', 'enviado']
+    );
+    await db.query(
+      'INSERT INTO wa_envios (campanha_id,aluno_id,tel,nome,status,enviado_em) VALUES (?,?,?,?,?,NOW())',
+      [waCamp.insertId, p.aluno_id, p.tel, p.nome, waOk ? 'enviado' : 'erro']
+    );
+  } catch(e) {}
+
+  // Atualiza status do pending
+  await db.query('UPDATE welcome_pending SET status="enviado", enviado_em=NOW() WHERE token=?', [wpToken]);
+
+  // Relatório de entrega + preview para o Anderson
+  if (process.env.SENDGRID_API_KEY) {
+    const relHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px">
+<div style="max-width:640px;margin:0 auto">
+  <div style="background:#111;border-radius:10px 10px 0 0;padding:18px 24px">
+    <p style="color:#fff;font-size:15px;font-weight:bold;margin:0">📊 Boas-Vindas Enviadas — ${p.nome}</p>
+    <p style="color:#aaa;font-size:12px;margin:4px 0 0">${p.plano} · R$ ${Number(p.valor||0).toFixed(0)}/mês · ${new Date().toLocaleString('pt-BR')}</p>
+  </div>
+  <div style="background:#fff;padding:20px 24px;border:1px solid #e5e5e5">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
+      <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Canal</th><th style="padding:8px;text-align:left">Destino</th><th style="padding:8px;text-align:left">Status</th></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee">✉️ Email</td><td style="padding:8px;border-bottom:1px solid #eee">${p.email||'—'}</td><td style="padding:8px;border-bottom:1px solid #eee;color:${emailOk?'#16a34a':'#dc2626'};font-weight:bold">${emailOk?'✅ Enviado':'❌ Falhou'}</td></tr>
+      <tr><td style="padding:8px">📱 WhatsApp</td><td style="padding:8px">${p.tel||'—'}</td><td style="padding:8px;color:${waOk?'#16a34a':'#dc2626'};font-weight:bold">${waOk?'✅ Enviado':'❌ Falhou'}</td></tr>
+    </table>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px;margin-bottom:16px">
+      <p style="color:#16a34a;font-size:10px;font-weight:bold;letter-spacing:1px;margin:0 0 8px">📱 WHATSAPP ENVIADO</p>
+      <pre style="font-family:Arial,sans-serif;font-size:12px;color:#333;white-space:pre-wrap;margin:0">${waMensagem}</pre>
+    </div>
+    <p style="color:#888;font-size:11px;margin:0">✅ Registrado no histórico de Email MKT e WA MKT</p>
+  </div>
+  <div style="border:2px dashed #d4111c;border-radius:0 0 10px 10px;padding:4px">
+    <p style="text-align:center;color:#d4111c;font-size:10px;font-weight:bold;letter-spacing:1px;margin:6px 0">✉️ EMAIL ENVIADO AO ALUNO</p>
+    ${emailHtml}
+  </div>
+</div>
+</body></html>`;
+    axios.post('https://api.sendgrid.com/v3/mail/send', {
+      personalizations: [{ to: [{ email: OWNER_EMAIL, name: 'Anderson Barcellos' }] }],
+      from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
+      subject: `[P&R] Boas-vindas enviadas — ${p.nome}`,
+      content: [{ type: 'text/html', value: relHtml }],
+    }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } }).catch(()=>{});
+  }
+
+  return { ok: true, emailOk, waOk };
+}
+
 
 // ══════════════════════════════════════
 // RELATÓRIO SEMANAL PRIVADO
