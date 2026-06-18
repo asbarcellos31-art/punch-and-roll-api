@@ -3419,8 +3419,10 @@ app.get('/api/_welcome-preview', async (req, res) => {
   if (!manualBuf) manualBuf = await gerarManualPDF();
   const manualB64 = manualBuf.toString('base64');
   let waOk = false, emailOk = false;
-  // WA para o número pessoal do Anderson
-  try { await notificarWA('48991860742', `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`); waOk = true; } catch(e){}
+  // WA para os dois números do Anderson
+  const waMsgPreview = `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`;
+  try { await notificarWA('48991860742', waMsgPreview); waOk = true; } catch(e){}
+  try { await notificarWA(OWNER_WA_NUM, waMsgPreview); waOk = true; } catch(e){}
   // Email para o Anderson com manual em PDF anexo
   if (process.env.SENDGRID_API_KEY) {
     try {
