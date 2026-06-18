@@ -2946,8 +2946,8 @@ function gerarEmailBoasVindas(d) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;">
 <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-  <div style="background:#ffffff;padding:20px 32px;text-align:center;border-bottom:4px solid #d4111c">
-    <img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll Fight Team" style="height:80px;width:auto;display:block;margin:0 auto">
+  <div style="background:#ffffff;padding:28px 32px 20px;text-align:center;border-bottom:4px solid #d4111c">
+    <img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll Fight Team" style="height:130px;width:auto;display:block;margin:0 auto">
   </div>
   <div style="padding:32px 28px">
     <h2 style="color:#111;font-size:22px;margin:0 0 12px">Bem-vindo, ${nomeFirst}! 🎉</h2>
