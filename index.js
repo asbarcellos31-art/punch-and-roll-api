@@ -3128,6 +3128,23 @@ app.get('/api/_report-now', async (req, res) => {
   }
 });
 
+// Disparo manual de boas-vindas por aluno_id (uso interno)
+app.get('/api/_welcome-manual/:aluno_id', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  try {
+    const [rows] = await db.query('SELECT * FROM alunos WHERE id=?', [req.params.aluno_id]);
+    if (!rows.length) return res.json({ ok: false, msg: 'Aluno não encontrado' });
+    const a = rows[0];
+    const wpToken = require('crypto').randomBytes(24).toString('hex');
+    await db.query(
+      'INSERT INTO welcome_pending (aluno_id,token,nome,email,tel,plano,valor,modalidade) VALUES (?,?,?,?,?,?,?,?)',
+      [a.id, wpToken, a.nome, a.email, a.tel, a.plano, a.valor||0, a.modalidade]
+    );
+    const result = await dispararBoasVindas(wpToken);
+    res.json(result);
+  } catch(e) { res.json({ ok: false, erro: e.message }); }
+});
+
 // Ping de visualização de página — chamado silenciosamente pelo frontend
 app.post('/api/_pv', async (req, res) => {
   try {
