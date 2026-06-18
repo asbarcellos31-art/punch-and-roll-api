@@ -2819,6 +2819,127 @@ const INSTRUTOR_WA_NUM = '4898463-9257';   // Instrutor
 const API_BASE         = process.env.API_URL || 'https://punch-and-roll-api-production.up.railway.app';
 const SITE_BASE        = 'https://punchandroll.com.br';
 
+async function gerarManualPDF() {
+  const PDFDocument = require('pdfkit');
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const RED = '#d4111c', DARK = '#111111', GRAY = '#555555';
+    const w = doc.page.width - 100;
+
+    // Cabeçalho
+    doc.rect(50, 50, w, 60).fill(RED);
+    doc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('PUNCH AND ROLL FIGHT TEAM', 50, 65, { width: w, align: 'center' });
+    doc.fontSize(9).font('Helvetica').text('MANUAL DE CONDUTA · 2026', 50, 90, { width: w, align: 'center' });
+    doc.moveDown(3);
+
+    const titulo = (n, t) => {
+      doc.moveDown(0.5);
+      doc.rect(50, doc.y, w, 18).fill(RED);
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text(`CAPÍTULO ${n}  ·  ${t}`, 56, doc.y - 14, { width: w - 12 });
+      doc.moveDown(0.8);
+      doc.fillColor(DARK);
+    };
+    const ok = (label, items) => {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#16a34a').text(`✓ ${label}`, { indent: 10 });
+      items.forEach(i => doc.fontSize(8).font('Helvetica').fillColor(GRAY).text(`    ✓  ${i}`, { indent: 10 }));
+      doc.moveDown(0.4);
+    };
+    const no = (label, items) => {
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(RED).text(`✗ ${label}`, { indent: 10 });
+      items.forEach(i => doc.fontSize(8).font('Helvetica').fillColor(GRAY).text(`    ✗  ${i}`, { indent: 10 }));
+      doc.moveDown(0.4);
+    };
+    const txt = t => { doc.fontSize(9).font('Helvetica').fillColor(DARK).text(t, { indent: 10 }); doc.moveDown(0.3); };
+
+    doc.fontSize(9).fillColor(DARK).font('Helvetica')
+      .text('Punch and Roll Fight Team é uma equipe formada por pessoas que buscam evolução física, técnica e pessoal. Nossa missão não é apenas ensinar Boxe e Jiu-Jitsu — buscamos desenvolver disciplina, respeito, confiança, saúde, espírito esportivo e senso de comunidade. O descumprimento das regras poderá resultar em advertência, suspensão ou desligamento.', { indent: 10 });
+    doc.moveDown(0.5);
+
+    titulo('I','VALORES DA EQUIPE');
+    txt('Respeito · Disciplina · Humildade · Honestidade · Pontualidade · Organização · Espírito Esportivo · Segurança · Companheirismo · Evolução');
+
+    titulo('II','HIGIENE PESSOAL');
+    ok('OBRIGATÓRIO — ALUNOS E PROFESSORES',['Tomar banho regularmente','Escovar os dentes antes das aulas','Utilizar desodorante','Manter unhas cortadas','Roupas, kimono, luvas e bandagens limpas','Protetores devidamente higienizados']);
+    no('NÃO SERÁ PERMITIDO TREINAR',['Com uniforme excessivamente sujo','Com odor excessivo','Com lesões infecciosas expostas','Com doenças contagiosas']);
+
+    titulo('III','APRESENTAÇÃO DOS PROFESSORES');
+    ok('DEVEM MANTER',['Cabelos limpos e organizados','Barba aparada e higienizada','Uniforme oficial em bom estado','Linguagem respeitosa','Postura profissional']);
+    no('É VEDADO',['Ministrar aulas com aparência desleixada','Utilizar linguagem ofensiva','Fazer comentários discriminatórios']);
+
+    titulo('IV','PONTUALIDADE');
+    ok('ALUNOS',['Chegar preferencialmente 10 minutos antes','Ingressar na aula já preparado']);
+    ok('PROFESSORES',['Estar presentes antes do início','Preparar previamente materiais','Iniciar e encerrar nos horários programados']);
+
+    titulo('V','UTILIZAÇÃO DO TATAME');
+    ok('OBRIGATÓRIO',['Entrar descalço no tatame','Manter o tatame limpo','Respeitar os espaços delimitados']);
+    no('PROIBIDO',['Entrar com calçados da rua','Comer sobre o tatame','Jogar lixo no chão','Sentar inadequadamente durante instruções']);
+
+    titulo('VI','EQUIPAMENTOS PESSOAIS');
+    ok('TRAZER OBRIGATORIAMENTE',['Kimono e faixa','Luvas e bandagens','Protetor bucal','Toalha e garrafa de água','Equipamentos de proteção da modalidade']);
+    no('ATENÇÃO',['A academia não se responsabiliza por objetos esquecidos ou perdidos']);
+
+    titulo('VII','ORGANIZAÇÃO DOS EQUIPAMENTOS');
+    ok('QUEM UTILIZA: GUARDA, ORGANIZA E CONSERVA',['Luvas de treino e aparadores','Escudos e cones','Cordas e colchonetes','Materiais de preparação física']);
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#d97706').text('⚡  PRINCÍPIO: Usou → Guardou → Organizou', { indent: 10 }); doc.moveDown(0.4);
+
+    titulo('VIII','LIMPEZA DOS AMBIENTES');
+    ok('INCLUI TODOS OS AMBIENTES',['Banheiros · Recepção · Tatame · Área de equipamentos','Dar descarga · lavar as mãos · manter banheiro limpo']);
+    no('PROIBIDO',['Jogar lixo no chão','Deixar copos ou garrafas espalhados','Deixar toalhas ou equipamentos abandonados']);
+
+    titulo('IX','CONDUTA DURANTE OS TREINOS');
+    ok('TODOS DEVEM',['Respeitar professores e colegas','Ouvir as instruções','Manter comportamento adequado']);
+    no('PROIBIDO',['Interromper explicações','Brincadeiras perigosas','Provocar colegas','Linguagem ofensiva']);
+
+    titulo('X','SPARRINGS E ROLAS');
+    txt('Os combates são ferramentas de aprendizado, não disputas de ego.');
+    ok('TODO PARTICIPANTE DEVERÁ',['Controlar força e intensidade','Respeitar iniciantes e diferenças físicas','Priorizar segurança acima de tudo']);
+    no('NÃO SERÁ TOLERADO',['Excesso de agressividade','Golpes intencionais para machucar','Atitudes antidesportivas']);
+
+    titulo('XI','SEGURANÇA');
+    no('PROIBIDO TREINAR',['Sob efeito de álcool','Sob efeito de drogas ilícitas','Em condições que coloquem terceiros em risco']);
+    txt('Professores têm autoridade para impedir alunos que representem risco. Toda lesão deve ser comunicada imediatamente.');
+
+    titulo('XII','CELULARES');
+    no('PROIBIDO',['Atender ligações durante instruções','Filmar terceiros sem autorização']);
+
+    titulo('XIII','CRIANÇAS E ADOLESCENTES');
+    ok('PAIS E RESPONSÁVEIS DEVERÃO',['Respeitar horários de início e término','Buscar os alunos ao término','Respeitar orientações dos professores']);
+
+    titulo('XIV','REDES SOCIAIS');
+    no('NÃO SERÃO TOLERADAS PUBLICAÇÕES QUE',['Ataquem membros da equipe','Difamem a academia','Exponham alunos sem autorização']);
+
+    titulo('XV','PROFESSORES');
+    ok('OS PROFESSORES DEVEM',['Dar exemplo dentro e fora da academia','Tratar todos de forma igualitária','Zelar pela segurança dos treinos','Cumprir a metodologia da equipe','Estimular ambiente acolhedor e familiar','Comunicar problemas disciplinares ou estruturais aos sócios']);
+    doc.fontSize(8).font('Helvetica').fillColor('#92400e')
+      .text('Advertência, suspensão ou desligamento poderão ser aplicados a qualquer integrante que descumprir as normas deste manual, a critério dos sócios.', { indent: 10 });
+
+    // Código de Honra
+    doc.addPage();
+    doc.rect(50, 50, w, 30).fill(RED);
+    doc.fillColor('#ffffff').fontSize(13).font('Helvetica-Bold').text('CÓDIGO DE HONRA — PUNCH AND ROLL', 50, 58, { width: w, align: 'center' });
+    doc.moveDown(2);
+    const honra = ['Respeito todos os membros da equipe.','Sou pontual.','Cuido do meu corpo e da minha higiene.','Cuido da academia como se fosse minha.','Ajudo os colegas a evoluírem.','Treino com disciplina e humildade.','Escuto meus professores.','Não utilizo minha técnica para intimidar pessoas.','Represento a Punch and Roll com honra.','Busco ser melhor hoje do que fui ontem.'];
+    honra.forEach((item, i) => {
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(RED).text(`${String(i+1).padStart(2,'0')}`, 50, doc.y, { continued: true, width: 30 });
+      doc.font('Helvetica').fillColor(DARK).text(`  ${item}`);
+      doc.moveDown(0.4);
+    });
+
+    doc.moveDown(1);
+    doc.fontSize(10).font('Helvetica-Oblique').fillColor(GRAY)
+      .text('"Na Punch and Roll Fight Team, a força vem da técnica.\nA técnica vem da disciplina.\nE a disciplina constrói campeões dentro e fora dos tatames."', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(8).font('Helvetica').fillColor('#aaaaaa').text('SÃO JOSÉ · SANTA CATARINA · 2026', { align: 'center' });
+
+    doc.end();
+  });
+}
+
 function gerarEmailBoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
   const modLabel  = d.modalidade === 'boxe' ? 'Boxe' : d.modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : 'Boxe + Jiu-Jitsu';
@@ -3047,10 +3168,19 @@ async function dispararBoasVindas(wpToken) {
 
   const emailHtml   = gerarEmailBoasVindas(d);
   const waMensagem  = gerarMsgWABoasVindas(d);
-  const manualBody  = gerarManualAnexo().replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
-  const emailFull   = emailHtml.replace('</body></html>', `<div style="margin-top:32px;border-top:3px solid #d4111c;padding-top:24px">${manualBody}</div></body></html>`);
 
-  // Email para o aluno com manual embutido no corpo
+  // Busca manual PDF no banco; gera se não encontrar
+  let manualBuf = null;
+  try {
+    const [mRows] = await db.query(
+      "SELECT arquivo, mimetype, extensao FROM documentos WHERE visivel=1 AND (nome LIKE '%anual%' OR nome LIKE '%onduta%') ORDER BY criado_em DESC LIMIT 1"
+    );
+    if (mRows.length && mRows[0].arquivo) manualBuf = Buffer.from(mRows[0].arquivo);
+  } catch(e) {}
+  if (!manualBuf) manualBuf = await gerarManualPDF();
+  const manualB64 = manualBuf.toString('base64');
+
+  // Email para o aluno com manual em PDF anexo
   let emailOk = false;
   if (p.email && process.env.SENDGRID_API_KEY) {
     try {
@@ -3058,7 +3188,8 @@ async function dispararBoasVindas(wpToken) {
         personalizations: [{ to: [{ email: p.email, name: p.nome }] }],
         from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Fight Team' },
         subject: `🥊 Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`,
-        content: [{ type: 'text/html', value: emailFull }],
+        content: [{ type: 'text/html', value: emailHtml }],
+        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.pdf', type: 'application/pdf', disposition: 'attachment' }],
       }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
       emailOk = true;
     } catch(e) { console.error('Email bv error:', e.message); }
@@ -3075,7 +3206,7 @@ async function dispararBoasVindas(wpToken) {
   try {
     const [camp] = await db.query(
       `INSERT INTO email_campanhas (nome,assunto,html,status,qtd_enviados,enviado_em) VALUES (?,?,?,?,1,NOW())`,
-      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailFull, 'enviado']
+      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailHtml, 'enviado']
     );
     await db.query(
       'INSERT INTO email_envios (campanha_id,email,nome,status,enviado_em) VALUES (?,?,?,?,NOW())',
@@ -3277,19 +3408,28 @@ app.get('/api/_welcome-preview', async (req, res) => {
   const d = { nome: 'NOME DO ALUNO', plano: 'Mensal — Boxe · 3x/sem', valor: 159, modalidade: 'boxe', email: 'email@aluno.com', tel: '(48) 99999-9999' };
   const waMsg = gerarMsgWABoasVindas(d);
   const emailHtml = gerarEmailBoasVindas(d);
-  const manualBody = gerarManualAnexo().replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
-  const emailFull = emailHtml.replace('</body></html>', `<div style="margin-top:32px;border-top:3px solid #d4111c;padding-top:24px">${manualBody}</div></body></html>`);
+  // Busca manual PDF no banco; gera se não encontrar
+  let manualBuf = null;
+  try {
+    const [mRows] = await db.query(
+      "SELECT arquivo FROM documentos WHERE visivel=1 AND (nome LIKE '%anual%' OR nome LIKE '%onduta%') ORDER BY criado_em DESC LIMIT 1"
+    );
+    if (mRows.length && mRows[0].arquivo) manualBuf = Buffer.from(mRows[0].arquivo);
+  } catch(e) {}
+  if (!manualBuf) manualBuf = await gerarManualPDF();
+  const manualB64 = manualBuf.toString('base64');
   let waOk = false, emailOk = false;
   // WA para o número pessoal do Anderson
   try { await notificarWA('48991860742', `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`); waOk = true; } catch(e){}
-  // Email para o Anderson com manual embutido no corpo
+  // Email para o Anderson com manual em PDF anexo
   if (process.env.SENDGRID_API_KEY) {
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send', {
         personalizations: [{ to: [{ email: 'asbarcellos31@gmail.com', name: 'Anderson' }] }],
         from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
         subject: '[PREVIEW] Email de boas-vindas — novos alunos',
-        content: [{ type: 'text/html', value: `<p style="font-family:Arial;background:#fffbe6;border:2px dashed #f59e0b;padding:16px;border-radius:8px;margin-bottom:20px"><strong>⚠️ ESTE É UM PREVIEW</strong> — modelo do email que será enviado automaticamente para cada novo aluno. O manual de conduta está embutido abaixo do email.</p>${emailFull}` }],
+        content: [{ type: 'text/html', value: `<p style="font-family:Arial;background:#fffbe6;border:2px dashed #f59e0b;padding:16px;border-radius:8px;margin-bottom:20px"><strong>⚠️ ESTE É UM PREVIEW</strong> — modelo do email que será enviado automaticamente para cada novo aluno. Manual de Conduta em PDF anexo.</p>${emailHtml}` }],
+        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.pdf', type: 'application/pdf', disposition: 'attachment' }],
       }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
       emailOk = true;
     } catch(e){}
