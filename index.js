@@ -2822,13 +2822,12 @@ const SITE_BASE        = 'https://punchandroll.com.br';
 function gerarEmailBoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
   const modLabel  = d.modalidade === 'boxe' ? 'Boxe' : d.modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : 'Boxe + Jiu-Jitsu';
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif">
-<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden">
-  <div style="background:#d4111c;padding:32px 24px;text-align:center">
-    <div style="font-size:36px;margin-bottom:8px">🥊</div>
-    <h1 style="color:#fff;font-size:26px;letter-spacing:3px;margin:0">PUNCH AND ROLL</h1>
-    <p style="color:rgba(255,255,255,.8);font-size:12px;margin:6px 0 0;letter-spacing:1px">FIGHT TEAM · SÃO JOSÉ, SC</p>
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+  <div style="background:#ffffff;padding:22px 32px;text-align:center;border-bottom:4px solid #d4111c">
+    <div style="font-size:26px;font-weight:900;letter-spacing:3px;line-height:1"><span style="color:#111">PUNCH </span><span style="color:#d4111c">AND</span><span style="color:#111"> ROLL</span></div>
+    <div style="color:#111;opacity:0.5;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-top:5px">FIGHT TEAM</div>
   </div>
   <div style="padding:32px 28px">
     <h2 style="color:#111;font-size:22px;margin:0 0 12px">Bem-vindo, ${nomeFirst}! 🎉</h2>
@@ -2894,27 +2893,107 @@ function gerarMsgWABoasVindas(d) {
 }
 
 function gerarManualAnexo() {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Manual de Conduta — Punch and Roll</title>
-<style>body{font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:32px;color:#333}h1{color:#d4111c;letter-spacing:2px}h2{color:#111;border-bottom:2px solid #d4111c;padding-bottom:4px}ul{line-height:2}.ok{color:#16a34a}.no{color:#d4111c}</style></head>
-<body>
-<h1>MANUAL DE CONDUTA</h1>
-<p><strong>Punch and Roll Fight Team · São José, SC · 2026</strong></p>
-<p><em>"Mais que uma academia. Uma família."</em></p>
-<p>Nossa missão é desenvolver <strong>disciplina</strong>, respeito, confiança e saúde — dentro e fora dos tatames. Todos devem respeitar as regras abaixo.</p>
-<h2>Valores</h2>
-<ul><li>Respeito</li><li>Disciplina</li><li>Humildade</li><li>Honestidade</li><li>Pontualidade</li><li>Organização</li><li>Espírito Esportivo</li><li>Companheirismo</li><li>Evolução</li></ul>
-<h2>Higiene Pessoal</h2>
-<ul><li class="ok">✓ Tomar banho antes das aulas</li><li class="ok">✓ Uniforme e kimono sempre limpos</li><li class="ok">✓ Luvas e bandagens higienizadas</li><li class="ok">✓ Unhas cortadas (mãos e pés)</li><li class="ok">✓ Desodorante obrigatório</li><li class="no">✗ Não treinar com uniforme sujo ou odor excessivo</li><li class="no">✗ Não treinar com lesões infecciosas</li></ul>
-<h2>Tatame</h2>
-<ul><li class="ok">✓ Entrar sempre descalço</li><li class="ok">✓ Manter o tatame limpo</li><li class="no">✗ Proibido calçados no tatame</li><li class="no">✗ Proibido comer sobre o tatame</li><li class="no">✗ Proibido jogar lixo no chão</li></ul>
-<h2>Organização dos Materiais</h2>
-<p><strong>⚡ USOU → GUARDOU → ORGANIZOU</strong></p>
-<ul><li>Luvas e bandagens: pendurar no local indicado</li><li>Escudos e aparadores: empilhar na prateleira</li><li>Cones e acessórios: devolver ao cesto correto</li><li>Colchonetes: reposicionar ao final da aula</li></ul>
-<h2>Banheiro</h2>
-<ul><li class="ok">✓ Dar sempre a descarga</li><li class="ok">✓ Lavar as mãos com sabão</li><li class="ok">✓ Papel na lixeira — nunca no vaso</li><li class="ok">✓ Fechar as torneiras</li><li class="no">✗ Não jogar papel no vaso (entope!)</li></ul>
-<h2>Conduta Geral</h2>
-<ul><li>Celular no silencioso durante o treino</li><li>Linguagem respeitosa sempre</li><li>Proibido fumar nas dependências</li><li>Proibido álcool e drogas</li><li>Pontualidade: chegar 10 min antes</li></ul>
-<p style="margin-top:32px;border-top:1px solid #ccc;padding-top:16px;color:#888;font-size:12px">O descumprimento reiterado poderá resultar em advertência, suspensão ou desligamento da equipe.<br>Punch and Roll Fight Team · punchandroll.com.br · (48) 98463-9257</p>
+  const cap = (n, t, sub) => `<div style="margin-bottom:16px"><div style="background:#d4111c;color:#fff;font-size:10px;letter-spacing:2px;padding:3px 8px;display:inline-block;border-radius:3px;margin-bottom:6px">CAPÍTULO ${n}</div><div style="font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:${sub?'4px':'8px'}">${t}</div>${sub?`<p style="font-size:11px;color:#6b7280;font-style:italic;margin-bottom:8px">${sub}</p>`:''}`;
+  const ok = (label, items) => `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:10px;color:#16a34a;letter-spacing:1px;margin-bottom:6px">✓ ${label}</div>${items.map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #bbf7d0">✓ ${i}</div>`).join('')}</div>`;
+  const no = (label, items) => `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:10px;color:#dc2626;letter-spacing:1px;margin-bottom:6px">✗ ${label}</div>${items.map(i=>`<div style="font-size:12px;color:#374151;padding:3px 0;border-bottom:1px solid #fecaca">✗ ${i}</div>`).join('')}</div>`;
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Manual de Conduta — Punch and Roll</title></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+  <div style="background:#ffffff;padding:22px 32px;text-align:center;border-bottom:4px solid #d4111c">
+    <div style="font-size:26px;font-weight:900;letter-spacing:3px;line-height:1"><span style="color:#111">PUNCH </span><span style="color:#d4111c">AND</span><span style="color:#111"> ROLL</span></div>
+    <div style="color:#111;opacity:0.5;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-top:5px">FIGHT TEAM</div>
+  </div>
+  <div style="padding:28px 32px;color:#333;line-height:1.7;font-size:15px;">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700;letter-spacing:3px">MANUAL DE CONDUTA</div>
+      <div style="font-size:12px;color:#d4111c;font-weight:600;margin-top:4px">DISCIPLINA E BOAS PRÁTICAS · PUNCH AND ROLL FIGHT TEAM · 2026</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:6px;font-style:italic">"Mais que uma academia. Uma família."</div>
+    </div>
+    <p style="margin-bottom:20px;line-height:1.7;color:#374151"><strong style="color:#111827">Sobre a Punch and Roll —</strong> Punch and Roll Fight Team é uma equipe formada por pessoas que buscam evolução física, técnica e pessoal. Nossa missão não é apenas ensinar Boxe e Jiu-Jitsu — buscamos desenvolver disciplina, respeito, confiança, saúde, espírito esportivo e senso de comunidade. Todos os alunos, professores, colaboradores e visitantes devem respeitar as regras descritas neste manual. O descumprimento poderá resultar em advertência, suspensão ou desligamento da equipe.</p>
+
+    ${cap('I','VALORES DA EQUIPE','Todo integrante da Punch and Roll deve praticar:')}
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">${['Respeito','Disciplina','Humildade','Honestidade','Pontualidade','Organização','Esp. Esportivo','Segurança','Companheirismo','Evolução'].map(v=>`<span style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:4px 10px;font-size:11px;letter-spacing:.5px">${v}</span>`).join('')}</div>
+    </div>
+
+    ${cap('II','HIGIENE PESSOAL','A higiene é uma demonstração de respeito aos colegas.')}
+    ${ok('OBRIGATÓRIO — ALUNOS E PROFESSORES',['Tomar banho regularmente','Escovar os dentes antes das aulas','Utilizar desodorante','Manter unhas das mãos e dos pés cortadas','Utilizar roupas limpas','Utilizar kimonos limpos','Utilizar luvas e bandagens limpas','Utilizar protetores devidamente higienizados'])}
+    ${no('NÃO SERÁ PERMITIDO TREINAR',['Com uniforme excessivamente sujo','Com odor excessivo','Com lesões infecciosas expostas','Com doenças contagiosas'])}
+    </div>
+
+    ${cap('III','APRESENTAÇÃO DOS PROFESSORES','Os professores representam a imagem da equipe.')}
+    ${ok('DEVEM MANTER',['Cabelos limpos e organizados','Barba aparada e higienizada','Uniforme oficial da equipe em bom estado','Linguagem respeitosa','Postura profissional'])}
+    ${no('É VEDADO',['Ministrar aulas com aparência desleixada','Utilizar linguagem ofensiva','Fazer comentários discriminatórios ou constrangedores'])}
+    </div>
+
+    ${cap('IV','PONTUALIDADE','A pontualidade demonstra respeito pelo tempo dos colegas.')}
+    ${ok('ALUNOS',['Chegar preferencialmente 10 minutos antes do horário','Ingressar na aula já preparado para o treino'])}
+    ${ok('PROFESSORES',['Estar presentes antes do início das aulas','Preparar previamente materiais e equipamentos','Iniciar e encerrar as aulas nos horários programados'])}
+    </div>
+
+    ${cap('V','UTILIZAÇÃO DO TATAME','')}
+    ${ok('OBRIGATÓRIO',['Entrar descalço no tatame','Manter o tatame limpo','Respeitar os espaços delimitados'])}
+    ${no('PROIBIDO',['Entrar com calçados utilizados na rua','Comer sobre o tatame','Jogar lixo no chão','Sentar-se de forma inadequada durante as instruções'])}
+    </div>
+
+    ${cap('VI','EQUIPAMENTOS PESSOAIS','Cada aluno é responsável por seus materiais.')}
+    ${ok('TRAZER OBRIGATORIAMENTE QUANDO APLICÁVEL',['Kimono e faixa','Luvas e bandagens','Protetor bucal','Toalha e garrafa de água','Equipamentos de proteção exigidos para cada modalidade'])}
+    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:10px;color:#dc2626;letter-spacing:1px;margin-bottom:6px">✗ ATENÇÃO</div><div style="font-size:12px;color:#374151;padding:3px 0">✗ A academia não se responsabiliza por objetos esquecidos ou perdidos</div></div>
+    </div>
+
+    ${cap('VII','ORGANIZAÇÃO DOS EQUIPAMENTOS','Todo equipamento utilizado deve retornar ao local correto. A organização é responsabilidade de todos.')}
+    ${ok('QUEM UTILIZA: GUARDA, ORGANIZA E CONSERVA',['Luvas de treino e aparadores','Escudos e cones','Cordas e colchonetes','Materiais de preparação física'])}
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:11px;color:#d97706;font-weight:600">⚡ PRINCÍPIO: Usou → Guardou → Organizou</div></div>
+    </div>
+
+    ${cap('VIII','LIMPEZA DOS AMBIENTES','Todos devem colaborar com a limpeza.')}
+    ${ok('INCLUI TODOS OS AMBIENTES',['Banheiros','Área de recepção','Tatame','Área de equipamentos','Área externa','Dar descarga · lavar as mãos · manter o banheiro limpo'])}
+    ${no('PROIBIDO',['Jogar lixo no chão','Deixar copos descartáveis espalhados','Deixar garrafas vazias','Deixar toalhas ou equipamentos abandonados'])}
+    </div>
+
+    ${cap('IX','CONDUTA DURANTE OS TREINOS','')}
+    ${ok('TODOS DEVEM',['Respeitar os professores','Respeitar os colegas','Ouvir as instruções','Manter comportamento adequado'])}
+    ${no('PROIBIDO',['Interromper explicações','Fazer brincadeiras perigosas','Provocar colegas','Utilizar linguagem ofensiva'])}
+    </div>
+
+    ${cap('X','SPARRINGS E ROLAS','Os combates são <strong style="color:#111827">ferramentas de aprendizado</strong>, não disputas de ego. O respeito ao parceiro é inegociável.')}
+    ${ok('TODO PARTICIPANTE DEVERÁ',['Controlar força e intensidade','Respeitar iniciantes','Respeitar diferenças físicas','Interromper imediatamente quando solicitado pelo professor','Priorizar segurança acima de tudo'])}
+    ${no('NÃO SERÁ TOLERADO',['Excesso de agressividade','Golpes intencionais para machucar','Desrespeito ao parceiro de treino','Atitudes antidesportivas'])}
+    </div>
+
+    ${cap('XI','SEGURANÇA','Toda lesão deve ser comunicada imediatamente ao professor.')}
+    ${no('PROIBIDO TREINAR',['Sob efeito de álcool','Sob efeito de drogas ilícitas','Em condições físicas que coloquem terceiros em risco'])}
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:10px;color:#d97706;letter-spacing:1px;margin-bottom:6px">⚠ AUTORIDADE DO PROFESSOR</div><div style="font-size:12px;color:#374151">✓ Os professores possuem autoridade para impedir qualquer aluno de participar da aula caso identifiquem riscos à segurança.</div></div>
+    </div>
+
+    ${cap('XII','CELULARES','')}
+    ${ok('DURANTE OS TREINOS',['Utilizar apenas quando necessário','Manter o foco na atividade'])}
+    ${no('PROIBIDO',['Atender ligações durante instruções','Filmar terceiros sem autorização'])}
+    </div>
+
+    ${cap('XIII','CRIANÇAS E ADOLESCENTES','A formação do caráter é parte fundamental da metodologia da equipe.')}
+    ${ok('PAIS E RESPONSÁVEIS DEVERÃO',['Respeitar os horários de início e término das aulas','Buscar os alunos ao término das aulas','Respeitar as orientações dos professores'])}
+    </div>
+
+    ${cap('XIV','REDES SOCIAIS','A imagem da Punch and Roll deve ser preservada por todos.')}
+    ${ok('ESPERA-SE DE TODOS',['Respeito à equipe nas publicações','Respeito aos colegas e professores','Representar a academia com orgulho e responsabilidade'])}
+    ${no('NÃO SERÃO TOLERADAS PUBLICAÇÕES QUE',['Ataquem membros da equipe','Difamem a academia','Exponham alunos sem autorização'])}
+    </div>
+
+    ${cap('XV','PROFESSORES','Além das demais regras, os professores têm responsabilidades adicionais.')}
+    ${ok('OS PROFESSORES DEVEM',['Dar exemplo dentro e fora da academia','Tratar todos os alunos de forma igualitária','Zelar pela segurança dos treinos','Cumprir a metodologia definida pela equipe','Estimular um ambiente acolhedor e familiar','Comunicar imediatamente problemas estruturais ou disciplinares aos sócios'])}
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px;margin-bottom:8px"><div style="font-size:12px;color:#92400e;line-height:1.6"><strong>Advertência, suspensão ou desligamento</strong> poderão ser aplicados a qualquer integrante — aluno, professor ou colaborador — que descumprir as normas deste manual, a critério dos sócios da Punch and Roll Fight Team.</div></div>
+    </div>
+
+    <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.3);border-radius:8px;padding:16px;margin-top:20px">
+      <div style="font-size:13px;font-weight:700;color:#d4111c;margin-bottom:12px;letter-spacing:2px;text-align:center">CÓDIGO DE HONRA — PUNCH AND ROLL</div>
+      ${['Respeito todos os membros da equipe.','Sou pontual.','Cuido do meu corpo e da minha higiene.','Cuido da academia como se fosse minha.','Ajudo os colegas a evoluírem.','Treino com disciplina e humildade.','Escuto meus professores.','Não utilizo minha técnica para intimidar pessoas.','Represento a Punch and Roll com honra.','Busco ser melhor hoje do que fui ontem.'].map((item,i)=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(212,17,28,.15)"><span style="font-size:15px;color:#d4111c;font-weight:700;min-width:24px">${String(i+1).padStart(2,'0')}</span><span style="font-size:12px;color:#374151;line-height:1.5">${item}</span></div>`).join('')}
+    </div>
+    <div style="text-align:center;margin-top:20px;padding-top:16px;border-top:1px solid #e5e5e5;color:#888;font-size:11px;font-style:italic;line-height:1.8">
+      "Na Punch and Roll Fight Team, a força vem da técnica.<br>A técnica vem da disciplina.<br>E a disciplina constrói <strong style="color:#d4111c">campeões</strong> dentro e fora dos tatames."<br>
+      <span style="font-size:10px;letter-spacing:2px;color:#aaa;font-style:normal">SÃO JOSÉ · SANTA CATARINA · 2026</span>
+    </div>
+  </div>
+</div>
 </body></html>`;
 }
 
