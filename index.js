@@ -831,13 +831,13 @@ app.post('/api/alunos/publico', async (req, res) => {
     // Notifica admin no WA
     await notificarWA(process.env.WA_ADMIN_NUM||'554898463-9257',`🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Plano:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}`);
 
-    // Cria pending e envia preview para Anderson aprovar ANTES de qualquer envio ao aluno
+    // Dispara boas-vindas automaticamente (modelo aprovado)
     const wpToken = require('crypto').randomBytes(24).toString('hex');
     await db.query(
       'INSERT INTO welcome_pending (aluno_id,token,nome,email,tel,plano,valor,modalidade) VALUES (?,?,?,?,?,?,?,?)',
       [alunoId, wpToken, d.nome, d.email, d.tel, d.plano, d.valor||0, d.modalidade]
     );
-    enviarPreviewParaAnderson(wpToken, d).catch(e => console.error('Preview error:', e.message));
+    dispararBoasVindas(wpToken).catch(e => console.error('Boas-vindas error:', e.message));
 
     res.json({ id: alunoId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
