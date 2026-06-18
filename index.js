@@ -831,13 +831,13 @@ app.post('/api/alunos/publico', async (req, res) => {
     // Notifica admin no WA
     await notificarWA(process.env.WA_ADMIN_NUM||'554898463-9257',`🥊 *Nova Matrícula!*\n\n*Aluno:* ${d.nome}\n*Plano:* ${d.plano}\n*Pagamento:* ${d.payMethod}\n*WhatsApp:* ${d.tel}`);
 
-    // Cria pending e dispara boas-vindas automaticamente
+    // Cria pending e envia preview para Anderson aprovar ANTES de qualquer envio ao aluno
     const wpToken = require('crypto').randomBytes(24).toString('hex');
     await db.query(
       'INSERT INTO welcome_pending (aluno_id,token,nome,email,tel,plano,valor,modalidade) VALUES (?,?,?,?,?,?,?,?)',
       [alunoId, wpToken, d.nome, d.email, d.tel, d.plano, d.valor||0, d.modalidade]
     );
-    dispararBoasVindas(wpToken).catch(e => console.error('Boas-vindas error:', e.message));
+    enviarPreviewParaAnderson(wpToken, d).catch(e => console.error('Preview error:', e.message));
 
     res.json({ id: alunoId, message: 'Matrícula recebida!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2916,6 +2916,52 @@ function gerarManualAnexo() {
 </body></html>`;
 }
 
+const OWNER_WA = process.env.WA_OWNER_NUM || (process.env.WA_ADMIN_NUM || '554898463-9257');
+
+async function enviarPreviewParaAnderson(wpToken, d) {
+  const urlAprovar  = `${API_BASE}/api/welcome/aprovar/${wpToken}`;
+  const emailAluno  = gerarEmailBoasVindas(d);
+  const waAluno     = gerarMsgWABoasVindas(d);
+  const nomeFirst   = (d.nome||'').split(' ')[0];
+
+  // ── WhatsApp para o Anderson ──
+  const waAnderson = `🥊 *Nova matrícula — prévia de boas-vindas*\n\n👤 *${d.nome}*\n📋 ${d.plano}\n💰 R$ ${Number(d.valor||0).toFixed(0)}/mês\n📱 ${d.tel}\n\n*Isso será enviado para o aluno:*\n\n${waAluno}\n\n✅ Para aprovar e disparar tudo (email + WA), acesse:\n${urlAprovar}`;
+  await notificarWA(OWNER_WA, waAnderson).catch(()=>{});
+
+  // ── Email para o Anderson com preview completo ──
+  if (!process.env.SENDGRID_API_KEY) return;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px">
+<div style="max-width:640px;margin:0 auto">
+  <div style="background:#1a1a1a;border-radius:10px 10px 0 0;padding:20px 24px">
+    <p style="color:#fff;font-size:16px;font-weight:bold;margin:0">🥊 Nova Matrícula — Aprovação Necessária</p>
+    <p style="color:#aaa;font-size:12px;margin:6px 0 0">Aluno: <strong style="color:#fff">${d.nome}</strong> · ${d.plano} · R$ ${Number(d.valor||0).toFixed(0)}/mês · ${d.tel}</p>
+  </div>
+  <div style="background:#fff;padding:24px;border:1px solid #e5e5e5">
+    <p style="color:#333;font-size:14px;margin:0 0 20px">Revise o email e o WhatsApp abaixo. Quando estiver ok, clique em <strong>Aprovar e Enviar</strong>.</p>
+    <div style="text-align:center;margin-bottom:24px">
+      <a href="${urlAprovar}" style="background:#16a34a;color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:bold;letter-spacing:1px;display:inline-block">✅ APROVAR E ENVIAR</a>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px;margin-bottom:20px">
+      <p style="color:#16a34a;font-size:10px;font-weight:bold;letter-spacing:1px;margin:0 0 10px">📱 WHATSAPP QUE SERÁ ENVIADO AO ALUNO</p>
+      <pre style="font-family:Arial,sans-serif;font-size:13px;color:#333;white-space:pre-wrap;margin:0">${waAluno}</pre>
+    </div>
+  </div>
+  <div style="border:2px dashed #d4111c;border-radius:0 0 10px 10px;padding:4px">
+    <p style="text-align:center;color:#d4111c;font-size:10px;font-weight:bold;letter-spacing:1px;margin:8px 0">✉️ EMAIL QUE SERÁ ENVIADO AO ALUNO</p>
+    ${emailAluno}
+  </div>
+</div>
+</body></html>`;
+
+  await axios.post('https://api.sendgrid.com/v3/mail/send', {
+    personalizations: [{ to: [{ email: OWNER_EMAIL, name: 'Anderson Barcellos' }] }],
+    from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
+    subject: `[APROVAR] Boas-vindas para ${d.nome} — ${d.plano}`,
+    content: [{ type: 'text/html', value: html }],
+  }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
+}
+
 async function dispararBoasVindas(wpToken) {
   const [rows] = await db.query('SELECT * FROM welcome_pending WHERE token=? AND status="pendente"', [wpToken]);
   if (!rows.length) return { ok: false, msg: 'Já enviado ou não encontrado' };
@@ -3126,6 +3172,32 @@ app.get('/api/_report-now', async (req, res) => {
   } catch(e) {
     res.json({ ok: false, erro: e.message });
   }
+});
+
+// Envia preview das boas-vindas para o Anderson (uso interno)
+app.get('/api/_welcome-preview', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  const d = { nome: 'NOME DO ALUNO', plano: 'Mensal — Boxe · 3x/sem', valor: 159, modalidade: 'boxe', email: 'email@aluno.com', tel: '(48) 99999-9999' };
+  const waMsg = gerarMsgWABoasVindas(d);
+  const emailHtml = gerarEmailBoasVindas(d);
+  const manualB64 = Buffer.from(gerarManualAnexo(), 'utf8').toString('base64');
+  let waOk = false, emailOk = false;
+  // WA para o Anderson
+  try { await notificarWA('48991860744', `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`); waOk = true; } catch(e){}
+  // Email para o Anderson
+  if (process.env.SENDGRID_API_KEY) {
+    try {
+      await axios.post('https://api.sendgrid.com/v3/mail/send', {
+        personalizations: [{ to: [{ email: 'asbarcellos31@gmail.com', name: 'Anderson' }] }],
+        from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
+        subject: '[PREVIEW] Email de boas-vindas — novos alunos',
+        content: [{ type: 'text/html', value: `<p style="font-family:Arial;background:#fffbe6;border:2px dashed #f59e0b;padding:16px;border-radius:8px;margin-bottom:20px"><strong>⚠️ ESTE É UM PREVIEW</strong> — modelo do email que será enviado automaticamente para cada novo aluno.</p>${emailHtml}` }],
+        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.html', type: 'text/html', disposition: 'attachment' }],
+      }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
+      emailOk = true;
+    } catch(e){}
+  }
+  res.json({ waOk, emailOk });
 });
 
 // Disparo manual de boas-vindas por aluno_id (uso interno)
