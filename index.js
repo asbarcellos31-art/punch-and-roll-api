@@ -3206,17 +3206,17 @@ async function dispararBoasVindas(wpToken) {
     waOk = true;
   } catch(e) { console.error('WA bv error:', e.message); }
 
-  // Registra no histórico de email
+  // Registra no histórico de Email MKT
   try {
     const [camp] = await db.query(
-      `INSERT INTO email_campanhas (nome,assunto,html,status,qtd_enviados,enviado_em) VALUES (?,?,?,?,1,NOW())`,
-      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailHtml, 'enviado']
+      `INSERT INTO email_campanhas (nome,status,total_enviados) VALUES (?,?,1)`,
+      [`Boas-vindas — ${p.nome}`, 'CONCLUIDA']
     );
     await db.query(
-      'INSERT INTO email_envios (campanha_id,email,nome,status,enviado_em) VALUES (?,?,?,?,NOW())',
-      [camp.insertId, p.email, p.nome, emailOk ? 'enviado' : 'erro']
+      'INSERT INTO email_envios (campanha_id,contato_nome,contato_email,tipo,status) VALUES (?,?,?,?,?)',
+      [camp.insertId, p.nome, p.email, 'INDIVIDUAL', emailOk ? 'ENVIADO' : 'ERRO']
     );
-  } catch(e) {}
+  } catch(e) { console.error('Email history error:', e.message); }
 
   // Registra no histórico de WA MKT
   try {
@@ -3225,10 +3225,10 @@ async function dispararBoasVindas(wpToken) {
       ['whatsapp', `Boas-vindas — ${p.nome}`, waMensagem, 'individual', 'enviado']
     );
     await db.query(
-      'INSERT INTO wa_envios (campanha_id,aluno_id,tel,nome,status,enviado_em) VALUES (?,?,?,?,?,NOW())',
-      [waCamp.insertId, p.aluno_id, p.tel, p.nome, waOk ? 'enviado' : 'erro']
+      'INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status) VALUES (?,?,?,?,?,?)',
+      [waCamp.insertId, p.nome, p.tel, waMensagem, 'INDIVIDUAL', waOk ? 'ENVIADO' : 'ERRO']
     );
-  } catch(e) {}
+  } catch(e) { console.error('WA history error:', e.message); }
 
   // Atualiza status do pending
   await db.query('UPDATE welcome_pending SET status="enviado", enviado_em=NOW() WHERE token=?', [wpToken]);
