@@ -2825,9 +2825,8 @@ function gerarEmailBoasVindas(d) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px;">
 <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-  <div style="background:#ffffff;padding:22px 32px;text-align:center;border-bottom:4px solid #d4111c">
-    <div style="font-size:26px;font-weight:900;letter-spacing:3px;line-height:1"><span style="color:#111">PUNCH </span><span style="color:#d4111c">AND</span><span style="color:#111"> ROLL</span></div>
-    <div style="color:#111;opacity:0.5;font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-top:5px">FIGHT TEAM</div>
+  <div style="background:#ffffff;padding:20px 32px;text-align:center;border-bottom:4px solid #d4111c">
+    <img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll Fight Team" style="height:80px;width:auto;display:block;margin:0 auto">
   </div>
   <div style="padding:32px 28px">
     <h2 style="color:#111;font-size:22px;margin:0 0 12px">Bem-vindo, ${nomeFirst}! 🎉</h2>
@@ -3048,10 +3047,10 @@ async function dispararBoasVindas(wpToken) {
 
   const emailHtml   = gerarEmailBoasVindas(d);
   const waMensagem  = gerarMsgWABoasVindas(d);
-  const manualHtml  = gerarManualAnexo();
-  const manualB64   = Buffer.from(manualHtml, 'utf8').toString('base64');
+  const manualBody  = gerarManualAnexo().replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
+  const emailFull   = emailHtml.replace('</body></html>', `<div style="margin-top:32px;border-top:3px solid #d4111c;padding-top:24px">${manualBody}</div></body></html>`);
 
-  // Email para o aluno com manual em anexo
+  // Email para o aluno com manual embutido no corpo
   let emailOk = false;
   if (p.email && process.env.SENDGRID_API_KEY) {
     try {
@@ -3059,8 +3058,7 @@ async function dispararBoasVindas(wpToken) {
         personalizations: [{ to: [{ email: p.email, name: p.nome }] }],
         from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Fight Team' },
         subject: `🥊 Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`,
-        content: [{ type: 'text/html', value: emailHtml }],
-        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.html', type: 'text/html', disposition: 'attachment' }],
+        content: [{ type: 'text/html', value: emailFull }],
       }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
       emailOk = true;
     } catch(e) { console.error('Email bv error:', e.message); }
@@ -3077,7 +3075,7 @@ async function dispararBoasVindas(wpToken) {
   try {
     const [camp] = await db.query(
       `INSERT INTO email_campanhas (nome,assunto,html,status,qtd_enviados,enviado_em) VALUES (?,?,?,?,1,NOW())`,
-      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailHtml, 'enviado']
+      [`Boas-vindas — ${p.nome}`, `Bem-vindo(a) à Punch and Roll, ${p.nome.split(' ')[0]}!`, emailFull, 'enviado']
     );
     await db.query(
       'INSERT INTO email_envios (campanha_id,email,nome,status,enviado_em) VALUES (?,?,?,?,NOW())',
@@ -3279,19 +3277,19 @@ app.get('/api/_welcome-preview', async (req, res) => {
   const d = { nome: 'NOME DO ALUNO', plano: 'Mensal — Boxe · 3x/sem', valor: 159, modalidade: 'boxe', email: 'email@aluno.com', tel: '(48) 99999-9999' };
   const waMsg = gerarMsgWABoasVindas(d);
   const emailHtml = gerarEmailBoasVindas(d);
-  const manualB64 = Buffer.from(gerarManualAnexo(), 'utf8').toString('base64');
+  const manualBody = gerarManualAnexo().replace(/^[\s\S]*?<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
+  const emailFull = emailHtml.replace('</body></html>', `<div style="margin-top:32px;border-top:3px solid #d4111c;padding-top:24px">${manualBody}</div></body></html>`);
   let waOk = false, emailOk = false;
-  // WA para o Anderson
-  try { await notificarWA('48991860744', `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`); waOk = true; } catch(e){}
-  // Email para o Anderson
+  // WA para o número pessoal do Anderson
+  try { await notificarWA('48991860742', `🥊 *Preview — Boas-vindas dos novos alunos*\n\nEste é o modelo que será enviado automaticamente. Abaixo o texto do WhatsApp:\n\n---\n\n${waMsg}`); waOk = true; } catch(e){}
+  // Email para o Anderson com manual embutido no corpo
   if (process.env.SENDGRID_API_KEY) {
     try {
       await axios.post('https://api.sendgrid.com/v3/mail/send', {
         personalizations: [{ to: [{ email: 'asbarcellos31@gmail.com', name: 'Anderson' }] }],
         from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
         subject: '[PREVIEW] Email de boas-vindas — novos alunos',
-        content: [{ type: 'text/html', value: `<p style="font-family:Arial;background:#fffbe6;border:2px dashed #f59e0b;padding:16px;border-radius:8px;margin-bottom:20px"><strong>⚠️ ESTE É UM PREVIEW</strong> — modelo do email que será enviado automaticamente para cada novo aluno.</p>${emailHtml}` }],
-        attachments: [{ content: manualB64, filename: 'Manual-de-Conduta-Punch-and-Roll.html', type: 'text/html', disposition: 'attachment' }],
+        content: [{ type: 'text/html', value: `<p style="font-family:Arial;background:#fffbe6;border:2px dashed #f59e0b;padding:16px;border-radius:8px;margin-bottom:20px"><strong>⚠️ ESTE É UM PREVIEW</strong> — modelo do email que será enviado automaticamente para cada novo aluno. O manual de conduta está embutido abaixo do email.</p>${emailFull}` }],
       }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
       emailOk = true;
     } catch(e){}
