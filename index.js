@@ -522,6 +522,33 @@ async function setupDB() {
       ('ANIVERSARIO','Parabéns Aniversariantes',0,'09:00'),
       ('VENCENDO','Alerta Mensalidade Vencendo',0,'09:00')`);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS login_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tipo VARCHAR(20),
+        user_id INT,
+        nome VARCHAR(200),
+        email VARCHAR(200),
+        ip VARCHAR(60),
+        user_agent TEXT,
+        logado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX (logado_em)
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS page_views (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        pagina VARCHAR(100),
+        ip VARCHAR(60),
+        user_agent TEXT,
+        referrer TEXT,
+        visto_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX (visto_em),
+        INDEX (pagina)
+      )
+    `);
+
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
       const senha = await bcrypt.hash('admin123', 10);
@@ -557,6 +584,9 @@ app.post('/api/auth/admin', async (req, res) => {
       nivel: rows[0].nivel || 'master',
       permissoes,
     }, JWT_SECRET, { expiresIn: '7d' });
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    db.query('INSERT INTO login_log (tipo,user_id,nome,email,ip,user_agent) VALUES (?,?,?,?,?,?)',
+      ['admin', rows[0].id, rows[0].nome, rows[0].email, ip, req.headers['user-agent'] || '']).catch(()=>{});
     res.json({ token, nome: rows[0].nome, tipo: 'admin', nivel: rows[0].nivel || 'master', permissoes });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -577,6 +607,9 @@ app.post('/api/auth/aluno', async (req, res) => {
     const ok = await bcrypt.compare(senha, aluno.senha);
     if (!ok) return res.status(401).json({ error: 'Senha incorreta' });
     const token = jwt.sign({ id: aluno.id, tipo: 'aluno', nome: aluno.nome }, JWT_SECRET, { expiresIn: '30d' });
+    const ipA = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    db.query('INSERT INTO login_log (tipo,user_id,nome,email,ip,user_agent) VALUES (?,?,?,?,?,?)',
+      ['aluno', aluno.id, aluno.nome, aluno.email || '', ipA, req.headers['user-agent'] || '']).catch(()=>{});
     res.json({
       token, tipo: 'aluno',
       aluno: { id: aluno.id, nome: aluno.nome, modalidade: aluno.modalidade, status: aluno.status, plano: aluno.plano, valor: aluno.valor, vencimento: aluno.vencimento, tel: aluno.tel, email: aluno.email }
@@ -2747,11 +2780,123 @@ app.put('/api/shop/pedidos/:id/status', auth, adminOnly, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ══════════════════════════════════════
+// RELATÓRIO SEMANAL PRIVADO
+// ══════════════════════════════════════
+
+async function enviarRelatorioSemanal() {
+  if (!process.env.SENDGRID_API_KEY) return;
+  try {
+    const agora = new Date();
+    const inicio = new Date(agora);
+    inicio.setDate(agora.getDate() - 7);
+    const fmt = d => d.toISOString().slice(0,19).replace('T',' ');
+
+    const [logins] = await db.query(
+      `SELECT tipo, nome, email, ip, logado_em FROM login_log WHERE logado_em >= ? ORDER BY logado_em DESC`,
+      [fmt(inicio)]
+    );
+    const [views] = await db.query(
+      `SELECT pagina, COUNT(*) as total FROM page_views WHERE visto_em >= ? GROUP BY pagina ORDER BY total DESC`,
+      [fmt(inicio)]
+    );
+    const [viewsTotal] = await db.query(
+      `SELECT COUNT(*) as total FROM page_views WHERE visto_em >= ?`, [fmt(inicio)]
+    );
+
+    const admins = logins.filter(l => l.tipo === 'admin');
+    const alunos = logins.filter(l => l.tipo === 'aluno');
+
+    const linhasAdmin = admins.length
+      ? admins.map(l => `<tr><td>${l.nome}</td><td>${l.email}</td><td>${l.ip}</td><td>${String(l.logado_em).slice(0,16)}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:#999">Nenhum acesso admin no período</td></tr>';
+
+    const linhasAluno = alunos.length
+      ? alunos.map(l => `<tr><td>${l.nome}</td><td>${l.email||'-'}</td><td>${l.ip}</td><td>${String(l.logado_em).slice(0,16)}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:#999">Nenhum acesso de aluno no período</td></tr>';
+
+    const linhasViews = views.length
+      ? views.map(v => `<tr><td>${v.pagina}</td><td style="text-align:center">${v.total}</td></tr>`).join('')
+      : '<tr><td colspan="2" style="color:#999">Nenhuma visita registrada</td></tr>';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+        <div style="background:#1a1a1a;padding:22px 32px;text-align:center">
+          <div style="font-size:24px;font-weight:900;letter-spacing:3px;color:#fff">PUNCH <span style="color:#d4111c">AND</span> ROLL</div>
+          <div style="color:#aaa;font-size:11px;letter-spacing:3px;margin-top:4px">RELATÓRIO SEMANAL DE ACESSOS</div>
+        </div>
+        <div style="padding:28px 32px;color:#333">
+          <p style="color:#666;font-size:13px">Período: <strong>${fmt(inicio).slice(0,10)}</strong> a <strong>${fmt(agora).slice(0,10)}</strong></p>
+
+          <h3 style="color:#d4111c;border-bottom:2px solid #d4111c;padding-bottom:6px">🔐 Logins Admin (${admins.length})</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Nome</th><th style="padding:8px;text-align:left">Email</th><th style="padding:8px;text-align:left">IP</th><th style="padding:8px;text-align:left">Data/Hora</th></tr></thead>
+            <tbody>${linhasAdmin}</tbody>
+          </table>
+
+          <h3 style="color:#d4111c;border-bottom:2px solid #d4111c;padding-bottom:6px;margin-top:28px">👤 Logins Alunos (${alunos.length})</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Nome</th><th style="padding:8px;text-align:left">Email</th><th style="padding:8px;text-align:left">IP</th><th style="padding:8px;text-align:left">Data/Hora</th></tr></thead>
+            <tbody>${linhasAluno}</tbody>
+          </table>
+
+          <h3 style="color:#d4111c;border-bottom:2px solid #d4111c;padding-bottom:6px;margin-top:28px">📊 Visitas por Página (total: ${viewsTotal[0].total})</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Página</th><th style="padding:8px;text-align:center">Visitas</th></tr></thead>
+            <tbody>${linhasViews}</tbody>
+          </table>
+        </div>
+        <div style="background:#f5f5f5;padding:14px 32px;font-size:11px;color:#999;text-align:center">Este relatório é privado e enviado automaticamente toda segunda-feira.</div>
+      </div>`;
+
+    await axios.post('https://api.sendgrid.com/v3/mail/send', {
+      personalizations: [{ to: [{ email: 'asbarcellos31@gmail.com', name: 'Anderson Barcellos' }] }],
+      from: { email: process.env.EMAIL_FROM || 'noreply@punchandroll.com.br', name: 'Punch and Roll Sistema' },
+      subject: `[P&R] Relatório de Acessos — semana ${fmt(inicio).slice(0,10)} a ${fmt(agora).slice(0,10)}`,
+      content: [{ type: 'text/html', value: html }],
+    }, { headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' } });
+
+    console.log('✅ Relatório semanal de acessos enviado para asbarcellos31@gmail.com');
+  } catch (e) {
+    console.error('Erro ao enviar relatório semanal:', e.message);
+  }
+}
+
+// Cron semanal — toda segunda-feira às 08:00
+function agendarRelatorioSemanal() {
+  const verificar = () => {
+    const agora = new Date();
+    // Segunda-feira = 1, às 08:00
+    if (agora.getDay() === 1 && agora.getHours() === 8 && agora.getMinutes() === 0) {
+      enviarRelatorioSemanal();
+    }
+  };
+  // Verifica a cada minuto
+  setInterval(verificar, 60 * 1000);
+}
+
+// ══════════════════════════════════════
+// TRACKING INTERNO (invisível no painel)
+// ══════════════════════════════════════
+
+// Ping de visualização de página — chamado silenciosamente pelo frontend
+app.post('/api/_pv', async (req, res) => {
+  try {
+    const { pagina } = req.body;
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    const ua = req.headers['user-agent'] || '';
+    const ref = req.headers['referer'] || '';
+    await db.query('INSERT INTO page_views (pagina,ip,user_agent,referrer) VALUES (?,?,?,?)', [pagina || 'desconhecida', ip, ua, ref]);
+    res.sendStatus(204);
+  } catch { res.sendStatus(204); }
+});
+
 // START
 // ══════════════════════════════════════
 const PORT = process.env.PORT || 3000;
 setupDB().then(() => {
   app.listen(PORT, () => console.log(`🥊 Punch and Roll API rodando na porta ${PORT}`));
+  agendarRelatorioSemanal();
 }).catch(e => {
   console.error('Erro ao configurar banco:', e.message);
   process.exit(1);
