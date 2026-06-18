@@ -235,7 +235,7 @@ function renderInicio() {
   if(pinned.length) {
     html+='<div class="card"><div class="card-title">📌 Avisos</div>';
     pinned.forEach(r=>{
-      const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted2)';
+      const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted)';
       html+=`<div style="padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${cor}">
         <div style="font-size:13px;font-weight:600;margin-bottom:3px">${r.titulo}</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.4">${r.body.slice(0,100)}${r.body.length>100?'...':''}</div>
@@ -298,7 +298,7 @@ function renderFinanceiro() {
         </div>`).join('')}
     </div>
     <div style="text-align:center;padding:10px 0 14px">
-      <a href="https://wa.me/554898463-9257?text=Olá! Sou ${a.nome} e preciso falar sobre minha mensalidade." target="_blank"
+      <a href="https://wa.me/5548984639257?text=Olá! Sou ${a.nome} e preciso falar sobre minha mensalidade." target="_blank"
          style="display:inline-flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">
         💬 Falar com a academia
       </a>
@@ -384,7 +384,7 @@ function renderRecados() {
   document.getElementById('page-recados').innerHTML = todos.length===0
     ? '<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px">Nenhum recado</div>'
     : todos.map(r=>{
-        const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted2)';
+        const cor=r.tipo==='urgente'?'var(--red)':r.tipo==='evento'?'var(--blue)':'var(--muted)';
         return `<div class="card" style="border-left:3px solid ${cor}">
           ${r.pin?'<div style="font-size:9px;color:var(--yellow);font-weight:600;margin-bottom:5px">📌 FIXADO</div>':''}
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">

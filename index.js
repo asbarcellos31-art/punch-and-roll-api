@@ -2690,12 +2690,12 @@ app.delete('/api/shop/produtos/:id', auth, adminOnly, async (req, res) => {
 });
 
 // Pedidos — criar (público com nome+tel ou aluno logado)
-app.post('/api/shop/pedidos', async (req, res) => {
+app.post('/api/shop/pedidos', auth, async (req, res) => {
   try {
     let { nome, tel, aluno_id, itens, obs } = req.body;
     if (!itens || !itens.length) return res.status(400).json({ error: 'Carrinho vazio' });
 
-    // Se autenticado como aluno, pegar dados do cadastro
+    // Pegar dados do aluno autenticado
     const tokenHeader = req.headers.authorization?.split(' ')[1];
     if (tokenHeader) {
       try {
