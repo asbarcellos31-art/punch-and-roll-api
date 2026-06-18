@@ -1229,7 +1229,6 @@ function imprimirContas() {
     ${totalPago>0?`<div class="t-pago">Pago: R$ ${totalPago.toFixed(2).replace('.',',')}</div>`:''}
     <div style="padding:8px 14px;background:#f3f3f3;border-radius:6px;font-weight:700">Total: R$ ${(totalPend+totalPago).toFixed(2).replace('.',',')}</div>
   </div>
-  <script>fetch('https://punch-and-roll-api-production.up.railway.app/api/_pv',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pagina:'punch-and-roll-admin'})}).catch(()=>{});</script>
 </body></html>`);
   w.document.close();
 }
