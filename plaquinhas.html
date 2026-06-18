@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Plaquinhas — Punch and Roll Fight Team</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #ccc;
+    font-family: 'Inter', sans-serif;
+    padding: 10mm;
+  }
+
+  /* Folha A4 com 2 plaquinhas por página */
+  .folha {
+    width: 210mm;
+    height: 297mm;
+    background: #ddd;
+    margin: 0 auto 10mm;
+    display: flex;
+    flex-direction: column;
+    gap: 4mm;
+    padding: 4mm;
+    page-break-after: always;
+  }
+
+  /* Cada plaquinha ≈ A5 (148×99mm) — 2 por folha */
+  .placa {
+    flex: 1;
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px dashed #aaa; /* guia de corte */
+  }
+
+  /* ── Cabeçalho ── */
+  .cab {
+    background: #111;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .cab-marca {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 17px;
+    letter-spacing: 3px;
+    color: #fff;
+    line-height: 1;
+  }
+  .cab-marca span { color: #d4111c; }
+  .cab-sub { font-size: 7px; color: #777; letter-spacing: 2px; margin-top: 2px; }
+  .cab-icone { font-size: 22px; }
+
+  /* ── Título ── */
+  .titulo {
+    background: #d4111c;
+    padding: 7px 14px 6px;
+    flex-shrink: 0;
+  }
+  .titulo h1 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .titulo .sub {
+    font-size: 8px;
+    color: rgba(255,255,255,.7);
+    letter-spacing: 1px;
+    font-style: italic;
+    margin-top: 1px;
+  }
+
+  /* ── Corpo ── */
+  .corpo {
+    padding: 10px 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .item:last-child { border-bottom: none; }
+  .item-icone { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; margin-top: 1px; }
+  .item-texto strong { display: block; font-size: 12px; font-weight: 700; color: #111; line-height: 1.2; }
+  .item-texto span { font-size: 10px; color: #666; }
+
+  .badge-ok {
+    background: #16a34a; color: #fff;
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 2px 8px; border-radius: 3px;
+    display: inline-block; margin-bottom: 6px;
+  }
+  .badge-no {
+    background: #d4111c; color: #fff;
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 2px 8px; border-radius: 3px;
+    display: inline-block; margin: 6px 0;
+  }
+
+  .destaque {
+    background: #111;
+    border-left: 3px solid #d4111c;
+    padding: 7px 10px;
+    border-radius: 3px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+  .destaque p { color: #fff; font-size: 10px; line-height: 1.5; }
+  .destaque strong { color: #d4111c; }
+
+  .principio {
+    background: #d4111c;
+    border-radius: 5px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .principio p {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    color: #fff;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+  }
+
+  /* ── Rodapé ── */
+  .rodape {
+    background: #111;
+    padding: 5px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .rodape-txt { font-size: 7px; color: #555; letter-spacing: 1px; }
+  .rodape-slogan { font-size: 7px; color: #d4111c; font-weight: 600; letter-spacing: 1px; }
+
+  /* ── Banheiro items ── */
+  .ban-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 8px; border-radius: 5px; margin-bottom: 5px;
+  }
+  .ban-item.ok { background: #f0fdf4; border: 1px solid #86efac; }
+  .ban-item.no { background: #fef2f2; border: 1px solid #fca5a5; }
+  .ban-item .bi { font-size: 16px; flex-shrink: 0; }
+  .ban-item .bt { font-size: 11px; font-weight: 600; color: #111; }
+  .ban-item.no .bt { color: #991b1b; }
+
+  /* ── Missão (placa escura) ── */
+  .missao-corpo {
+    flex: 1;
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 14px 20px;
+  }
+  .missao-aspas { font-size: 44px; color: #d4111c; font-family: Georgia, serif; line-height: .7; margin-bottom: 8px; }
+  .missao-txt {
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: #fff;
+    line-height: 1.5;
+    letter-spacing: .5px;
+  }
+  .missao-txt strong { color: #d4111c; font-weight: 700; }
+  .missao-linha { width: 40px; height: 2px; background: #d4111c; margin: 10px auto 8px; }
+  .missao-ass { font-size: 8px; color: #555; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── Disciplina grande ── */
+  .big-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px;
+    color: #111;
+    letter-spacing: 3px;
+    line-height: 1.1;
+    text-align: center;
+    margin: auto 0;
+    padding: 6px 0;
+  }
+  .big-text span { color: #d4111c; }
+
+  /* Valores grid */
+  .valores-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 4px;
+    flex: 1;
+  }
+  .v-card {
+    background: #111;
+    border-radius: 5px;
+    padding: 8px 6px;
+    text-align: center;
+    border-top: 2px solid #d4111c;
+  }
+  .v-card .vi { font-size: 18px; display: block; margin-bottom: 4px; }
+  .v-card .vn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px; font-weight: 700;
+    color: #fff; letter-spacing: 1px;
+  }
+  .v-card .vd { font-size: 8px; color: #666; margin-top: 2px; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .folha { margin: 0; background: #f0f0f0; }
+    @page { size: A4; margin: 0; }
+  }
+
+  /* Força impressão de fundos e cores */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ FOLHA 1 ═══════ -->
+<div class="folha">
+
+  <!-- PLACA 1 — MISSÃO -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🥊</div>
+    </div>
+    <div class="titulo">
+      <h1>Nossa Missão</h1>
+      <div class="sub">O que nos move todos os dias</div>
+    </div>
+    <div class="missao-corpo">
+      <div class="missao-aspas">"</div>
+      <div class="missao-txt">
+        Mais que uma academia.<br>
+        Uma <strong>família</strong>.<br><br>
+        Desenvolvemos <strong>disciplina</strong>, respeito,<br>
+        confiança e saúde —<br>dentro e fora dos tatames.
+      </div>
+      <div class="missao-linha"></div>
+      <div class="missao-ass">Punch and Roll Fight Team · 2026</div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+  <!-- PLACA 2 — NOSSOS VALORES -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🏅</div>
+    </div>
+    <div class="titulo">
+      <h1>Nossos Valores</h1>
+      <div class="sub">Todo integrante da equipe pratica</div>
+    </div>
+    <div class="corpo">
+      <div class="valores-grid">
+        <div class="v-card"><span class="vi">🤝</span><div class="vn">Respeito</div><div class="vd">Com todos, sempre</div></div>
+        <div class="v-card"><span class="vi">⚔️</span><div class="vn">Disciplina</div><div class="vd">Dentro e fora</div></div>
+        <div class="v-card"><span class="vi">🙏</span><div class="vn">Humildade</div><div class="vd">Sempre há algo a aprender</div></div>
+        <div class="v-card"><span class="vi">⏰</span><div class="vn">Pontualidade</div><div class="vd">Respeite o tempo de todos</div></div>
+        <div class="v-card"><span class="vi">💪</span><div class="vn">Evolução</div><div class="vd">Supere-se a cada treino</div></div>
+        <div class="v-card"><span class="vi">🫂</span><div class="vn">União</div><div class="vd">Somos uma equipe</div></div>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════ FOLHA 2 ═══════ -->
+<div class="folha">
+
+  <!-- PLACA 3 — ORGANIZAÇÃO DOS MATERIAIS -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">📦</div>
+    </div>
+    <div class="titulo">
+      <h1>Organização dos Materiais</h1>
+      <div class="sub">A organização é responsabilidade de todos</div>
+    </div>
+    <div class="corpo">
+      <div class="principio"><p>⚡ USOU → GUARDOU → ORGANIZOU</p></div>
+      <div class="badge-ok">✓ Guarde sempre após o uso</div>
+      <div class="item">
+        <div class="item-icone">🥊</div>
+        <div class="item-texto"><strong>Luvas e bandagens</strong><span>Pendurar no local indicado após o treino</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🛡️</div>
+        <div class="item-texto"><strong>Escudos e aparadores</strong><span>Empilhar organizados na prateleira</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🎯</div>
+        <div class="item-texto"><strong>Cones e acessórios</strong><span>Devolver ao cesto ou caixa correta</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🏋️</div>
+        <div class="item-texto"><strong>Colchonetes</strong><span>Reposicionar ao final de cada aula</span></div>
+      </div>
+      <div class="destaque">
+        <p>Quem deixa material espalhado prejudica o próximo colega.<br><strong>Cuide como se fosse seu — porque é.</strong></p>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+  <!-- PLACA 4 — REGRAS DO TATAME -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🥋</div>
+    </div>
+    <div class="titulo">
+      <h1>Regras do Tatame</h1>
+      <div class="sub">O tatame é sagrado — cuide e respeite</div>
+    </div>
+    <div class="corpo">
+      <div class="badge-ok">✓ Obrigatório</div>
+      <div class="item">
+        <div class="item-icone">🦶</div>
+        <div class="item-texto"><strong>Entre sempre descalço</strong><span>Calçados de rua são proibidos no tatame</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🧹</div>
+        <div class="item-texto"><strong>Mantenha o tatame limpo</strong><span>Nunca jogue lixo ou comida no tatame</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">👂</div>
+        <div class="item-texto"><strong>Atenção durante as instruções</strong><span>Respeite o professor e os colegas</span></div>
+      </div>
+      <div class="badge-no">✗ Proibido</div>
+      <div class="item">
+        <div class="item-icone">👟</div>
+        <div class="item-texto"><strong>Entrar calçado</strong><span>Suja e danifica o tatame</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🍔</div>
+        <div class="item-texto"><strong>Comer sobre o tatame</strong><span>Alimentação apenas fora da área de treino</span></div>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════ FOLHA 3 ═══════ -->
+<div class="folha">
+
+  <!-- PLACA 5 — BANHEIRO -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🚿</div>
+    </div>
+    <div class="titulo">
+      <h1>Banheiro</h1>
+      <div class="sub">Deixe como você gostaria de encontrar</div>
+    </div>
+    <div class="corpo">
+      <div class="ban-item ok"><div class="bi">✅</div><div class="bt">Dê sempre a descarga</div></div>
+      <div class="ban-item ok"><div class="bi">🧼</div><div class="bt">Lave bem as mãos com sabão</div></div>
+      <div class="ban-item ok"><div class="bi">🗑️</div><div class="bt">Papel na lixeira — não no vaso</div></div>
+      <div class="ban-item ok"><div class="bi">💧</div><div class="bt">Feche bem as torneiras</div></div>
+      <div class="ban-item ok"><div class="bi">🧹</div><div class="bt">Deixe o chão seco ao redor do chuveiro</div></div>
+      <div class="ban-item no"><div class="bi">🚫</div><div class="bt">Não jogue papel dentro do vaso — entope!</div></div>
+      <div class="ban-item no"><div class="bi">🚫</div><div class="bt">Não deixe lixo no chão ou na pia</div></div>
+      <div class="destaque">
+        <p><strong>Respeito começa aqui.</strong> O banheiro é de todos. Cuide como se fosse o seu.</p>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+  <!-- PLACA 6 — DISCIPLINA motivacional -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🏆</div>
+    </div>
+    <div class="titulo">
+      <h1>Disciplina</h1>
+      <div class="sub">O que separa quem sonha de quem conquista</div>
+    </div>
+    <div class="corpo">
+      <div class="item">
+        <div class="item-icone">⏰</div>
+        <div class="item-texto"><strong>Seja pontual</strong><span>Chegar 10 min antes é respeitar a todos</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🧠</div>
+        <div class="item-texto"><strong>Foco total no treino</strong><span>Celular guardado. Mente presente.</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🙏</div>
+        <div class="item-texto"><strong>Humildade acima de tudo</strong><span>Todo campeão começa ouvindo seu professor</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🔄</div>
+        <div class="item-texto"><strong>Consistência é a chave</strong><span>Um treino fraco vale mais que nenhum</span></div>
+      </div>
+      <div class="big-text">
+        TREINO COM<br><span>DISCIPLINA</span><br>VIVO COM<br><span>PROPÓSITO</span>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════ FOLHA 4 ═══════ -->
+<div class="folha">
+
+  <!-- PLACA 7 — HIGIENE PESSOAL -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">🧴</div>
+    </div>
+    <div class="titulo">
+      <h1>Higiene Pessoal</h1>
+      <div class="sub">Higiene é respeito com seu colega de treino</div>
+    </div>
+    <div class="corpo">
+      <div class="badge-ok">✓ Obrigatório para treinar</div>
+      <div class="item">
+        <div class="item-icone">🚿</div>
+        <div class="item-texto"><strong>Venha limpo para treinar</strong><span>Banho antes da aula é essencial</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">👕</div>
+        <div class="item-texto"><strong>Uniforme e kimono sempre limpos</strong><span>Nunca use roupas sujas do treino anterior</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🥊</div>
+        <div class="item-texto"><strong>Luvas e bandagens higienizadas</strong><span>Higienize após cada treino</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">💅</div>
+        <div class="item-texto"><strong>Unhas cortadas (mãos e pés)</strong><span>Unhas longas machucam colegas</span></div>
+      </div>
+      <div class="badge-no">✗ Não poderá treinar</div>
+      <div class="item">
+        <div class="item-icone">🚫</div>
+        <div class="item-texto"><strong>Uniforme sujo ou odor excessivo</strong><span>Respeito ao próximo começa pela higiene</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🚫</div>
+        <div class="item-texto"><strong>Lesões infecciosas ou doenças contagiosas</strong><span>Proteja seus colegas</span></div>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+  <!-- PLACA 8 — ATENÇÃO GERAL -->
+  <div class="placa">
+    <div class="cab">
+      <div>
+        <div class="cab-marca">PUNCH <span>AND</span> ROLL</div>
+        <div class="cab-sub">FIGHT TEAM · SÃO JOSÉ / SC</div>
+      </div>
+      <div class="cab-icone">📵</div>
+    </div>
+    <div class="titulo">
+      <h1>Atenção, Atleta!</h1>
+      <div class="sub">Pequenas atitudes fazem a diferença</div>
+    </div>
+    <div class="corpo">
+      <div class="item">
+        <div class="item-icone">📵</div>
+        <div class="item-texto"><strong>Celular no silencioso durante o treino</strong><span>Sua atenção deve estar no tatame</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🎒</div>
+        <div class="item-texto"><strong>Guarde seus pertences no armário</strong><span>A academia não se responsabiliza por objetos perdidos</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">💬</div>
+        <div class="item-texto"><strong>Linguagem respeitosa sempre</strong><span>Palavrões e discussões não têm espaço aqui</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🚭</div>
+        <div class="item-texto"><strong>Proibido fumar nas dependências</strong><span>Incluindo cigarro eletrônico</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icone">🍺</div>
+        <div class="item-texto"><strong>Proibido álcool e drogas</strong><span>Quem vier sob efeito não poderá treinar</span></div>
+      </div>
+      <div class="destaque">
+        <p>Dúvidas? Fale com a equipe.<br><strong>Queremos o melhor espaço para o seu desenvolvimento.</strong></p>
+      </div>
+    </div>
+    <div class="rodape">
+      <div class="rodape-txt">PUNCH AND ROLL FIGHT TEAM</div>
+      <div class="rodape-slogan">DISCIPLINA · RESPEITO · EVOLUÇÃO</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
