@@ -2882,8 +2882,15 @@ function agendarRelatorioSemanal() {
 // Disparo manual do relatório semanal (uso interno)
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
-  await enviarRelatorioSemanal();
-  res.json({ ok: true });
+  try {
+    const hasKey = !!process.env.SENDGRID_API_KEY;
+    const from = process.env.EMAIL_FROM || 'noreply@punchandroll.com.br';
+    if (!hasKey) return res.json({ ok: false, erro: 'SENDGRID_API_KEY não configurado no Railway' });
+    await enviarRelatorioSemanal();
+    res.json({ ok: true, from, para: 'asbarcellos31@gmail.com' });
+  } catch(e) {
+    res.json({ ok: false, erro: e.message });
+  }
 });
 
 // Ping de visualização de página — chamado silenciosamente pelo frontend
