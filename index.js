@@ -3209,24 +3209,24 @@ async function dispararBoasVindas(wpToken) {
   // Registra no histórico de Email MKT
   try {
     const [camp] = await db.query(
-      `INSERT INTO email_campanhas (nome,status,total_enviados) VALUES (?,?,1)`,
-      [`Boas-vindas — ${p.nome}`, 'CONCLUIDA']
+      `INSERT INTO email_campanhas (nome,status,total_enviados,total_erros) VALUES (?,?,?,?)`,
+      [`Boas-vindas — ${p.nome}`, 'CONCLUIDA', emailOk?1:0, emailOk?0:1]
     );
     await db.query(
       'INSERT INTO email_envios (campanha_id,contato_nome,contato_email,tipo,status) VALUES (?,?,?,?,?)',
-      [camp.insertId, p.nome, p.email, 'INDIVIDUAL', emailOk ? 'ENVIADO' : 'ERRO']
+      [camp.insertId, p.nome, p.email||'', 'INDIVIDUAL', emailOk ? 'ENVIADO' : 'ERRO']
     );
   } catch(e) { console.error('Email history error:', e.message); }
 
   // Registra no histórico de WA MKT
   try {
     const [waCamp] = await db.query(
-      `INSERT INTO marketing_msgs (tipo,titulo,texto,segmento,status,qtd_enviados) VALUES (?,?,?,?,?,1)`,
-      ['whatsapp', `Boas-vindas — ${p.nome}`, waMensagem, 'individual', 'enviado']
+      `INSERT INTO wa_campanhas (nome,mensagem,segmento,status,total_enviados,total_erros) VALUES (?,?,?,?,?,?)`,
+      [`Boas-vindas — ${p.nome}`, waMensagem, 'individual', 'CONCLUIDA', waOk?1:0, waOk?0:1]
     );
     await db.query(
       'INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status) VALUES (?,?,?,?,?,?)',
-      [waCamp.insertId, p.nome, p.tel, waMensagem, 'INDIVIDUAL', waOk ? 'ENVIADO' : 'ERRO']
+      [waCamp.insertId, p.nome, p.tel||'', waMensagem, 'INDIVIDUAL', waOk ? 'ENVIADO' : 'ERRO']
     );
   } catch(e) { console.error('WA history error:', e.message); }
 
