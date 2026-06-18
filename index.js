@@ -2813,9 +2813,11 @@ app.put('/api/shop/pedidos/:id/status', auth, adminOnly, async (req, res) => {
 // BOAS-VINDAS — FLUXO DE APROVAÇÃO
 // ══════════════════════════════════════
 
-const OWNER_EMAIL = 'asbarcellos31@gmail.com';
-const API_BASE    = process.env.API_URL || 'https://punch-and-roll-api-production.up.railway.app';
-const SITE_BASE   = 'https://punchandroll.com.br';
+const OWNER_EMAIL      = 'asbarcellos31@gmail.com';
+const OWNER_WA_NUM     = '4899225-9899';   // Anderson
+const INSTRUTOR_WA_NUM = '4898463-9257';   // Instrutor
+const API_BASE         = process.env.API_URL || 'https://punch-and-roll-api-production.up.railway.app';
+const SITE_BASE        = 'https://punchandroll.com.br';
 
 function gerarEmailBoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
@@ -2888,7 +2890,7 @@ function gerarEmailBoasVindas(d) {
 
 function gerarMsgWABoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
-  return `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nQualquer dúvida, fala com a gente!\n📞 (48) 98463-9257\n\nBora treinar! 💪`;
+  return `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪`;
 }
 
 function gerarManualAnexo() {
@@ -2916,17 +2918,14 @@ function gerarManualAnexo() {
 </body></html>`;
 }
 
-const OWNER_WA = process.env.WA_OWNER_NUM || (process.env.WA_ADMIN_NUM || '554898463-9257');
-
 async function enviarPreviewParaAnderson(wpToken, d) {
   const urlAprovar  = `${API_BASE}/api/welcome/aprovar/${wpToken}`;
   const emailAluno  = gerarEmailBoasVindas(d);
   const waAluno     = gerarMsgWABoasVindas(d);
-  const nomeFirst   = (d.nome||'').split(' ')[0];
 
   // ── WhatsApp para o Anderson ──
-  const waAnderson = `🥊 *Nova matrícula — prévia de boas-vindas*\n\n👤 *${d.nome}*\n📋 ${d.plano}\n💰 R$ ${Number(d.valor||0).toFixed(0)}/mês\n📱 ${d.tel}\n\n*Isso será enviado para o aluno:*\n\n${waAluno}\n\n✅ Para aprovar e disparar tudo (email + WA), acesse:\n${urlAprovar}`;
-  await notificarWA(OWNER_WA, waAnderson).catch(()=>{});
+  const waAnderson = `🥊 *Nova matrícula — aprovação necessária*\n\n👤 *${d.nome}*\n📋 ${d.plano}\n💰 R$ ${Number(d.valor||0).toFixed(0)}/mês\n📱 ${d.tel}\n\n*Mensagem que será enviada ao aluno:*\n\n${waAluno}\n\n✅ *Para aprovar e disparar (email + WA):*\n${urlAprovar}`;
+  await notificarWA(OWNER_WA_NUM, waAnderson).catch(()=>{});
 
   // ── Email para o Anderson com preview completo ──
   if (!process.env.SENDGRID_API_KEY) return;
@@ -3021,6 +3020,11 @@ async function dispararBoasVindas(wpToken) {
 
   // Atualiza status do pending
   await db.query('UPDATE welcome_pending SET status="enviado", enviado_em=NOW() WHERE token=?', [wpToken]);
+
+  // Notifica Anderson + Instrutor que novo aluno entrou
+  const avisoEquipe = `✅ *Boas-vindas enviadas!*\n\n👤 *${p.nome}*\n📋 ${p.plano}\n💰 R$ ${Number(p.valor||0).toFixed(0)}/mês\n📱 ${p.tel}\n\n✉️ Email: ${emailOk ? 'enviado ✅' : 'falhou ❌'}\n📱 WhatsApp: ${waOk ? 'enviado ✅' : 'falhou ❌'}`;
+  await notificarWA(OWNER_WA_NUM, avisoEquipe).catch(()=>{});
+  await notificarWA(INSTRUTOR_WA_NUM, `🥊 *Novo aluno!*\n\n👤 *${p.nome}*\n📋 ${p.plano}\n📱 ${p.tel}`).catch(()=>{});
 
   // Relatório de entrega + preview para o Anderson
   if (process.env.SENDGRID_API_KEY) {
@@ -3172,6 +3176,22 @@ app.get('/api/_report-now', async (req, res) => {
   } catch(e) {
     res.json({ ok: false, erro: e.message });
   }
+});
+
+// Aprovação das boas-vindas — Anderson clica no link do WhatsApp/email
+app.get('/api/welcome/aprovar/:token', async (req, res) => {
+  try {
+    const result = await dispararBoasVindas(req.params.token);
+    if (!result.ok) return res.send(`<html><body style="font-family:Arial;text-align:center;padding:60px;background:#f4f4f4"><div style="max-width:400px;margin:0 auto;background:#fff;border-radius:12px;padding:40px"><h2 style="color:#888">⚠️ ${result.msg}</h2></div></body></html>`);
+    res.send(`<html><body style="font-family:Arial;text-align:center;padding:60px;background:#f4f4f4">
+      <div style="max-width:400px;margin:0 auto;background:#fff;border-radius:12px;padding:40px;box-shadow:0 2px 12px rgba(0,0,0,.1)">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <h2 style="color:#16a34a;margin:0 0 12px">Boas-vindas enviadas!</h2>
+        <p style="color:#555;font-size:14px">✉️ Email: ${result.emailOk ? 'enviado ✅' : 'falhou ❌'}<br>📱 WhatsApp: ${result.waOk ? 'enviado ✅' : 'falhou ❌'}</p>
+        <p style="color:#999;font-size:11px;margin-top:20px">Registrado no histórico de Email MKT e WA MKT.</p>
+      </div>
+    </body></html>`);
+  } catch(e) { res.send(`<html><body style="font-family:Arial;text-align:center;padding:60px"><h2>❌ Erro: ${e.message}</h2></body></html>`); }
 });
 
 // Envia preview das boas-vindas para o Anderson (uso interno)
