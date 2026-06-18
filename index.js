@@ -2468,7 +2468,9 @@ app.get('/api/documentos/:id/download', async (req, res) => {
     const doc = rows[0];
     await db.query('UPDATE documentos SET downloads=downloads+1 WHERE id=?', [req.params.id]);
     res.setHeader('Content-Type', doc.mimetype || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.nome}.${doc.extensao}"`);
+    const nomeSeguro = doc.nome.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w\s\-().]/g,'_').replace(/\s+/g,' ').trim();
+    const ext = doc.extensao ? `.${doc.extensao}` : '';
+    res.setHeader('Content-Disposition', `inline; filename="${nomeSeguro}${ext}"`);
     res.send(doc.arquivo);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
