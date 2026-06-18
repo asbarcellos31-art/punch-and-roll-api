@@ -1185,10 +1185,14 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
 // NOTIFICAÇÕES
 // ══════════════════════════════════════
 async function notificarWA(tel, msg) {
-  if (!process.env.WA_API_URL || !process.env.WA_API_KEY) return;
+  const url      = process.env.WA_EVOLUTION_URL || process.env.WA_API_URL;
+  const instance = process.env.WA_EVOLUTION_INSTANCE || '';
+  const key      = process.env.WA_EVOLUTION_KEY || process.env.WA_API_KEY;
+  if (!url || !key) return;
   try {
-    const num = '55' + tel.replace(/\D/g,'');
-    await axios.post(process.env.WA_API_URL, { number: num, text: msg }, { headers: { 'apikey': process.env.WA_API_KEY, 'Content-Type': 'application/json' } });
+    const num     = '55' + tel.replace(/\D/g,'');
+    const apiUrl  = instance ? `${url}/message/sendText/${instance}` : url;
+    await axios.post(apiUrl, { number: num, text: msg }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
   } catch (e) { console.log('WA error:', e.message); }
 }
 
