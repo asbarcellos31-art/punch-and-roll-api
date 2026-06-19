@@ -442,7 +442,13 @@ async function setupDB() {
       ('boasvindas_wa', 'Olá, *{{nome}}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* {{plano}}\n💰 *Valor:* R$ {{valor}}/mês\n\n*📱 Portal do Aluno*\nAcesse: https://punchandroll.com.br/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*'),
       ('boasvindas_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Seja bem-vindo(a), {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi confirmada com sucesso! Estamos muito felizes em ter você na nossa equipe.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 8px"><strong>📋 Plano:</strong> {{plano}}</p>'),
       ('espera_wa', 'Olá, *{{nome}}*! 👊\n\nRecebemos sua sugestão para a *Punch and Roll Fight Team* e estamos muito felizes com seu interesse!\n\nNossa equipe vai analisar sua preferência de horário e entraremos em contato em breve. 🥊\n\nQualquer dúvida, fale com a gente:\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 *@punchandrollfight*'),
-      ('espera_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 👊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Recebemos sua sugestão de horário e ficamos felizes com seu interesse em treinar na <strong>Punch and Roll Fight Team</strong>!</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Nossa equipe vai analisar sua preferência e entraremos em contato em breve.</p>')
+      ('espera_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 👊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Recebemos sua sugestão de horário e ficamos felizes com seu interesse em treinar na <strong>Punch and Roll Fight Team</strong>!</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Nossa equipe vai analisar sua preferência e entraremos em contato em breve.</p>'),
+      ('vencimento5_ativo', '1'),
+      ('vencimento5_wa', 'Olá, *{{nome}}*! 🥊\n\nPassando para avisar que seu plano na *Punch and Roll Fight Team* vence em *5 dias*.\n\nRenove com antecedência e continue treinando sem interrupção! 💪\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*'),
+      ('vencimento5_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Passando para avisar que seu plano na <strong>Punch and Roll Fight Team</strong> vence em <strong>5 dias</strong>.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Renove com antecedência e continue treinando sem interrupção! 💪</p>'),
+      ('vencimento1_ativo', '1'),
+      ('vencimento1_wa', 'Olá, *{{nome}}*! 🥊\n\nSeu plano na *Punch and Roll Fight Team* vence *amanhã*.\n\nRenove hoje para não perder acesso à academia! 💪\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*'),
+      ('vencimento1_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Seu plano na <strong>Punch and Roll Fight Team</strong> vence <strong>amanhã</strong>.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Renove hoje para não perder acesso à academia! 💪</p>')
     `);
 
 
@@ -1644,9 +1650,10 @@ app.post('/api/wa/config', auth, adminOnly, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Cron: aniversariantes + atrasados automáticos (verificação a cada hora) ───
+// ── Cron: aniversariantes + atrasados + vencimento (verificação a cada hora) ───
 let ultimoDiaAniversario = -1;
 let ultimoDiaAtrasados = -1;
+let ultimoDiaVencimento = -1;
 setInterval(async () => {
   const agora = new Date();
   const hora = agora.getHours();
@@ -1695,6 +1702,66 @@ setInterval(async () => {
       if (alunos.length) console.log(`[Atrasados] ${alunos.length} mensagens enviadas`);
     }
   } catch(e) { console.error('[Cron Atrasados]',e.message); }
+
+  // Vencimento de plano (disparo às 9h)
+  try {
+    if (hora === 9 && dia !== ultimoDiaVencimento) {
+      ultimoDiaVencimento = dia;
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      const em5 = new Date(hoje); em5.setDate(em5.getDate()+5);
+      const em1 = new Date(hoje); em1.setDate(em1.getDate()+1);
+      const fmt = d => d.toISOString().slice(0,10);
+
+      for (const [diasLabel, dataAlvo, waChave, emailChave, atoChave] of [
+        ['5 dias', em5, 'vencimento5_wa', 'vencimento5_email_corpo', 'vencimento5_ativo'],
+        ['1 dia',  em1, 'vencimento1_wa', 'vencimento1_email_corpo', 'vencimento1_ativo'],
+      ]) {
+        const [[cfgAtivo]] = await db.query(`SELECT valor FROM wa_config WHERE chave=?`, [atoChave]);
+        if (cfgAtivo?.valor !== '1') continue;
+        const [[tmplWA]]   = await db.query(`SELECT valor FROM wa_config WHERE chave=?`, [waChave]);
+        const [[tmplEmail]]= await db.query(`SELECT valor FROM wa_config WHERE chave=?`, [emailChave]);
+        const [alunos] = await db.query(
+          "SELECT id,nome,tel,email FROM alunos WHERE status='ativo' AND DATE(vencimento)=? AND (cortesia IS NULL OR cortesia=0)",
+          [fmt(dataAlvo)]
+        );
+        for (const a of alunos) {
+          const nomeFirst = a.nome.split(' ')[0];
+          // WhatsApp
+          if (a.tel && tmplWA?.valor) {
+            const msg = tmplWA.valor.replace(/\{\{nome\}\}/gi, nomeFirst);
+            const r = await enviarWA(a.tel, msg);
+            const [waCamp] = await db.query(
+              `INSERT INTO wa_campanhas (nome,mensagem,segmento,status,total_enviados,total_erros) VALUES (?,?,?,?,?,?)`,
+              [`Vencimento ${diasLabel} — ${a.nome}`, msg, 'individual', 'CONCLUIDA', r.sucesso?1:0, r.sucesso?0:1]
+            );
+            await db.query(
+              'INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
+              [waCamp.insertId, a.nome, formatarTelWA(a.tel), msg, 'INDIVIDUAL', r.sucesso?'ENVIADO':'ERRO', r.erro||null]
+            );
+          }
+          // Email
+          if (a.email && tmplEmail?.valor) {
+            const corpo = tmplEmail.valor.replace(/\{\{nome\}\}/gi, nomeFirst);
+            const assunto = diasLabel === '5 dias'
+              ? 'Seu plano vence em 5 dias — Punch and Roll Fight Team'
+              : 'Seu plano vence amanhã — Punch and Roll Fight Team';
+            const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f4f4f4;padding:24px"><div style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><div style="background:#ffffff;padding:28px 32px 20px;text-align:center;border-bottom:4px solid #d4111c"><img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll" style="height:130px;width:auto;display:block;margin:0 auto"></div><div style="padding:32px">${corpo}<div style="background:#f9f9f9;border-left:4px solid #d4111c;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px"><p style="color:#444;font-size:13px;line-height:1.8;margin:0">👊 Admin: (48) 99225-9899<br>🥋 Instrutor: (48) 98463-9257<br>📸 <a href="https://instagram.com/punchandrollfight" style="color:#d4111c;text-decoration:none">@punchandrollfight</a><br>🌐 punchandroll.com.br</p></div></div><div style="background:#111;padding:16px 32px;text-align:center"><p style="color:#888;font-size:11px;margin:0">© Punch and Roll Fight Team — R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC</p></div></div></div>`;
+            const emailOk = await enviarEmailAluno(a.email, a.nome, assunto, html).then(()=>true).catch(()=>false);
+            const [eCamp] = await db.query(
+              `INSERT INTO email_campanhas (nome,status,total_enviados,total_erros) VALUES (?,?,?,?)`,
+              [`Vencimento ${diasLabel} — ${a.nome}`, 'CONCLUIDA', emailOk?1:0, emailOk?0:1]
+            );
+            await db.query(
+              'INSERT INTO email_envios (campanha_id,contato_nome,contato_email,tipo,status) VALUES (?,?,?,?,?)',
+              [eCamp.insertId, a.nome, a.email, 'INDIVIDUAL', emailOk?'ENVIADO':'ERRO']
+            );
+          }
+          await new Promise(x=>setTimeout(x,2000));
+        }
+        if (alunos.length) console.log(`[Vencimento ${diasLabel}] ${alunos.length} alunos notificados`);
+      }
+    }
+  } catch(e) { console.error('[Cron Vencimento]',e.message); }
 
   // Campanhas WA agendadas
   try {
