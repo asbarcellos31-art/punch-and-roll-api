@@ -431,14 +431,18 @@ async function setupDB() {
     // Garante que media_url suporte base64 (MEDIUMTEXT)
     await conn.query(`ALTER TABLE wa_campanhas MODIFY COLUMN media_url MEDIUMTEXT`).catch(()=>{});
 
-    // Config padrão de aniversário
+    // Config padrão de aniversário e automações
     await conn.query(`
       INSERT IGNORE INTO wa_config (chave, valor) VALUES
       ('aniversario_ativo', '1'),
       ('aniversario_horario', '08:00'),
       ('aniversario_template', '🥊 Feliz Aniversário, {{nome}}! 🎂\n\nA família Punch and Roll Fight Team deseja um dia muito especial para você!\n\nContinue na luta e nos vemos na academia! 💪\n\n— Punch and Roll Fight Team 🥊'),
       ('atrasados_ativo', '0'),
-      ('atrasados_template', 'Olá, {{nome}}! 🥊\n\nIdentificamos que sua mensalidade da *Punch and Roll* está em atraso.\n\nPara manter seu acesso à academia, regularize sua situação:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team')
+      ('atrasados_template', 'Olá, {{nome}}! 🥊\n\nIdentificamos que sua mensalidade da *Punch and Roll* está em atraso.\n\nPara manter seu acesso à academia, regularize sua situação:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team'),
+      ('boasvindas_wa', 'Olá, *{{nome}}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* {{plano}}\n💰 *Valor:* R$ {{valor}}/mês\n\n*📱 Portal do Aluno*\nAcesse: https://punchandroll.com.br/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*'),
+      ('boasvindas_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Seja bem-vindo(a), {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi confirmada com sucesso! Estamos muito felizes em ter você na nossa equipe.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 8px"><strong>📋 Plano:</strong> {{plano}}</p>'),
+      ('espera_wa', 'Olá, *{{nome}}*! 👊\n\nRecebemos sua sugestão para a *Punch and Roll Fight Team* e estamos muito felizes com seu interesse!\n\nNossa equipe vai analisar sua preferência de horário e entraremos em contato em breve. 🥊\n\nQualquer dúvida, fale com a gente:\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 *@punchandrollfight*'),
+      ('espera_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 👊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Recebemos sua sugestão de horário e ficamos felizes com seu interesse em treinar na <strong>Punch and Roll Fight Team</strong>!</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Nossa equipe vai analisar sua preferência e entraremos em contato em breve.</p>')
     `);
 
 
@@ -846,6 +850,40 @@ app.post('/api/alunos/publico', async (req, res) => {
 // ══════════════════════════════════════
 // AULAS
 // ══════════════════════════════════════
+async function gerarWAEspera(nome) {
+  const nomeFirst = nome.split(' ')[0];
+  try {
+    const [[row]] = await db.query("SELECT valor FROM wa_config WHERE chave='espera_wa'");
+    if (row?.valor) return row.valor.replace(/\{\{nome\}\}/g, nomeFirst);
+  } catch(e) {}
+  return `Olá, *${nomeFirst}*! 👊\n\nRecebemos sua sugestão para a *Punch and Roll Fight Team* e estamos muito felizes com seu interesse!\n\nNossa equipe vai analisar sua preferência de horário e entraremos em contato em breve. 🥊\n\nQualquer dúvida, fale com a gente:\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 *@punchandrollfight*`;
+}
+
+async function gerarEmailEspera(nome) {
+  const nomeFirst = nome.split(' ')[0];
+  let corpo = `<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, ${nomeFirst}! 👊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Recebemos sua sugestão de horário e ficamos felizes com seu interesse em treinar na <strong>Punch and Roll Fight Team</strong>!</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Nossa equipe vai analisar sua preferência e entraremos em contato em breve.</p>`;
+  try {
+    const [[row]] = await db.query("SELECT valor FROM wa_config WHERE chave='espera_email_corpo'");
+    if (row?.valor) corpo = row.valor.replace(/\{\{nome\}\}/g, nomeFirst);
+  } catch(e) {}
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f4f4f4;padding:24px">
+  <div style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div style="background:#ffffff;padding:28px 32px 20px;text-align:center;border-bottom:4px solid #d4111c">
+      <img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll Fight Team" style="height:130px;width:auto;display:block;margin:0 auto">
+    </div>
+    <div style="padding:32px">
+      ${corpo}
+      <div style="background:#f9f9f9;border-left:4px solid #d4111c;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px">
+        <p style="color:#444;font-size:13px;line-height:1.8;margin:0">👊 Admin: (48) 99225-9899<br>🥋 Instrutor: (48) 98463-9257<br>📸 <a href="https://instagram.com/punchandrollfight" style="color:#d4111c;text-decoration:none">@punchandrollfight</a><br>🌐 punchandroll.com.br</p>
+      </div>
+    </div>
+    <div style="background:#111;padding:16px 32px;text-align:center">
+      <p style="color:#888;font-size:11px;margin:0">© Punch and Roll Fight Team — R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC</p>
+    </div>
+  </div>
+</div>`;
+}
+
 // Lista de espera — público
 app.post('/api/lista-espera', async (req, res) => {
   try {
@@ -857,8 +895,11 @@ app.post('/api/lista-espera', async (req, res) => {
     );
     // Notifica admin no WhatsApp
     const modLabel = { boxe:'🥊 Boxe', jiujitsu:'🟦 Jiu-Jitsu', ambos:'🥊🟦 Ambos' };
-    const msg = `📋 *Nova entrada na Lista de Espera*\n\n👤 ${nome}${tel ? '\n📱 ' + tel : ''}\n${modalidade ? '🏋️ ' + (modLabel[modalidade]||modalidade) : ''}${dia_sugerido ? '\n📅 ' + dia_sugerido + (hora_sugerida ? ' às ' + hora_sugerida : '') : ''}${obs ? '\n💬 ' + obs : ''}\n\nAcesse o admin para gerenciar.`;
-    if (process.env.ADMIN_TEL) notificarWA(process.env.ADMIN_TEL, msg).catch(()=>{});
+    const msgAdmin = `📋 *Nova entrada na Lista de Espera*\n\n👤 ${nome}${tel ? '\n📱 ' + tel : ''}\n${modalidade ? '🏋️ ' + (modLabel[modalidade]||modalidade) : ''}${dia_sugerido ? '\n📅 ' + dia_sugerido + (hora_sugerida ? ' às ' + hora_sugerida : '') : ''}${obs ? '\n💬 ' + obs : ''}\n\nAcesse o admin para gerenciar.`;
+    if (process.env.ADMIN_TEL) notificarWA(process.env.ADMIN_TEL, msgAdmin).catch(()=>{});
+    // Confirma para quem enviou
+    if (tel) gerarWAEspera(nome).then(msg => notificarWA(tel, msg)).catch(()=>{});
+    if (req.body.email) gerarEmailEspera(nome).then(html => enviarEmailAluno(req.body.email, nome, 'Recebemos sua sugestão — Punch and Roll Fight Team', html)).catch(()=>{});
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -3011,9 +3052,17 @@ function gerarEmailBoasVindas(d) {
 </body></html>`;
 }
 
-function gerarMsgWABoasVindas(d) {
+async function gerarMsgWABoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
-  return `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*`;
+  const fallback = `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*`;
+  try {
+    const [[row]] = await db.query("SELECT valor FROM wa_config WHERE chave='boasvindas_wa'");
+    if (row?.valor) return row.valor
+      .replace(/\{\{nome\}\}/g, nomeFirst)
+      .replace(/\{\{plano\}\}/g, d.plano||'')
+      .replace(/\{\{valor\}\}/g, Number(d.valor||0).toFixed(0));
+  } catch(e) {}
+  return fallback;
 }
 
 function gerarManualAnexo() {
@@ -3124,7 +3173,7 @@ function gerarManualAnexo() {
 async function enviarPreviewParaAnderson(wpToken, d) {
   const urlAprovar  = `${API_BASE}/api/welcome/aprovar/${wpToken}`;
   const emailAluno  = gerarEmailBoasVindas(d);
-  const waAluno     = gerarMsgWABoasVindas(d);
+  const waAluno     = await gerarMsgWABoasVindas(d);
 
   // ── WhatsApp para o Anderson ──
   const waAnderson = `🥊 *Nova matrícula — aprovação necessária*\n\n👤 *${d.nome}*\n📋 ${d.plano}\n💰 R$ ${Number(d.valor||0).toFixed(0)}/mês\n📱 ${d.tel}\n\n*Mensagem que será enviada ao aluno:*\n\n${waAluno}\n\n✅ *Para aprovar e disparar (email + WA):*\n${urlAprovar}`;
@@ -3171,7 +3220,7 @@ async function dispararBoasVindas(wpToken) {
   const d = { nome: p.nome, email: p.email, tel: p.tel, plano: p.plano, valor: p.valor, modalidade: p.modalidade };
 
   const emailHtml   = gerarEmailBoasVindas(d);
-  const waMensagem  = gerarMsgWABoasVindas(d);
+  const waMensagem  = await gerarMsgWABoasVindas(d);
 
   // Busca manual PDF no banco; gera se não encontrar
   let manualBuf = null;
@@ -3410,7 +3459,7 @@ app.get('/api/welcome/aprovar/:token', async (req, res) => {
 app.get('/api/_welcome-preview', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   const d = { nome: 'NOME DO ALUNO', plano: 'Mensal — Boxe · 3x/sem', valor: 159, modalidade: 'boxe', email: 'email@aluno.com', tel: '(48) 99999-9999' };
-  const waMsg = gerarMsgWABoasVindas(d);
+  const waMsg = await gerarMsgWABoasVindas(d);
   const emailHtml = gerarEmailBoasVindas(d);
   // Busca manual PDF no banco; gera se não encontrar
   let manualBuf = null;

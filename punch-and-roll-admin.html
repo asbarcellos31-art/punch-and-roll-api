@@ -2621,7 +2621,7 @@ async function waRenderAutomacoes(c){
       </div>
 
       <!-- Atrasados -->
-      <div class="card">
+      <div class="card" style="margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <div>
             <div style="font-weight:700;font-size:15px">⚠️ Mensagem de Cobrança (Atrasados)</div>
@@ -2638,6 +2638,26 @@ async function waRenderAutomacoes(c){
         </div>
         <div class="fg"><label class="fl">Template de cobrança (use {{nome}})</label><textarea class="fi" id="cfg-atr-tmpl" rows="5" style="resize:vertical;font-family:monospace">${cfg.atrasados_template||''}</textarea></div>
         <button onclick="waSalvarAutomacao('atrasados')" class="btn btn-r btn-sm" style="background:#f59e0b">Salvar configuração de cobrança</button>
+      </div>
+
+      <!-- Boas-vindas -->
+      <div class="card" style="margin-bottom:12px">
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;font-size:15px">🥊 Mensagem de Boas-vindas</div>
+          <div style="font-size:12px;color:var(--muted)">Disparada automaticamente quando um novo aluno realiza a matrícula. Use {{nome}}, {{plano}}, {{valor}}</div>
+        </div>
+        <div class="fg"><label class="fl">Template WhatsApp</label><textarea class="fi" id="cfg-bv-tmpl" rows="14" style="resize:vertical;font-family:monospace">${cfg.boasvindas_wa||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('boasvindas')" class="btn btn-r btn-sm">Salvar boas-vindas</button>
+      </div>
+
+      <!-- Lista de espera -->
+      <div class="card">
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;font-size:15px">📋 Confirmação — Lista de Espera</div>
+          <div style="font-size:12px;color:var(--muted)">Disparada automaticamente quando alguém envia uma sugestão pela lista de espera. Use {{nome}}</div>
+        </div>
+        <div class="fg"><label class="fl">Template WhatsApp</label><textarea class="fi" id="cfg-esp-tmpl" rows="8" style="resize:vertical;font-family:monospace">${cfg.espera_wa||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('espera')" class="btn btn-r btn-sm">Salvar confirmação de espera</button>
       </div>`;
   }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
 }
@@ -2650,10 +2670,16 @@ async function waSalvarAutomacao(tipo){
       const hora = document.getElementById('cfg-aniv-hora')?.value;
       const media = document.getElementById('cfg-aniv-media')?.value;
       await POST('/api/wa/config',{aniversario_ativo:ativo,aniversario_template:tmpl,aniversario_horario:hora,aniversario_media:media||''});
-    } else {
+    } else if(tipo==='atrasados'){
       const ativo = document.getElementById('cfg-atr-ativo')?.checked?'1':'0';
       const tmpl = document.getElementById('cfg-atr-tmpl')?.value;
       await POST('/api/wa/config',{atrasados_ativo:ativo,atrasados_template:tmpl});
+    } else if(tipo==='boasvindas'){
+      const tmpl = document.getElementById('cfg-bv-tmpl')?.value;
+      await POST('/api/wa/config',{boasvindas_wa:tmpl});
+    } else if(tipo==='espera'){
+      const tmpl = document.getElementById('cfg-esp-tmpl')?.value;
+      await POST('/api/wa/config',{espera_wa:tmpl});
     }
     alert('✅ Configuração salva!');
   }catch(e){alert('Erro: '+e.message);}
@@ -3514,9 +3540,9 @@ async function emExcluirTemplate(id){
 async function emRenderAutomacoes(c){
   c.innerHTML=`<div style="text-align:center;padding:30px"><div class="spinner"></div></div>`;
   try{
-    const [autos,templates] = await Promise.all([GET('/api/email/automacoes'),GET('/api/email/templates')]);
+    const [autos,templates,waCfg] = await Promise.all([GET('/api/email/automacoes'),GET('/api/email/templates'),GET('/api/wa/config')]);
     const icones={ANIVERSARIO:'🎂',VENCENDO:'⚠️'};
-    c.innerHTML=autos.map(a=>`<div class="card" style="margin-bottom:10px">
+    const autoCards = autos.map(a=>`<div class="card" style="margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -3538,7 +3564,40 @@ async function emRenderAutomacoes(c){
         </div>
       </div>
     </div>`).join('');
+
+    const transCards = `
+      <div class="card" style="margin-bottom:12px">
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;font-size:15px">🥊 Email de Boas-vindas</div>
+          <div style="font-size:12px;color:var(--muted)">Enviado automaticamente ao novo aluno no momento da matrícula. Use {{nome}}, {{plano}}</div>
+        </div>
+        <div class="fg"><label class="fl">Corpo do email (HTML — conteúdo principal)</label><textarea class="fi" id="cfg-em-bv" rows="6" style="resize:vertical;font-family:monospace">${(waCfg.boasvindas_email_corpo||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea></div>
+        <button onclick="emSalvarAutoTransacional('boasvindas')" class="btn btn-r btn-sm">Salvar boas-vindas</button>
+      </div>
+      <div class="card">
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;font-size:15px">📋 Email — Confirmação Lista de Espera</div>
+          <div style="font-size:12px;color:var(--muted)">Enviado automaticamente quando alguém registra uma sugestão. Use {{nome}}</div>
+        </div>
+        <div class="fg"><label class="fl">Corpo do email (HTML — conteúdo principal)</label><textarea class="fi" id="cfg-em-esp" rows="6" style="resize:vertical;font-family:monospace">${(waCfg.espera_email_corpo||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea></div>
+        <button onclick="emSalvarAutoTransacional('espera')" class="btn btn-r btn-sm">Salvar confirmação de espera</button>
+      </div>`;
+
+    c.innerHTML = (autoCards||'') + transCards;
   }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function emSalvarAutoTransacional(tipo){
+  try{
+    if(tipo==='boasvindas'){
+      const corpo = document.getElementById('cfg-em-bv')?.value;
+      await POST('/api/wa/config',{boasvindas_email_corpo: corpo});
+    } else {
+      const corpo = document.getElementById('cfg-em-esp')?.value;
+      await POST('/api/wa/config',{espera_email_corpo: corpo});
+    }
+    alert('✅ Template salvo!');
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 function emConfigAutoModal(auto,templates){
