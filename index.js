@@ -2317,6 +2317,22 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
       );
       ids.push(r.insertId);
     }
+    // Recorrente: já cria o próximo mês ao cadastrar (não espera o pagamento)
+    if (recorrente && n === 1) {
+      const [y, m, d] = data_vencimento.split('-').map(Number);
+      const proxDt = new Date(y, m, d); // +1 mês
+      const proxVenc = `${proxDt.getFullYear()}-${String(proxDt.getMonth()+1).padStart(2,'0')}-${String(proxDt.getDate()).padStart(2,'0')}`;
+      const [existente] = await db.query(
+        'SELECT id FROM despesas WHERE descricao=? AND data_vencimento=? AND status="pendente" LIMIT 1',
+        [descricao, proxVenc]
+      );
+      if (!existente.length) {
+        await db.query(
+          'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,grupo_parcelas) VALUES (?,?,?,?,?,?,?,?)',
+          [descricao, valor, proxVenc, 'pendente', categoria||null, metodo||'pix', 1, grupo]
+        );
+      }
+    }
     res.json({ ids, id: ids[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
