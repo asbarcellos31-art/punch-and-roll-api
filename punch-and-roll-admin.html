@@ -1377,7 +1377,6 @@ function relatorioDRE() {
 
   // Alunos ativos pagantes (base da receita prevista)
   const alunosPagantes = (cache.alunos||[]).filter(a => !a.cortesia && a.status !== 'inativo');
-  const potencialMensal = alunosPagantes.reduce((s,a) => s + parseFloat(a.valor||0), 0);
 
   // Pagamentos reais registrados
   const pgtos = Array.isArray(mensHistorico) ? mensHistorico : [];
@@ -1417,8 +1416,15 @@ function relatorioDRE() {
     const totalShopHist = parseFloat((historicoShop.find(h=>h.mes===mes)||{}).total||0);
     const recShopTotal = totalShopHist > 0 ? totalShopHist : shopMes.reduce((s,p)=>s+parseFloat(p.total||0),0);
 
-    // Total receita = recebido + potencial previsto (não duplicamos: mostramos ambos)
-    const totalRec = potencialMensal + recShopTotal;
+    // Alunos ativos neste mês específico (só a partir do mês de matrícula)
+    const alunosMes = alunosPagantes.filter(a => {
+      const matricula = String(a.criado_em||a.data_matricula||'2000-01').slice(0,7);
+      return mes >= matricula;
+    });
+    const potencialMes = alunosMes.reduce((s,a) => s + parseFloat(a.valor||0), 0);
+
+    // Total receita = potencial do mês + shop
+    const totalRec = potencialMes + recShopTotal;
 
     const desp = despesas.filter(d=>(d.data_vencimento||'').slice(0,7)===mes);
     const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
@@ -1426,19 +1432,19 @@ function relatorioDRE() {
     totalReceitaGeral += totalRec;
     totalDespesaGeral += totalDesp;
 
-    // Linhas receita: previsto por aluno
+    // Linhas receita: previsto por aluno (somente os que já eram alunos neste mês)
     let linhasRec = '';
     const labelMes = isFuturo ? '📅 Previsto' : isAtual ? '📅 Previsto (mês atual)' : '📅 Previsto';
-    linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades — ' + labelMes + ' (' + alunosPagantes.length + ' alunos ativos)</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMensal) + '</td><td colspan="2"></td></tr>';
-    alunosPagantes.forEach(a => {
-      const pgtoAluno = pgtosMes.find(p => p.aluno_id === a.id || p.alunoNome === a.nome);
+    linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades — ' + labelMes + ' (' + alunosMes.length + ' alunos)</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMes) + '</td><td colspan="2"></td></tr>';
+    alunosMes.forEach(a => {
+      const pgtoAluno = pgtosMes.find(p => p.alunoId == a.id || p.alunoNome === a.nome);
       const stLabel = pgtoAluno ? '✅ Pago' : (isFuturo||isAtual) ? '⏳ Previsto' : '⚠️ Não registrado';
       const stColor = pgtoAluno ? '#16a34a' : (isFuturo||isAtual) ? '#2563eb' : '#b45309';
       linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (a.nome||'—') + ' <span style="font-size:9px;color:#666">' + (a.modalidade||'') + '</span></td><td>Mensalidade</td><td>' + (pgtoAluno ? fmtD(pgtoAluno.data) : '—') + '</td><td style="text-align:right;color:' + stColor + '">+ ' + fmtV(a.valor) + '</td><td style="color:' + stColor + ';font-size:9px">' + stLabel + '</td><td>' + (pgtoAluno ? (pgtoAluno.metodo||'—') : '—') + '</td></tr>';
     });
 
     // Pagamentos extras (não vinculados a aluno previsto acima)
-    const pgtoExtras = pgtosMes.filter(r => !alunosPagantes.find(a => a.id === r.aluno_id || a.nome === r.alunoNome));
+    const pgtoExtras = pgtosMes.filter(r => !alunosMes.find(a => a.id == r.alunoId || a.nome === r.alunoNome));
     if (pgtoExtras.length) {
       linhasRec += '<tr style="background:#ecfdf5"><td colspan="3"><b>💰 Outros pagamentos recebidos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(pgtoExtras.reduce((s,r)=>s+parseFloat(r.valor||0),0)) + '</td><td colspan="2"></td></tr>';
       pgtoExtras.forEach(r => { linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (r.alunoNome||r.descricao||'—') + '</td><td>Mensalidade</td><td>' + fmtD(r.data) + '</td><td style="text-align:right;color:#16a34a">+ ' + fmtV(r.valor) + '</td><td style="color:#16a34a;font-size:9px">✅ Pago</td><td>' + (r.metodo||'—') + '</td></tr>'; });
@@ -1493,7 +1499,7 @@ function relatorioDRE() {
   '</style></head><body>' +
   '<button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>' +
   '<h2>PUNCH AND ROLL — Demonstrativo de Resultado (DRE)</h2>' +
-  '<div class="sub">Gerado em ' + new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + ' | ' + alunosPagantes.length + ' alunos pagantes | Potencial mensal: R$ ' + potencialMensal.toFixed(2).replace('.',',') + '</div>' +
+  '<div class="sub">Gerado em ' + new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + ' | ' + alunosPagantes.length + ' alunos pagantes ativos</div>' +
   secoes +
   '<div class="geral">' +
   '<span>📅 ' + meses.length + ' meses</span>' +
