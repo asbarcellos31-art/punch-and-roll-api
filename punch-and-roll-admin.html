@@ -1114,6 +1114,7 @@ function renderFinContas(){
       <div style="display:flex;gap:6px">
         <button class="btn btn-ghost btn-sm" onclick="exportarContasCSV()">📥 CSV</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirContas()">🖨️ PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="relatorioAnual()">📊 Anual</button>
         <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
       </div>
     </div>
@@ -1238,6 +1239,100 @@ function imprimirContas() {
     ${totalPend>0?`<div class="t-pend">A pagar: R$ ${totalPend.toFixed(2).replace('.',',')}</div>`:''}
     ${totalPago>0?`<div class="t-pago">Pago: R$ ${totalPago.toFixed(2).replace('.',',')}</div>`:''}
     <div style="padding:8px 14px;background:#f3f3f3;border-radius:6px;font-weight:700">Total: R$ ${(totalPend+totalPago).toFixed(2).replace('.',',')}</div>
+  </div>
+</body></html>`);
+  w.document.close();
+}
+
+function relatorioAnual() {
+  const ano = new Date().getFullYear();
+  const todas = finResumo?.despesas || [];
+  if (!todas.length) { alert('Nenhuma conta encontrada.'); return; }
+
+  // Agrupa por mês (YYYY-MM)
+  const porMes = {};
+  todas.forEach(d => {
+    const mes = (d.data_vencimento||'').slice(0,7);
+    if (!mes) return;
+    if (!porMes[mes]) porMes[mes] = [];
+    porMes[mes].push(d);
+  });
+
+  const mesesOrdenados = Object.keys(porMes).sort();
+  if (!mesesOrdenados.length) { alert('Nenhuma conta com data encontrada.'); return; }
+
+  const nomeMes = m => {
+    const [y,mo] = m.split('-');
+    const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return `${nomes[parseInt(mo)-1]}/${y}`;
+  };
+
+  let totalGeralPend = 0, totalGeralPago = 0;
+
+  const secoes = mesesOrdenados.map(mes => {
+    const dados = porMes[mes];
+    const pend = dados.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    const pago = dados.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    totalGeralPend += pend; totalGeralPago += pago;
+
+    const linhas = dados.map(d => {
+      const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
+      const cor = d.status==='pago' ? '#16a34a' : vencida ? '#dc2626' : '#ca8a04';
+      const st = d.status==='pago' ? 'Pago' : vencida ? 'Vencida' : 'Pendente';
+      const parcelaInfo = d.parcelas>1 ? ` (${d.parcela_atual}/${d.parcelas})` : '';
+      const recorrenteInfo = d.recorrente ? ' 🔄' : '';
+      return `<tr>
+        <td>${d.descricao}${parcelaInfo}${recorrenteInfo}${d.obs?`<div style="font-size:10px;color:#555;margin-top:1px">📝 ${d.obs}</div>`:''}</td>
+        <td>${d.categoria||'—'}</td>
+        <td>${fmtD(d.data_vencimento)}</td>
+        <td>${d.data_pagamento?fmtD(d.data_pagamento):'—'}</td>
+        <td style="text-align:right;font-weight:600">R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
+        <td style="color:${cor};font-weight:600">${st}</td>
+        <td>${d.metodo||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="mes-titulo">${nomeMes(mes)}</div>
+      <table>
+        <thead><tr><th>Descrição / Obs</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+      <div class="mes-totais">
+        ${pend>0?`<span class="t-pend">A pagar: R$ ${pend.toFixed(2).replace('.',',')}</span>`:''}
+        ${pago>0?`<span class="t-pago">Pago: R$ ${pago.toFixed(2).replace('.',',')}</span>`:''}
+        <span class="t-total">Total mês: R$ ${(pend+pago).toFixed(2).replace('.',',')}</span>
+      </div>`;
+  }).join('');
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório Anual ${ano}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;max-width:900px;margin:0 auto}
+    h2{font-size:15px;margin-bottom:2px}
+    .sub{font-size:10px;color:#666;margin-bottom:18px}
+    .mes-titulo{font-size:13px;font-weight:700;color:#1e40af;margin:20px 0 6px;padding:4px 8px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:2px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#f3f3f3;padding:5px 6px;text-align:left;font-size:10px;border-bottom:2px solid #ddd}
+    td{padding:5px 6px;border-bottom:1px solid #eee;font-size:10px}
+    .mes-totais{display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+    .mes-totais span{padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px}
+    .t-pend{background:#fef2f2;color:#dc2626}
+    .t-pago{background:#f0fdf4;color:#16a34a}
+    .t-total{background:#f3f3f3;color:#374151}
+    .geral{margin-top:20px;padding:12px 16px;background:#1e293b;color:#fff;border-radius:8px;display:flex;gap:20px;flex-wrap:wrap}
+    .geral span{font-weight:700;font-size:12px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
+  <h2>PUNCH AND ROLL — Relatório Anual</h2>
+  <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+  ${secoes}
+  <div class="geral">
+    <span>📅 ${mesesOrdenados.length} meses</span>
+    ${totalGeralPend>0?`<span style="color:#fca5a5">Total a pagar: R$ ${totalGeralPend.toFixed(2).replace('.',',')}</span>`:''}
+    ${totalGeralPago>0?`<span style="color:#86efac">Total pago: R$ ${totalGeralPago.toFixed(2).replace('.',',')}</span>`:''}
+    <span style="color:#fde68a">Geral: R$ ${(totalGeralPend+totalGeralPago).toFixed(2).replace('.',',')}</span>
   </div>
 </body></html>`);
   w.document.close();
