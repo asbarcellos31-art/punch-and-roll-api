@@ -1136,6 +1136,24 @@ function renderFinContas(){
   const totalPend=doMes.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const totalPago=doMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const qtdVenc=doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
+  // Receitas por fonte
+  const _mes=contasMes||`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const _recMens=parseFloat((finResumo?.historicoRec||[]).find(h=>h.mes===_mes)?.total||0);
+  const _recShop=parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mes)?.total||0);
+  const _recTotal=_recMens+_recShop;
+  const _recPot=(cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const _qtdPgtos=(Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===_mes).length;
+  const _resultado=_recTotal-totalPago;
+  const _receitasHTML=`<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+    <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:8px">RECEITAS</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--muted)">💚 Mensalidades</span><span style="color:var(--green);font-weight:700">${fmtR(_recMens)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${_qtdPgtos} pgtos)</span></span></div>
+      ${_recShop>0?`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--muted)">🛒 Loja</span><span style="color:#818cf8;font-weight:700">${fmtR(_recShop)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--muted)">📊 Potencial mensal</span><span style="color:var(--muted)">${fmtR(_recPot)}</span></div>
+      <div style="border-top:1px solid var(--border);margin-top:3px;padding-top:5px;display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:600">Total receitas</span><span style="font-weight:700;color:var(--green)">${fmtR(_recTotal)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:600">Resultado (rec. - desp. pagas)</span><span style="font-weight:700;color:${_resultado>=0?'var(--green)':'#f87171'}">${_resultado>=0?'+':''}${fmtR(_resultado)}</span></div>
+    </div>
+  </div>`;
   document.getElementById('fin-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px">
@@ -1163,40 +1181,7 @@ function renderFinContas(){
         <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(totalPago)}</div>
       </div>
     </div>
-    ${(()=>{
-      const mes = contasMes || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-      const recMesFonte = parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mes)?.total||0);
-      const shopMesFonte = parseFloat(finResumo?.historicoShop?.find(h=>h.mes===mes)?.total||0);
-      const qtdPgtos = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mes).length;
-      const recPotFonte = (cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
-      const totalRecFonte = recMesFonte + shopMesFonte;
-      const resultado = totalRecFonte - totalPago;
-      return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:8px">RECEITAS</div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <div style="display:flex;justify-content:space-between;font-size:12px">
-            <span style="color:var(--muted)">💚 Mensalidades</span>
-            <span style="color:var(--green);font-weight:700">${fmtR(recMesFonte)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${qtdPgtos} pgtos)</span></span>
-          </div>
-          ${shopMesFonte>0?`<div style="display:flex;justify-content:space-between;font-size:12px">
-            <span style="color:var(--muted)">🛒 Loja</span>
-            <span style="color:#818cf8;font-weight:700">${fmtR(shopMesFonte)}</span>
-          </div>`:''}
-          <div style="display:flex;justify-content:space-between;font-size:12px">
-            <span style="color:var(--muted)">📊 Potencial (alunos ativos)</span>
-            <span style="color:var(--muted)">${fmtR(recPotFonte)}</span>
-          </div>
-          <div style="border-top:1px solid var(--border);margin-top:3px;padding-top:5px;display:flex;justify-content:space-between;font-size:12px">
-            <span style="font-weight:600">Total receitas</span>
-            <span style="font-weight:700;color:var(--green)">${fmtR(totalRecFonte)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:12px">
-            <span style="font-weight:600">Resultado (rec. - despesas pagas)</span>
-            <span style="font-weight:700;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</span>
-          </div>
-        </div>
-      </div>`;
-    })()}
+    ${_receitasHTML}
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
     <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
       ${[['pendente','Pendentes'],['vencida','Vencidas'],['pago','Pagas'],['todas','Todas']].map(([v,l])=>
