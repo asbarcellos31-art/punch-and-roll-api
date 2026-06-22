@@ -1372,117 +1372,136 @@ function relatorioAnual() {
 
 function relatorioDRE() {
   const despesas = finResumo?.despesas || [];
-  const receitas = mensHistorico || [];
   const shopPeds = Array.isArray(_finShopPedidos) ? _finShopPedidos.filter(p=>p.status!=='cancelado') : [];
-  if (!despesas.length && !receitas.length) { alert('Nenhum dado encontrado.'); return; }
+  const historicoShop = finResumo?.historicoShop || [];
 
-  // Coleta todos os meses presentes
+  // Alunos ativos pagantes (base da receita prevista)
+  const alunosPagantes = (cache.alunos||[]).filter(a => !a.cortesia && a.status !== 'inativo');
+  const potencialMensal = alunosPagantes.reduce((s,a) => s + parseFloat(a.valor||0), 0);
+
+  // Pagamentos reais registrados
+  const pgtos = Array.isArray(mensHistorico) ? mensHistorico : [];
+
+  // Monta conjunto de meses: despesas + shop + 3 meses anteriores + mês atual + 2 futuros
   const mesesSet = new Set();
+  const hoje = new Date();
+  for (let i = -3; i <= 2; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+    mesesSet.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  }
   despesas.forEach(d => { const m=(d.data_vencimento||'').slice(0,7); if(m) mesesSet.add(m); });
-  receitas.forEach(r => { const m=String(r.data||'').slice(0,7); if(m) mesesSet.add(m); });
   shopPeds.forEach(p => { const m=String(p.criado_em||'').slice(0,7); if(m) mesesSet.add(m); });
+  pgtos.forEach(r => { const m=String(r.data||'').slice(0,7); if(m) mesesSet.add(m); });
   const meses = [...mesesSet].sort();
 
   const nomeMes = m => {
     const [y,mo] = m.split('-');
     const n=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    return `${n[parseInt(mo)-1]}/${y}`;
+    return n[parseInt(mo)-1] + '/' + y;
   };
-
-  // Usar historicoRec e historicoShop do finResumo como fonte confiável de totais
-  const historicoRec = finResumo?.historicoRec || [];
-  const historicoShop = finResumo?.historicoShop || [];
+  const mesCur = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0');
+  const fmtV = v => 'R$ ' + Number(v||0).toFixed(2).replace('.',',');
 
   let totalReceitaGeral=0, totalDespesaGeral=0;
 
   const secoes = meses.map(mes => {
-    const recMensTotal = parseFloat((historicoRec.find(h=>h.mes===mes)||{}).total||0);
-    const recShopTotal = parseFloat((historicoShop.find(h=>h.mes===mes)||{}).total||0);
-    const totalRec = recMensTotal + recShopTotal;
-    const desp = despesas.filter(d=>(d.data_vencimento||'').startsWith(mes));
+    const isFuturo = mes > mesCur;
+    const isAtual = mes === mesCur;
+
+    // Receitas: pagamentos realmente recebidos neste mês
+    const pgtosMes = pgtos.filter(r => String(r.data||'').slice(0,7) === mes);
+    const totalRecebido = pgtosMes.reduce((s,r) => s + parseFloat(r.valor||0), 0);
+
+    // Shop
+    const shopMes = shopPeds.filter(p => String(p.criado_em||'').slice(0,7) === mes);
+    const totalShopHist = parseFloat((historicoShop.find(h=>h.mes===mes)||{}).total||0);
+    const recShopTotal = totalShopHist > 0 ? totalShopHist : shopMes.reduce((s,p)=>s+parseFloat(p.total||0),0);
+
+    // Total receita = recebido + potencial previsto (não duplicamos: mostramos ambos)
+    const totalRec = potencialMensal + recShopTotal;
+
+    const desp = despesas.filter(d=>(d.data_vencimento||'').slice(0,7)===mes);
     const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const resultado = totalRec - totalDesp;
     totalReceitaGeral += totalRec;
     totalDespesaGeral += totalDesp;
 
-    // Linhas individuais de pagamentos (detalhe)
-    const recInd = receitas.filter(r=>String(r.data||'').slice(0,7)===mes);
-    const shopInd = shopPeds.filter(p=>String(p.criado_em||'').slice(0,7)===mes);
+    // Linhas receita: previsto por aluno
     let linhasRec = '';
-    if (recMensTotal > 0) {
-      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades recebidas</b>';
-      if (recInd.length) linhasRec += ' (' + recInd.length + ' pagamentos)';
-      linhasRec += '</td><td style="text-align:right;color:#16a34a;font-weight:700">+ R$ ' + recMensTotal.toFixed(2).replace('.',',') + '</td><td colspan="2"></td></tr>';
-      recInd.forEach(r=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (r.alunoNome||'—') + '</td><td>Mensalidade</td><td>' + fmtD(r.data) + '</td><td style="text-align:right;color:#16a34a">+ R$ ' + Number(r.valor||0).toFixed(2).replace('.',',') + '</td><td style="color:#16a34a">' + (r.status||'Recebido') + '</td><td>' + (r.metodo||'—') + '</td></tr>'; });
+    const labelMes = isFuturo ? '📅 Previsto' : isAtual ? '📅 Previsto (mês atual)' : '📅 Previsto';
+    linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades — ' + labelMes + ' (' + alunosPagantes.length + ' alunos ativos)</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMensal) + '</td><td colspan="2"></td></tr>';
+    alunosPagantes.forEach(a => {
+      const pgtoAluno = pgtosMes.find(p => p.aluno_id === a.id || p.alunoNome === a.nome);
+      const stLabel = pgtoAluno ? '✅ Pago' : (isFuturo||isAtual) ? '⏳ Previsto' : '⚠️ Não registrado';
+      const stColor = pgtoAluno ? '#16a34a' : (isFuturo||isAtual) ? '#2563eb' : '#b45309';
+      linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (a.nome||'—') + ' <span style="font-size:9px;color:#666">' + (a.modalidade||'') + '</span></td><td>Mensalidade</td><td>' + (pgtoAluno ? fmtD(pgtoAluno.data) : '—') + '</td><td style="text-align:right;color:' + stColor + '">+ ' + fmtV(a.valor) + '</td><td style="color:' + stColor + ';font-size:9px">' + stLabel + '</td><td>' + (pgtoAluno ? (pgtoAluno.metodo||'—') : '—') + '</td></tr>';
+    });
+
+    // Pagamentos extras (não vinculados a aluno previsto acima)
+    const pgtoExtras = pgtosMes.filter(r => !alunosPagantes.find(a => a.id === r.aluno_id || a.nome === r.alunoNome));
+    if (pgtoExtras.length) {
+      linhasRec += '<tr style="background:#ecfdf5"><td colspan="3"><b>💰 Outros pagamentos recebidos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(pgtoExtras.reduce((s,r)=>s+parseFloat(r.valor||0),0)) + '</td><td colspan="2"></td></tr>';
+      pgtoExtras.forEach(r => { linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (r.alunoNome||r.descricao||'—') + '</td><td>Mensalidade</td><td>' + fmtD(r.data) + '</td><td style="text-align:right;color:#16a34a">+ ' + fmtV(r.valor) + '</td><td style="color:#16a34a;font-size:9px">✅ Pago</td><td>' + (r.metodo||'—') + '</td></tr>'; });
     }
+
     if (recShopTotal > 0) {
-      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>🛒 Loja / Shop</b>';
-      if (shopInd.length) linhasRec += ' (' + shopInd.length + ' pedidos)';
-      linhasRec += '</td><td style="text-align:right;color:#16a34a;font-weight:700">+ R$ ' + recShopTotal.toFixed(2).replace('.',',') + '</td><td colspan="2"></td></tr>';
-      shopInd.forEach(p=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (p.cliente_nome||'Cliente') + '</td><td>Loja</td><td>' + fmtD(String(p.criado_em||'').slice(0,10)) + '</td><td style="text-align:right;color:#16a34a">+ R$ ' + Number(p.total||0).toFixed(2).replace('.',',') + '</td><td style="color:#16a34a">' + (p.status||'—') + '</td><td>—</td></tr>'; });
+      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>🛒 Loja / Shop' + (shopMes.length ? ' (' + shopMes.length + ' pedidos)' : '') + '</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(recShopTotal) + '</td><td colspan="2"></td></tr>';
+      shopMes.forEach(p=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (p.cliente_nome||'Cliente') + '</td><td>Loja</td><td>' + fmtD(String(p.criado_em||'').slice(0,10)) + '</td><td style="text-align:right;color:#16a34a">+ ' + fmtV(p.total) + '</td><td style="color:#16a34a;font-size:9px">✅ Pago</td><td>—</td></tr>'; });
     }
-    if (!linhasRec) linhasRec = '<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>';
 
     const linhasDesp = desp.length ? desp.map(d=>{
-      const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
+      const vencida = d.status==='pendente' && (d.data_vencimento||'') < mesCur+'-32';
       const cor = d.status==='pago'?'#dc2626':vencida?'#b91c1c':'#ca8a04';
       const st = d.status==='pago'?'Pago':vencida?'Vencida':'Pendente';
-      const parcelaInfo = d.parcelas>1?` (${d.parcela_atual}/${d.parcelas})`:'';
-      return `<tr>
-        <td>🔴 ${d.descricao}${parcelaInfo}${d.recorrente?' 🔄':''}${d.obs?`<div style="font-size:9px;color:#777">📝 ${d.obs}</div>`:''}</td>
-        <td>${d.categoria||'—'}</td>
-        <td>${fmtD(d.data_vencimento)}</td>
-        <td style="text-align:right;color:${cor};font-weight:600">- R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
-        <td style="color:${cor};font-weight:600">${st}</td>
-        <td>${d.metodo||'—'}</td>
-      </tr>`;}).join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma despesa neste mês</td></tr>`;
+      const parcelaInfo = d.parcelas>1?' ('+d.parcela_atual+'/'+d.parcelas+')':'';
+      return '<tr><td>🔴 '+d.descricao+parcelaInfo+(d.recorrente?' 🔄':'')+(d.obs?'<div style="font-size:9px;color:#777">📝 '+d.obs+'</div>':'')+'</td><td>'+(d.categoria||'—')+'</td><td>'+fmtD(d.data_vencimento)+'</td><td style="text-align:right;color:'+cor+';font-weight:600">- '+fmtV(d.valor)+'</td><td style="color:'+cor+';font-weight:600">'+st+'</td><td>'+(d.metodo||'—')+'</td></tr>';
+    }).join('') : '<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma despesa neste mês</td></tr>';
 
-    return `
-      <div class="mes-titulo">${nomeMes(mes)}</div>
-      <table>
-        <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead>
-        <tbody>
-          <tr><td colspan="6" style="background:#dcfce7;font-weight:700;font-size:10px;color:#15803d;padding:4px 6px">▲ RECEITAS</td></tr>
-          ${linhasRec}
-          <tr><td colspan="6" style="background:#fee2e2;font-weight:700;font-size:10px;color:#b91c1c;padding:4px 6px">▼ DESPESAS</td></tr>
-          ${linhasDesp}
-        </tbody>
-      </table>
-      <div class="mes-totais">
-        <span class="t-rec">Receitas: R$ ${totalRec.toFixed(2).replace('.',',')}</span>
-        <span class="t-pend">Despesas: R$ ${totalDesp.toFixed(2).replace('.',',')}</span>
-        <span style="padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px;background:${resultado>=0?'#dbeafe':'#fef3c7'};color:${resultado>=0?'#1d4ed8':'#b45309'}">Resultado: ${resultado>=0?'+':''}R$ ${resultado.toFixed(2).replace('.',',')}</span>
-      </div>`;
+    const badgeMes = isFuturo ? ' <span style="font-size:9px;background:#dbeafe;color:#1d4ed8;padding:2px 6px;border-radius:3px">PREVISÃO</span>' : isAtual ? ' <span style="font-size:9px;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:3px">MÊS ATUAL</span>' : '';
+
+    return '<div class="mes-titulo">' + nomeMes(mes) + badgeMes + '</div>' +
+      '<table><thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead><tbody>' +
+      '<tr><td colspan="6" style="background:#dcfce7;font-weight:700;font-size:10px;color:#15803d;padding:4px 6px">▲ RECEITAS</td></tr>' +
+      linhasRec +
+      '<tr><td colspan="6" style="background:#fee2e2;font-weight:700;font-size:10px;color:#b91c1c;padding:4px 6px">▼ DESPESAS</td></tr>' +
+      linhasDesp +
+      '</tbody></table>' +
+      '<div class="mes-totais">' +
+      '<span class="t-rec">Receitas: ' + fmtV(totalRec) + '</span>' +
+      '<span class="t-pend">Despesas: ' + fmtV(totalDesp) + '</span>' +
+      '<span style="padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px;background:' + (resultado>=0?'#dbeafe':'#fef3c7') + ';color:' + (resultado>=0?'#1d4ed8':'#b45309') + '">Resultado: ' + (resultado>=0?'+':'') + fmtV(resultado) + '</span>' +
+      (pgtosMes.length>0 ? '<span style="padding:4px 10px;border-radius:4px;font-size:10px;background:#f0fdf4;color:#15803d">✅ Recebido real: ' + fmtV(totalRecebido) + ' (' + pgtosMes.length + ' pgtos)</span>' : '') +
+      '</div>';
   }).join('');
 
   const resultadoGeral = totalReceitaGeral - totalDespesaGeral;
   const w = window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DRE — Punch and Roll</title>
-  <style>
-    body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;max-width:960px;margin:0 auto}
-    h2{font-size:15px;margin-bottom:2px} .sub{font-size:10px;color:#666;margin-bottom:18px}
-    .mes-titulo{font-size:13px;font-weight:700;color:#1e40af;margin:22px 0 6px;padding:4px 8px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:2px}
-    table{width:100%;border-collapse:collapse;margin-bottom:4px}
-    th{background:#f3f3f3;padding:5px 6px;text-align:left;font-size:10px;border-bottom:2px solid #ddd}
-    td{padding:5px 6px;border-bottom:1px solid #eee;font-size:10px}
-    .mes-totais{display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap}
-    .mes-totais span{padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px}
-    .t-rec{background:#dcfce7;color:#15803d} .t-pend{background:#fee2e2;color:#b91c1c}
-    .geral{margin-top:24px;padding:14px 18px;background:#0f172a;color:#fff;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
-    .geral span{font-weight:700;font-size:12px}
-    @media print{button{display:none}}
-  </style></head><body>
-  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
-  <h2>PUNCH AND ROLL — Demonstrativo de Resultado (DRE)</h2>
-  <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
-  ${secoes}
-  <div class="geral">
-    <span>📅 ${meses.length} meses</span>
-    <span style="color:#86efac">Receitas: R$ ${totalReceitaGeral.toFixed(2).replace('.',',')}</span>
-    <span style="color:#fca5a5">Despesas: R$ ${totalDespesaGeral.toFixed(2).replace('.',',')}</span>
-    <span style="color:${resultadoGeral>=0?'#bef264':'#fde68a'}">Resultado Geral: ${resultadoGeral>=0?'+':''}R$ ${resultadoGeral.toFixed(2).replace('.',',')}</span>
-  </div>
-</body></html>`);
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DRE — Punch and Roll</title>' +
+  '<style>' +
+  'body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;max-width:960px;margin:0 auto}' +
+  'h2{font-size:15px;margin-bottom:2px} .sub{font-size:10px;color:#666;margin-bottom:18px}' +
+  '.mes-titulo{font-size:13px;font-weight:700;color:#1e40af;margin:22px 0 6px;padding:4px 8px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:2px}' +
+  'table{width:100%;border-collapse:collapse;margin-bottom:4px}' +
+  'th{background:#f3f3f3;padding:5px 6px;text-align:left;font-size:10px;border-bottom:2px solid #ddd}' +
+  'td{padding:5px 6px;border-bottom:1px solid #eee;font-size:10px}' +
+  '.mes-totais{display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap}' +
+  '.mes-totais span{padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px}' +
+  '.t-rec{background:#dcfce7;color:#15803d} .t-pend{background:#fee2e2;color:#b91c1c}' +
+  '.geral{margin-top:24px;padding:14px 18px;background:#0f172a;color:#fff;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}' +
+  '.geral span{font-weight:700;font-size:12px}' +
+  '@media print{button{display:none}}' +
+  '</style></head><body>' +
+  '<button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>' +
+  '<h2>PUNCH AND ROLL — Demonstrativo de Resultado (DRE)</h2>' +
+  '<div class="sub">Gerado em ' + new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + ' | ' + alunosPagantes.length + ' alunos pagantes | Potencial mensal: R$ ' + potencialMensal.toFixed(2).replace('.',',') + '</div>' +
+  secoes +
+  '<div class="geral">' +
+  '<span>📅 ' + meses.length + ' meses</span>' +
+  '<span style="color:#86efac">Receitas Previstas: R$ ' + totalReceitaGeral.toFixed(2).replace('.',',') + '</span>' +
+  '<span style="color:#fca5a5">Despesas: R$ ' + totalDespesaGeral.toFixed(2).replace('.',',') + '</span>' +
+  '<span style="color:' + (resultadoGeral>=0?'#bef264':'#fde68a') + '">Resultado Geral: ' + (resultadoGeral>=0?'+':'') + 'R$ ' + resultadoGeral.toFixed(2).replace('.',',') + '</span>' +
+  '</div>' +
+  '</body></html>');
   w.document.close();
 }
 
