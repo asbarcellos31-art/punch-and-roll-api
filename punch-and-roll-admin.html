@@ -590,7 +590,12 @@ function abrirModalAluno(id) {
     if(a.inicio) document.getElementById('a-inicio').value=a.inicio;
     if(a.venc) document.getElementById('a-venc').value=a.venc;
     setTimeout(()=>{
-      if(a.modalidade){document.getElementById('a-modalidade').value=a.modalidade;atualizarPlanos();}
+      if(a.modalidade){
+        document.getElementById('a-modalidade').value=a.modalidade;
+        atualizarPlanos();
+        // Restaura o vencimento original — atualizarPlanos() chama atualizarVenc() e sobrescreveria a data salva
+        if(a.venc) document.getElementById('a-venc').value=a.venc;
+      }
       setTimeout(()=>{ const pId=a.planoId||a.plano_id; if(pId) document.getElementById('a-plano').value=pId; },80);
     },50);
   } else {
