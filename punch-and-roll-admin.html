@@ -1389,36 +1389,39 @@ function relatorioDRE() {
     return `${n[parseInt(mo)-1]}/${y}`;
   };
 
+  // Usar historicoRec e historicoShop do finResumo como fonte confiável de totais
+  const historicoRec = finResumo?.historicoRec || [];
+  const historicoShop = finResumo?.historicoShop || [];
+
   let totalReceitaGeral=0, totalDespesaGeral=0;
 
   const secoes = meses.map(mes => {
-    const rec = receitas.filter(r=>String(r.data||'').slice(0,7)===mes);
-    const shop = shopPeds.filter(p=>String(p.criado_em||'').slice(0,7)===mes);
+    const recMensTotal = parseFloat((historicoRec.find(h=>h.mes===mes)||{}).total||0);
+    const recShopTotal = parseFloat((historicoShop.find(h=>h.mes===mes)||{}).total||0);
+    const totalRec = recMensTotal + recShopTotal;
     const desp = despesas.filter(d=>(d.data_vencimento||'').startsWith(mes));
-    const totalRec = rec.reduce((s,r)=>s+parseFloat(r.valor||0),0) + shop.reduce((s,p)=>s+parseFloat(p.total||0),0);
     const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const resultado = totalRec - totalDesp;
     totalReceitaGeral += totalRec;
     totalDespesaGeral += totalDesp;
 
-    const linhasRec = (rec.length||shop.length) ? [
-      ...rec.map(r=>`<tr style="background:#f0fdf4">
-        <td>💚 ${r.alunoNome||'—'}</td>
-        <td>Mensalidade</td>
-        <td>${fmtD(r.data)}</td>
-        <td style="text-align:right;color:#16a34a;font-weight:600">+ R$ ${Number(r.valor||0).toFixed(2).replace('.',',')}</td>
-        <td style="color:#16a34a;font-weight:600">Recebido</td>
-        <td>${r.metodo||'—'}</td>
-      </tr>`),
-      ...shop.map(p=>`<tr style="background:#f0fdf4">
-        <td>🛒 ${p.cliente_nome||'Cliente'}</td>
-        <td>Loja</td>
-        <td>${fmtD(String(p.criado_em||'').slice(0,10))}</td>
-        <td style="text-align:right;color:#16a34a;font-weight:600">+ R$ ${Number(p.total||0).toFixed(2).replace('.',',')}</td>
-        <td style="color:#16a34a;font-weight:600">${p.status||'—'}</td>
-        <td>—</td>
-      </tr>`)
-    ].join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>`;
+    // Linhas individuais de pagamentos (detalhe)
+    const recInd = receitas.filter(r=>String(r.data||'').slice(0,7)===mes);
+    const shopInd = shopPeds.filter(p=>String(p.criado_em||'').slice(0,7)===mes);
+    let linhasRec = '';
+    if (recMensTotal > 0) {
+      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades recebidas</b>';
+      if (recInd.length) linhasRec += ' (' + recInd.length + ' pagamentos)';
+      linhasRec += '</td><td style="text-align:right;color:#16a34a;font-weight:700">+ R$ ' + recMensTotal.toFixed(2).replace('.',',') + '</td><td colspan="2"></td></tr>';
+      recInd.forEach(r=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (r.alunoNome||'—') + '</td><td>Mensalidade</td><td>' + fmtD(r.data) + '</td><td style="text-align:right;color:#16a34a">+ R$ ' + Number(r.valor||0).toFixed(2).replace('.',',') + '</td><td style="color:#16a34a">' + (r.status||'Recebido') + '</td><td>' + (r.metodo||'—') + '</td></tr>'; });
+    }
+    if (recShopTotal > 0) {
+      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>🛒 Loja / Shop</b>';
+      if (shopInd.length) linhasRec += ' (' + shopInd.length + ' pedidos)';
+      linhasRec += '</td><td style="text-align:right;color:#16a34a;font-weight:700">+ R$ ' + recShopTotal.toFixed(2).replace('.',',') + '</td><td colspan="2"></td></tr>';
+      shopInd.forEach(p=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (p.cliente_nome||'Cliente') + '</td><td>Loja</td><td>' + fmtD(String(p.criado_em||'').slice(0,10)) + '</td><td style="text-align:right;color:#16a34a">+ R$ ' + Number(p.total||0).toFixed(2).replace('.',',') + '</td><td style="color:#16a34a">' + (p.status||'—') + '</td><td>—</td></tr>'; });
+    }
+    if (!linhasRec) linhasRec = '<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>';
 
     const linhasDesp = desp.length ? desp.map(d=>{
       const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
