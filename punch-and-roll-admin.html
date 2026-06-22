@@ -1395,12 +1395,14 @@ function relatorioAnual() {
 function relatorioDRE() {
   const despesas = finResumo?.despesas || [];
   const receitas = mensHistorico || [];
+  const shopPeds = Array.isArray(_finShopPedidos) ? _finShopPedidos.filter(p=>p.status!=='cancelado') : [];
   if (!despesas.length && !receitas.length) { alert('Nenhum dado encontrado.'); return; }
 
   // Coleta todos os meses presentes
   const mesesSet = new Set();
   despesas.forEach(d => { const m=(d.data_vencimento||'').slice(0,7); if(m) mesesSet.add(m); });
-  receitas.forEach(r => { const m=(r.data||'').slice(0,7); if(m) mesesSet.add(m); });
+  receitas.forEach(r => { const m=String(r.data||'').slice(0,7); if(m) mesesSet.add(m); });
+  shopPeds.forEach(p => { const m=String(p.criado_em||'').slice(0,7); if(m) mesesSet.add(m); });
   const meses = [...mesesSet].sort();
 
   const nomeMes = m => {
@@ -1412,23 +1414,33 @@ function relatorioDRE() {
   let totalReceitaGeral=0, totalDespesaGeral=0;
 
   const secoes = meses.map(mes => {
-    const rec = receitas.filter(r=>(r.data||'').startsWith(mes));
+    const rec = receitas.filter(r=>String(r.data||'').slice(0,7)===mes);
+    const shop = shopPeds.filter(p=>String(p.criado_em||'').slice(0,7)===mes);
     const desp = despesas.filter(d=>(d.data_vencimento||'').startsWith(mes));
-    const totalRec = rec.reduce((s,r)=>s+parseFloat(r.valor||0),0);
+    const totalRec = rec.reduce((s,r)=>s+parseFloat(r.valor||0),0) + shop.reduce((s,p)=>s+parseFloat(p.total||0),0);
     const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const resultado = totalRec - totalDesp;
     totalReceitaGeral += totalRec;
     totalDespesaGeral += totalDesp;
 
-    const linhasRec = rec.length ? rec.map(r=>`
-      <tr style="background:#f0fdf4">
+    const linhasRec = (rec.length||shop.length) ? [
+      ...rec.map(r=>`<tr style="background:#f0fdf4">
         <td>💚 ${r.alunoNome||'—'}</td>
         <td>Mensalidade</td>
         <td>${fmtD(r.data)}</td>
         <td style="text-align:right;color:#16a34a;font-weight:600">+ R$ ${Number(r.valor||0).toFixed(2).replace('.',',')}</td>
         <td style="color:#16a34a;font-weight:600">Recebido</td>
         <td>${r.metodo||'—'}</td>
-      </tr>`).join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>`;
+      </tr>`),
+      ...shop.map(p=>`<tr style="background:#f0fdf4">
+        <td>🛒 ${p.cliente_nome||'Cliente'}</td>
+        <td>Loja</td>
+        <td>${fmtD(String(p.criado_em||'').slice(0,10))}</td>
+        <td style="text-align:right;color:#16a34a;font-weight:600">+ R$ ${Number(p.total||0).toFixed(2).replace('.',',')}</td>
+        <td style="color:#16a34a;font-weight:600">${p.status||'—'}</td>
+        <td>—</td>
+      </tr>`)
+    ].join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>`;
 
     const linhasDesp = desp.length ? desp.map(d=>{
       const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
