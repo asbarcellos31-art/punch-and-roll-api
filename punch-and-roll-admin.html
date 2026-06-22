@@ -1175,10 +1175,11 @@ function exportarContasCSV() {
   if (!dados.length) { alert('Nenhuma conta para exportar.'); return; }
   const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
   const linhas = [
-    ['Descrição','Categoria','Vencimento','Pagamento','Valor (R$)','Status','Método'].map(esc).join(';'),
+    ['Descrição','Categoria','Vencimento','Pagamento','Valor (R$)','Status','Método','Observações','Recorrente','Parcela'].map(esc).join(';'),
     ...dados.map(d => [
       d.descricao, d.categoria||'', fmtD(d.data_vencimento), d.data_pagamento?fmtD(d.data_pagamento):'',
-      Number(d.valor||0).toFixed(2).replace('.',','), d.status==='pago'?'Pago':d.data_vencimento<todayStr?'Vencida':'Pendente', d.metodo||''
+      Number(d.valor||0).toFixed(2).replace('.',','), d.status==='pago'?'Pago':d.data_vencimento<todayStr?'Vencida':'Pendente', d.metodo||'',
+      d.obs||'', d.recorrente?'Sim':'Não', d.parcelas>1?`${d.parcela_atual}/${d.parcelas}`:''
     ].map(esc).join(';'))
   ];
   const bom = '﻿';
@@ -1199,13 +1200,16 @@ function imprimirContas() {
     const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
     const cor = d.status==='pago' ? '#16a34a' : vencida ? '#dc2626' : '#ca8a04';
     const st = d.status==='pago' ? 'Pago' : vencida ? 'Vencida' : 'Pendente';
+    const parcelaInfo = d.parcelas>1 ? ` <span style="font-size:10px;color:#888">(${d.parcela_atual}/${d.parcelas})</span>` : '';
+    const recorrenteInfo = d.recorrente ? ' <span style="font-size:10px;color:#2563eb">🔄</span>' : '';
     return `<tr>
-      <td>${d.descricao}</td>
+      <td>${d.descricao}${parcelaInfo}${recorrenteInfo}${d.obs?`<div style="font-size:10px;color:#555;margin-top:2px">📝 ${d.obs}</div>`:''}</td>
       <td>${d.categoria||'—'}</td>
       <td>${fmtD(d.data_vencimento)}</td>
       <td>${d.data_pagamento?fmtD(d.data_pagamento):'—'}</td>
       <td style="text-align:right;font-weight:600">R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
       <td style="color:${cor};font-weight:600">${st}</td>
+      <td>${d.metodo||'—'}</td>
     </tr>`;
   }).join('');
   const w = window.open('','_blank');
@@ -1227,7 +1231,7 @@ function imprimirContas() {
   <h2>PUNCH AND ROLL — ${titulo}</h2>
   <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
   <table>
-    <thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th></tr></thead>
+    <thead><tr><th>Descrição / Observações</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead>
     <tbody>${linhas}</tbody>
   </table>
   <div class="totais">
