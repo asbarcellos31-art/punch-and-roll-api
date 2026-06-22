@@ -983,7 +983,9 @@ function renderFinGeral(){
   const ticketMedio=nAtivos>0?ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0)/nAtivos:0;
   const agora=new Date();
   const mesCur=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
-  const recMes=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mesCur)?.total||0);
+  const recMesMens=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mesCur)?.total||0);
+  const recMesShop=parseFloat(finResumo?.historicoShop?.find(h=>h.mes===mesCur)?.total||0);
+  const recMes=recMesMens+recMesShop;
   const desMes=parseFloat(finResumo?.historicoDes?.find(h=>h.mes===mesCur)?.total||0);
   const resultado=recMes-desMes;
   const nomeMes=agora.toLocaleDateString('pt-BR',{month:'long'});
@@ -1058,7 +1060,7 @@ function renderFinGeral(){
         const dt=new Date(ag.getFullYear(),ag.getMonth()-i,1);
         const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
         labels.push(dt.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''));
-        recs.push(parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0));
+        recs.push(parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0)+parseFloat(finResumo?.historicoShop?.find(h=>h.mes===key)?.total||0));
         des.push(parseFloat(finResumo?.historicoDes?.find(h=>h.mes===key)?.total||0));
       }
       _finChart=new Chart(ctxBar,{type:'bar',data:{labels,datasets:[{label:'Receitas',data:recs,backgroundColor:'rgba(34,197,94,0.7)',borderRadius:3},{label:'Despesas',data:des,backgroundColor:'rgba(212,17,28,0.55)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#666',font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.02)'},ticks:{color:'#666',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{size:10},callback:v=>'R$'+v}}}}});
@@ -1081,7 +1083,7 @@ function renderFinDRE(){
     const dt=new Date(agora.getFullYear(),agora.getMonth()-i,1);
     const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
     const lbl=dt.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','');
-    const rec=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0);
+    const rec=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===key)?.total||0)+parseFloat(finResumo?.historicoShop?.find(h=>h.mes===key)?.total||0);
     const des=parseFloat(finResumo?.historicoDes?.find(h=>h.mes===key)?.total||0);
     meses.push({key,lbl,rec,des,res:rec-des});
   }
@@ -1164,28 +1166,32 @@ function renderFinContas(){
     ${(()=>{
       const mes = contasMes || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
       const recMesFonte = parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mes)?.total||0);
+      const shopMesFonte = parseFloat(finResumo?.historicoShop?.find(h=>h.mes===mes)?.total||0);
       const qtdPgtos = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mes).length;
-      const shopMesFonte = (Array.isArray(_finShopPedidos)?_finShopPedidos:[]).filter(p=>p.status!=='cancelado'&&String(p.criado_em||'').slice(0,7)===mes);
-      const totalShopFonte = shopMesFonte.reduce((s,p)=>s+parseFloat(p.total||0),0);
       const recPotFonte = (cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
-      const resultado = recMesFonte - totalPago;
+      const totalRecFonte = recMesFonte + shopMesFonte;
+      const resultado = totalRecFonte - totalPago;
       return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
         <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:8px">RECEITAS</div>
         <div style="display:flex;flex-direction:column;gap:5px">
           <div style="display:flex;justify-content:space-between;font-size:12px">
-            <span style="color:var(--muted)">💚 Mensalidades recebidas</span>
+            <span style="color:var(--muted)">💚 Mensalidades</span>
             <span style="color:var(--green);font-weight:700">${fmtR(recMesFonte)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${qtdPgtos} pgtos)</span></span>
           </div>
-          ${totalShopFonte>0?`<div style="display:flex;justify-content:space-between;font-size:12px">
+          ${shopMesFonte>0?`<div style="display:flex;justify-content:space-between;font-size:12px">
             <span style="color:var(--muted)">🛒 Loja</span>
-            <span style="color:#818cf8;font-weight:700">${fmtR(totalShopFonte)}</span>
+            <span style="color:#818cf8;font-weight:700">${fmtR(shopMesFonte)}</span>
           </div>`:''}
           <div style="display:flex;justify-content:space-between;font-size:12px">
             <span style="color:var(--muted)">📊 Potencial (alunos ativos)</span>
             <span style="color:var(--muted)">${fmtR(recPotFonte)}</span>
           </div>
           <div style="border-top:1px solid var(--border);margin-top:3px;padding-top:5px;display:flex;justify-content:space-between;font-size:12px">
-            <span style="font-weight:600">Resultado (rec. - pago)</span>
+            <span style="font-weight:600">Total receitas</span>
+            <span style="font-weight:700;color:var(--green)">${fmtR(totalRecFonte)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="font-weight:600">Resultado (rec. - despesas pagas)</span>
             <span style="font-weight:700;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</span>
           </div>
         </div>

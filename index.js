@@ -2273,6 +2273,11 @@ app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
       FROM pagamentos WHERE status='pago' AND data_pagamento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
       GROUP BY mes ORDER BY mes
     `);
+    const [historicoShop] = await db.query(`
+      SELECT DATE_FORMAT(criado_em, '%Y-%m') as mes, COALESCE(SUM(total),0) as total
+      FROM shop_pedidos WHERE status NOT IN ('cancelado','novo') AND criado_em >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      GROUP BY mes ORDER BY mes
+    `).catch(() => [[]]);
     const [historicoDes] = await db.query(`
       SELECT DATE_FORMAT(data_vencimento, '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
       FROM despesas WHERE data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
@@ -2284,8 +2289,8 @@ app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
     const [cats] = await db.query(
       `SELECT DISTINCT categoria FROM despesas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria`
     );
-    res.json({ historicoRec, historicoDes, despesas, categorias: cats.map(c => c.categoria) });
-  } catch (e) { res.json({ historicoRec: [], historicoDes: [], despesas: [], categorias: [] }); }
+    res.json({ historicoRec, historicoShop, historicoDes, despesas, categorias: cats.map(c => c.categoria) });
+  } catch (e) { res.json({ historicoRec: [], historicoShop: [], historicoDes: [], despesas: [], categorias: [] }); }
 });
 
 // ── DESPESAS CRUD ──
