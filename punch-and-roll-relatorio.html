@@ -249,9 +249,10 @@ function calcMetricas() {
   const alunos = dadosCache.alunos;
   const pags = dadosCache.pagamentos;
 
-  const ativos = alunos.filter(a=>a.status==='ativo');
-  const atrasados = alunos.filter(a=>a.status==='atrasado');
-  const vencendo = alunos.filter(a=>a.status==='vencendo');
+  const pagantes = alunos.filter(a=>!a.cortesia);
+  const ativos = pagantes.filter(a=>a.status==='ativo');
+  const atrasados = pagantes.filter(a=>a.status==='atrasado');
+  const vencendo = pagantes.filter(a=>a.status==='vencendo');
 
   // Receita do mês
   const recMes = pags.filter(p=>{
@@ -267,8 +268,8 @@ function calcMetricas() {
   const metaReceita = metaAlunos * 220; // R$ 220 médio por aluno
   const metaNovosMes = 3; // novos alunos por mês
 
-  // Novos alunos no mês
-  const novosNoMes = alunos.filter(a=>{
+  // Novos alunos no mês (excluindo cortesia)
+  const novosNoMes = pagantes.filter(a=>{
     const mat = a.mat||a.criado_em||'';
     return parseInt(mat.slice(5,7))===mes && parseInt(mat.slice(0,4))===ano;
   }).length;
@@ -295,15 +296,15 @@ function calcMetricas() {
   const aulasBoxe = dadosCache.aulas.filter(a=>a.modalidade==='boxe').length;
   const aulasJJ = dadosCache.aulas.filter(a=>a.modalidade==='jiujitsu').length;
 
-  // Taxa de adimplência
-  const taxaAdim = alunos.length>0?Math.round(ativos.length/alunos.length*100):0;
+  // Taxa de adimplência (apenas pagantes)
+  const taxaAdim = pagantes.length>0?Math.round(ativos.length/pagantes.length*100):0;
 
   // Próximo mês
   const proxMes = mes===12?1:mes+1;
   const proxAno = mes===12?ano+1:ano;
 
   return {
-    mes, ano, alunos, ativos, atrasados, vencendo,
+    mes, ano, alunos, pagantes, ativos, atrasados, vencendo,
     recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
     novosNoMes, inadimTotal, historico, cancelados,
     aulasBoxe, aulasJJ, taxaAdim, proxMes, proxAno,
@@ -479,8 +480,8 @@ function renderRelatorio(m) {
         <!-- Distribuição por modalidade -->
         <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px">Distribuição por Modalidade</div>
         ${['boxe','jiujitsu','ambos'].map(mod=>{
-          const n = m.alunos.filter(a=>a.modalidade===mod).length;
-          const pct = m.alunos.length>0?Math.round(n/m.alunos.length*100):0;
+          const n = m.alunos.filter(a=>!a.cortesia&&a.modalidade===mod).length;
+          const pct = m.pagantes.length>0?Math.round(n/m.pagantes.length*100):0;
           const label = mod==='boxe'?'🥊 Boxe':mod==='jiujitsu'?'🟦 Jiu-Jitsu':'🥊🟦 Ambos';
           return `<div class="meta-row">
             <span class="meta-label">${label}</span>
@@ -500,7 +501,7 @@ function renderRelatorio(m) {
 
     <div class="grid2" style="margin-bottom:20px">
       ${['boxe','jiujitsu'].map((mod,i)=>{
-        const alunosMod = m.alunos.filter(a=>a.modalidade===mod||a.modalidade==='ambos');
+        const alunosMod = m.alunos.filter(a=>!a.cortesia&&(a.modalidade===mod||a.modalidade==='ambos'));
         const ativosMod = alunosMod.filter(a=>a.status==='ativo');
         const aulasMod = m.aulasBoxe;
         const recMod = ativosMod.reduce((s,a)=>s+parseFloat(a.valor||0),0);
@@ -518,7 +519,7 @@ function renderRelatorio(m) {
           <div class="colab-row"><span>Alunos Ativos</span><span style="font-weight:700">${ativosMod.length}</span></div>
           <div class="colab-row"><span>Inadimplentes</span><span style="font-weight:700;color:#ef4444">${alunosMod.filter(a=>a.status==='atrasado').length}</span></div>
           <div class="colab-row" style="border:none"><span>Aulas/semana</span><span style="font-weight:700">${aulas}</span></div>
-          <div class="colab-pct-bar"><div style="height:100%;border-radius:4px;background:${cor};width:${m.alunos.length>0?Math.round(alunosMod.length/m.alunos.length*100):0}%"></div></div>
+          <div class="colab-pct-bar"><div style="height:100%;border-radius:4px;background:${cor};width:${m.pagantes.length>0?Math.round(alunosMod.length/m.pagantes.length*100):0}%"></div></div>
         </div>`;
       }).join('')}
     </div>

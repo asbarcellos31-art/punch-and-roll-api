@@ -936,7 +936,7 @@ async function renderCheckins() {
   } catch(e) { document.getElementById('checkins-lista').innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
 }
 
-let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente';
+let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente'; let _finShopPedidos=[];
 const _agora=new Date(); let contasMes=`${_agora.getFullYear()}-${String(_agora.getMonth()+1).padStart(2,'0')}`;
 function contasMesNav(delta){const[y,m]=contasMes.split('-').map(Number);const nd=new Date(y,m-1+delta,1);contasMes=`${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,'0')}`;renderFinContas();}
 function contasMesLabel(){if(!contasMes)return'Todos os meses';const[y,m]=contasMes.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});}
@@ -946,6 +946,7 @@ async function renderFinanceiro() {
   const pg=document.getElementById('page-financeiro');
   pg.innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
   try{finResumo=await GET('/api/financeiro/resumo');}catch(e){finResumo={historicoRec:[],historicoDes:[],despesas:[],categorias:[]};}
+  try{_finShopPedidos=await GET('/api/shop/pedidos');}catch(e){_finShopPedidos=[];}
   pg.innerHTML=`
     <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
       ${[['geral','📊 Geral'],['dre','📋 DRE'],['contas','💸 Contas'],['inadimplencia','🔴 Inadimpl.']].map(([id,lbl])=>
@@ -999,6 +1000,36 @@ function renderFinGeral(){
     </div>
     ${despVencidas.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="contasFilter='vencida';finNavTo('contas')">⚠️ ${despVencidas.length} conta(s) vencida(s) — clique para ver</div>`:''}
     ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
+    ${(()=>{
+      const mensMes = (mensHistorico||[]).filter(p=>(p.data||'').startsWith(mesCur));
+      const totalMens = mensMes.reduce((s,p)=>s+parseFloat(p.valor||0),0);
+      const shopMes = (_finShopPedidos||[]).filter(p=>p.status!=='cancelado'&&(p.criado_em||'').slice(0,7)===mesCur);
+      const totalShop = shopMes.reduce((s,p)=>s+parseFloat(p.total||0),0);
+      const totalRec = totalMens + totalShop;
+      const recPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
+      const aReceber = Math.max(0, recPot - totalMens);
+      return `<div class="card" style="margin-bottom:10px">
+        <div class="card-title">💰 Receitas ${nomeMes} — Por Fonte</div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-top:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)">
+            <span style="font-size:12px">💚 Mensalidades recebidas</span>
+            <span style="font-size:13px;font-weight:700;color:var(--green)">${fmtR(totalMens)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${mensMes.length} pgtos)</span></span>
+          </div>
+          ${totalShop>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8">
+            <span style="font-size:12px">🛒 Loja / Shop</span>
+            <span style="font-size:13px;font-weight:700;color:#818cf8">${fmtR(totalShop)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${shopMes.length} pedidos)</span></span>
+          </div>`:''}
+          ${aReceber>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)">
+            <span style="font-size:12px">⏳ A receber (alunos pendentes)</span>
+            <span style="font-size:13px;font-weight:700;color:var(--yellow)">${fmtR(aReceber)}</span>
+          </div>`:''}
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px">
+            <span style="font-size:12px;font-weight:600">Total recebido</span>
+            <span style="font-size:15px;font-weight:700;color:var(--green)">${fmtR(totalRec)}</span>
+          </div>
+        </div>
+      </div>`;
+    })()}
     <div class="card">
       <div class="card-title">📊 Receitas vs Despesas — 6 Meses</div>
       <div style="position:relative;height:160px"><canvas id="fin-chart-bar"></canvas></div>
@@ -1116,6 +1147,7 @@ function renderFinContas(){
         <button class="btn btn-ghost btn-sm" onclick="imprimirContas()">🖨️ PDF</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioAnual()">📊 Anual</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioDRE()">💰 DRE</button>
+        <button class="btn btn-ghost btn-sm" onclick="relatorioFluxo()">📈 Fluxo</button>
         <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
       </div>
     </div>
@@ -1435,6 +1467,135 @@ function relatorioDRE() {
     <span style="color:#86efac">Receitas: R$ ${totalReceitaGeral.toFixed(2).replace('.',',')}</span>
     <span style="color:#fca5a5">Despesas: R$ ${totalDespesaGeral.toFixed(2).replace('.',',')}</span>
     <span style="color:${resultadoGeral>=0?'#bef264':'#fde68a'}">Resultado Geral: ${resultadoGeral>=0?'+':''}R$ ${resultadoGeral.toFixed(2).replace('.',',')}</span>
+  </div>
+</body></html>`);
+  w.document.close();
+}
+
+function relatorioFluxo() {
+  const despesas = finResumo?.despesas || [];
+  const receitas = mensHistorico || [];
+  const alunosPagantes = cache.alunos.filter(a => !a.cortesia && a.status !== 'inativo');
+  const receitaPotencial = alunosPagantes.reduce((s, a) => s + parseFloat(a.valor || 0), 0);
+
+  // Coletar meses: histórico + próximos 3 meses
+  const mesesSet = new Set();
+  despesas.forEach(d => { const m = (d.data_vencimento || '').slice(0, 7); if (m) mesesSet.add(m); });
+  receitas.forEach(r => { const m = (r.data || '').slice(0, 7); if (m) mesesSet.add(m); });
+  const hoje = new Date();
+  for (let i = 0; i <= 3; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+    mesesSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const meses = [...mesesSet].sort();
+  const mesCur = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+
+  const nomeMes = m => {
+    const [y, mo] = m.split('-');
+    const n = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return `${n[parseInt(mo) - 1]}/${y}`;
+  };
+
+  let totEntradas = 0, totAPagar = 0, totPago = 0, totPrevisto = 0;
+
+  const linhas = meses.map(mes => {
+    const isFuturo = mes > mesCur;
+    const isAtual = mes === mesCur;
+
+    const recMes = receitas.filter(r => (r.data || '').startsWith(mes));
+    const entradaReal = recMes.reduce((s, r) => s + parseFloat(r.valor || 0), 0);
+    const qtdRecebidos = new Set(recMes.map(r => r.alunoId)).size;
+
+    // Alunos que ainda não pagaram neste mês
+    const alunosQueJaPagaram = new Set(recMes.map(r => r.alunoId));
+    const alunosPendentes = alunosPagantes.filter(a => !alunosQueJaPagaram.has(a.id));
+    const entradaPrevista = alunosPendentes.reduce((s, a) => s + parseFloat(a.valor || 0), 0);
+    const totalPrevisto = isFuturo ? receitaPotencial : entradaReal + entradaPrevista;
+
+    const despMes = despesas.filter(d => (d.data_vencimento || '').startsWith(mes));
+    const saidasPagas = despMes.filter(d => d.status === 'pago').reduce((s, d) => s + parseFloat(d.valor || 0), 0);
+    const saidasPendentes = despMes.filter(d => d.status !== 'pago').reduce((s, d) => s + parseFloat(d.valor || 0), 0);
+    const totalDesp = saidasPagas + saidasPendentes;
+
+    const saldoReal = entradaReal - saidasPagas;
+    const saldoPrevisto = totalPrevisto - totalDesp;
+
+    totEntradas += entradaReal;
+    totPago += saidasPagas;
+    totAPagar += saidasPendentes;
+    totPrevisto += totalPrevisto;
+
+    const tag = isFuturo ? '<span style="background:#dbeafe;color:#1d4ed8;border-radius:3px;padding:1px 6px;font-size:9px">FUTURO</span>'
+               : isAtual ? '<span style="background:#dcfce7;color:#16a34a;border-radius:3px;padding:1px 6px;font-size:9px">MÊS ATUAL</span>' : '';
+
+    return `<tr>
+      <td style="font-weight:700">${nomeMes(mes)} ${tag}</td>
+      <td style="color:#16a34a;font-weight:600">R$ ${entradaReal.toFixed(2).replace('.', ',')}<br><span style="font-size:9px;color:#888">${qtdRecebidos} aluno(s)</span></td>
+      <td style="color:${entradaPrevista > 0 && !isFuturo ? '#ca8a04' : '#888'};font-weight:${entradaPrevista > 0 && !isFuturo ? '600' : '400'}">
+        ${isFuturo ? `<span style="color:#888">R$ ${receitaPotencial.toFixed(2).replace('.', ',')} pot.</span>`
+                   : (entradaPrevista > 0 ? `R$ ${entradaPrevista.toFixed(2).replace('.', ',')}<br><span style="font-size:9px;color:#888">${alunosPendentes.length} pendente(s)</span>` : '<span style="color:#16a34a">✅ Todos pagaram</span>')}
+      </td>
+      <td style="color:#dc2626;font-weight:600">R$ ${saidasPagas.toFixed(2).replace('.', ',')}</td>
+      <td style="color:${saidasPendentes > 0 ? '#ca8a04' : '#888'};font-weight:${saidasPendentes > 0 ? '600' : '400'}">
+        ${saidasPendentes > 0 ? `R$ ${saidasPendentes.toFixed(2).replace('.', ',')}<br><span style="font-size:9px;color:#888">${despMes.filter(d => d.status !== 'pago').length} conta(s)</span>` : '—'}
+      </td>
+      <td style="font-weight:700;color:${saldoReal >= 0 ? '#16a34a' : '#dc2626'}">${saldoReal >= 0 ? '+' : ''}R$ ${saldoReal.toFixed(2).replace('.', ',')}</td>
+      <td style="font-weight:700;color:${saldoPrevisto >= 0 ? '#1d4ed8' : '#dc2626'}">${saldoPrevisto >= 0 ? '+' : ''}R$ ${saldoPrevisto.toFixed(2).replace('.', ',')}</td>
+    </tr>`;
+  }).join('');
+
+  const saldoFinal = totEntradas - totPago;
+  const saldoPrevistoFinal = totPrevisto - totPago - totAPagar;
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fluxo de Caixa — Punch and Roll</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;max-width:1100px;margin:0 auto}
+    h2{font-size:15px;margin-bottom:2px} .sub{font-size:10px;color:#666;margin-bottom:18px}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#1e293b;color:#fff;padding:7px 8px;text-align:left;font-size:10px}
+    td{padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:10px;vertical-align:top}
+    tr:hover{background:#f9fafb}
+    .legend{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+    .legend-item{display:flex;align-items:center;gap:5px;font-size:10px}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+    .geral{margin-top:16px;padding:14px 18px;background:#0f172a;color:#fff;border-radius:8px;display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+    .geral span{font-weight:700;font-size:12px}
+    .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:10px;color:#1e40af}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
+  <h2>PUNCH AND ROLL — Fluxo de Caixa</h2>
+  <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>
+  <div class="info-box">
+    📊 <strong>Receita potencial mensal:</strong> R$ ${receitaPotencial.toFixed(2).replace('.', ',')} (${alunosPagantes.length} alunos pagantes ativos/atrasados/vencendo)
+    &nbsp;·&nbsp; Colunas <em>A receber</em> e <em>Saldo Previsto</em> consideram alunos que ainda não pagaram no mês.
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#16a34a"></div> Entradas recebidas</div>
+    <div class="legend-item"><div class="dot" style="background:#ca8a04"></div> A receber / A pagar</div>
+    <div class="legend-item"><div class="dot" style="background:#dc2626"></div> Saídas pagas</div>
+    <div class="legend-item"><div class="dot" style="background:#1d4ed8"></div> Saldo previsto</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Mês</th>
+      <th>✅ Entradas<br>Recebidas</th>
+      <th>⏳ A Receber<br>(alunos pendentes)</th>
+      <th>✅ Saídas<br>Pagas</th>
+      <th>⏳ A Pagar<br>(despesas pend.)</th>
+      <th>Saldo Real<br>(recebido - pago)</th>
+      <th>Saldo Previsto<br>(potencial - total)</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>
+  <div class="geral">
+    <span>📅 ${meses.length} meses</span>
+    <span style="color:#86efac">✅ Recebido: R$ ${totEntradas.toFixed(2).replace('.', ',')}</span>
+    <span style="color:#fca5a5">✅ Pago: R$ ${totPago.toFixed(2).replace('.', ',')}</span>
+    <span style="color:#fde68a">⏳ A Pagar: R$ ${totAPagar.toFixed(2).replace('.', ',')}</span>
+    <span style="color:${saldoFinal >= 0 ? '#bef264' : '#f87171'}">Saldo Real: ${saldoFinal >= 0 ? '+' : ''}R$ ${saldoFinal.toFixed(2).replace('.', ',')}</span>
+    <span style="color:#93c5fd">Saldo Previsto: ${saldoPrevistoFinal >= 0 ? '+' : ''}R$ ${saldoPrevistoFinal.toFixed(2).replace('.', ',')}</span>
   </div>
 </body></html>`);
   w.document.close();
