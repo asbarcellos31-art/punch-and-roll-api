@@ -1985,7 +1985,7 @@ async function renovarSelecionados(){
       const novoVenc=new Date(a.venc&&a.venc>todayStr?a.venc:todayStr);
       novoVenc.setMonth(novoVenc.getMonth()+meses);
       await PUT('/api/alunos/'+id,{...a,status:'ativo',venc:novoVenc.toISOString().slice(0,10)});
-      mensHistorico.unshift({id:Date.now()+id,alunoId:id,alunoNome:a.nome,valor:a.valor,data,metodo});
+      await POST('/api/pagamentos',{aluno_id:id,descricao:'Mensalidade '+a.nome,valor:a.valor,data_pagamento:data,status:'pago',metodo});
       ok++;
     }catch(e){console.error(e);}
   }
@@ -2022,7 +2022,7 @@ async function confirmarPagamento(){
     const base=a.venc&&a.venc>todayStr?a.venc:todayStr;
     const novoVenc=new Date(base); novoVenc.setMonth(novoVenc.getMonth()+meses);
     await PUT('/api/alunos/'+alunoId,{...a,status:'ativo',venc:novoVenc.toISOString().slice(0,10)});
-    mensHistorico.unshift({id:Date.now(),alunoId,alunoNome:a.nome,valor,data,metodo});
+    await POST('/api/pagamentos',{aluno_id:alunoId,descricao:'Mensalidade '+a.nome,valor,data_pagamento:data,status:'pago',metodo});
     document.getElementById('modal-reg-pag').remove();
     await carregarTudo(); alert('✅ Pagamento registrado!'); renderPagamentos();
   }catch(e){alert('Erro: '+e.message);}
