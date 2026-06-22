@@ -1432,28 +1432,32 @@ function relatorioDRE() {
     totalReceitaGeral += totalRec;
     totalDespesaGeral += totalDesp;
 
-    // Linhas receita: previsto por aluno (somente os que já eram alunos neste mês)
-    let linhasRec = '';
-    const labelMes = isFuturo ? '📅 Previsto' : isAtual ? '📅 Previsto (mês atual)' : '📅 Previsto';
-    linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades — ' + labelMes + ' (' + alunosMes.length + ' alunos)</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMes) + '</td><td colspan="2"></td></tr>';
-    alunosMes.forEach(a => {
-      const pgtoAluno = pgtosMes.find(p => p.alunoId == a.id || p.alunoNome === a.nome);
-      const stLabel = pgtoAluno ? '✅ Pago' : (isFuturo||isAtual) ? '⏳ Previsto' : '⚠️ Não registrado';
-      const stColor = pgtoAluno ? '#16a34a' : (isFuturo||isAtual) ? '#2563eb' : '#b45309';
-      linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (a.nome||'—') + ' <span style="font-size:9px;color:#666">' + (a.modalidade||'') + '</span></td><td>Mensalidade</td><td>' + (pgtoAluno ? fmtD(pgtoAluno.data) : '—') + '</td><td style="text-align:right;color:' + stColor + '">+ ' + fmtV(a.valor) + '</td><td style="color:' + stColor + ';font-size:9px">' + stLabel + '</td><td>' + (pgtoAluno ? (pgtoAluno.metodo||'—') : '—') + '</td></tr>';
-    });
-
-    // Pagamentos extras (não vinculados a aluno previsto acima)
+    // Resumo receitas: totais agrupados, sem listar nomes
+    const pagosNoMes = alunosMes.filter(a => pgtosMes.find(p => p.alunoId == a.id || p.alunoNome === a.nome));
+    const totalPagoMens = pgtosMes.filter(r => alunosMes.find(a => a.id == r.alunoId || a.nome === r.alunoNome)).reduce((s,r)=>s+parseFloat(r.valor||0),0);
+    const qtdPendente = alunosMes.length - pagosNoMes.length;
+    const totalPendente = alunosMes.filter(a => !pgtosMes.find(p => p.alunoId == a.id || p.alunoNome === a.nome)).reduce((s,a)=>s+parseFloat(a.valor||0),0);
+    const novosMes = alunosMes.filter(a => String(a.criado_em||'').slice(0,7) === mes);
     const pgtoExtras = pgtosMes.filter(r => !alunosMes.find(a => a.id == r.alunoId || a.nome === r.alunoNome));
-    if (pgtoExtras.length) {
-      linhasRec += '<tr style="background:#ecfdf5"><td colspan="3"><b>💰 Outros pagamentos recebidos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(pgtoExtras.reduce((s,r)=>s+parseFloat(r.valor||0),0)) + '</td><td colspan="2"></td></tr>';
-      pgtoExtras.forEach(r => { linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (r.alunoNome||r.descricao||'—') + '</td><td>Mensalidade</td><td>' + fmtD(r.data) + '</td><td style="text-align:right;color:#16a34a">+ ' + fmtV(r.valor) + '</td><td style="color:#16a34a;font-size:9px">✅ Pago</td><td>' + (r.metodo||'—') + '</td></tr>'; });
-    }
 
-    if (recShopTotal > 0) {
-      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>🛒 Loja / Shop' + (shopMes.length ? ' (' + shopMes.length + ' pedidos)' : '') + '</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(recShopTotal) + '</td><td colspan="2"></td></tr>';
-      shopMes.forEach(p=>{ linhasRec += '<tr style="background:#f7fef9"><td style="padding-left:16px">↳ ' + (p.cliente_nome||'Cliente') + '</td><td>Loja</td><td>' + fmtD(String(p.criado_em||'').slice(0,10)) + '</td><td style="text-align:right;color:#16a34a">+ ' + fmtV(p.total) + '</td><td style="color:#16a34a;font-size:9px">✅ Pago</td><td>—</td></tr>'; });
+    let linhasRec = '';
+    if (isFuturo || isAtual) {
+      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades previstas — ' + alunosMes.length + ' alunos ativos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMes) + '</td><td style="color:#2563eb;font-size:9px">⏳ Previsto</td><td></td></tr>';
+    } else {
+      if (totalPagoMens > 0)
+        linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>✅ Mensalidades recebidas — ' + pagosNoMes.length + ' alunos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(totalPagoMens) + '</td><td style="color:#16a34a;font-size:9px">Recebido</td><td></td></tr>';
+      if (qtdPendente > 0)
+        linhasRec += '<tr style="background:#fffbeb"><td colspan="3"><b>⚠️ Mensalidades não registradas — ' + qtdPendente + ' alunos</b></td><td style="text-align:right;color:#b45309;font-weight:700">+ ' + fmtV(totalPendente) + '</td><td style="color:#b45309;font-size:9px">Previsto/Pendente</td><td></td></tr>';
+      if (!totalPagoMens && !qtdPendente)
+        linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>💚 Mensalidades previstas — ' + alunosMes.length + ' alunos ativos</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(potencialMes) + '</td><td style="color:#2563eb;font-size:9px">Previsto</td><td></td></tr>';
     }
+    if (novosMes.length > 0)
+      linhasRec += '<tr style="background:#f0f9ff"><td colspan="3"><b>🆕 Novas matrículas — ' + novosMes.length + ' aluno(s)</b></td><td style="text-align:right;color:#0369a1;font-weight:700">+ ' + fmtV(novosMes.reduce((s,a)=>s+parseFloat(a.valor||0),0)) + '</td><td style="color:#0369a1;font-size:9px">Matrícula</td><td></td></tr>';
+    if (pgtoExtras.length > 0)
+      linhasRec += '<tr style="background:#ecfdf5"><td colspan="3"><b>💰 Outros recebimentos — ' + pgtoExtras.length + '</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(pgtoExtras.reduce((s,r)=>s+parseFloat(r.valor||0),0)) + '</td><td style="color:#16a34a;font-size:9px">Recebido</td><td></td></tr>';
+    if (recShopTotal > 0)
+      linhasRec += '<tr style="background:#f0fdf4"><td colspan="3"><b>🛒 Loja / Shop' + (shopMes.length ? ' — ' + shopMes.length + ' pedidos' : '') + '</b></td><td style="text-align:right;color:#16a34a;font-weight:700">+ ' + fmtV(recShopTotal) + '</td><td style="color:#16a34a;font-size:9px">Recebido</td><td></td></tr>';
+    if (!linhasRec) linhasRec = '<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>';
 
     const linhasDesp = desp.length ? desp.map(d=>{
       const vencida = d.status==='pendente' && (d.data_vencimento||'') < mesCur+'-32';
