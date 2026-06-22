@@ -3516,6 +3516,37 @@ function agendarRelatorioSemanal() {
 // ══════════════════════════════════════
 
 // Disparo manual do relatório semanal (uso interno)
+// Endpoint de recuperação: cria pagamentos retroativos para alunos ativos que não têm registro no banco
+app.get('/api/_recuperar-pagamentos', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  try {
+    const [alunos] = await db.query(`SELECT * FROM alunos WHERE status='ativo' AND cortesia=0`);
+    const [existing] = await db.query(`SELECT aluno_id, DATE_FORMAT(data_pagamento,'%Y-%m') as mes FROM pagamentos WHERE status='pago'`);
+    const existMap = new Set(existing.map(e => e.aluno_id + '_' + e.mes));
+    let criados = 0;
+    for (const a of alunos) {
+      if (!a.valor || parseFloat(a.valor) <= 0) continue;
+      // Estima pagamentos dos últimos 6 meses com base no vencimento atual
+      const venc = new Date(a.vencimento || a.venc || new Date());
+      for (let i = 0; i < 6; i++) {
+        const mes = new Date(venc.getFullYear(), venc.getMonth() - i, 1);
+        const mesKey = `${mes.getFullYear()}-${String(mes.getMonth()+1).padStart(2,'0')}`;
+        const dataEstimada = `${mesKey}-${String(venc.getDate()).padStart(2,'0')}`;
+        const key = a.id + '_' + mesKey;
+        if (!existMap.has(key)) {
+          await db.query(
+            `INSERT IGNORE INTO pagamentos (aluno_id,descricao,valor,data_pagamento,status,metodo) VALUES (?,?,?,?,?,?)`,
+            [a.id, 'Mensalidade ' + a.nome, a.valor, dataEstimada, 'pago', a.pagto || 'pix']
+          );
+          existMap.add(key);
+          criados++;
+        }
+      }
+    }
+    res.json({ ok: true, criados, alunos: alunos.length });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   try {
