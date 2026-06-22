@@ -993,6 +993,13 @@ function renderFinGeral(){
   const despVencidas=despPendentes.filter(d=>d.data_vencimento<todayStr);
   if(_finChart){try{_finChart.destroy();}catch(e){}_finChart=null;}
   if(_finChartDoughnut){try{_finChartDoughnut.destroy();}catch(e){}_finChartDoughnut=null;}
+  // receitas por fonte — calculado antes do template
+  const _gQtdPgtos = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mesCur).length;
+  const _gRecPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
+  const _gAReceber = Math.max(0, _gRecPot - recMes);
+  const _gShopLinha = recMesShop>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8"><span style="font-size:12px">&#x1F6D2; Loja / Shop</span><span style="font-size:13px;font-weight:700;color:#818cf8">'+fmtR(recMesShop)+'</span></div>' : '';
+  const _gAReceberLinha = _gAReceber>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)"><span style="font-size:12px">&#x23F3; A receber (alunos pendentes)</span><span style="font-size:13px;font-weight:700;color:var(--yellow)">'+fmtR(_gAReceber)+'</span></div>' : '';
+  const _geralReceitasHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">&#x1F4B0; Receitas '+nomeMes+' — Por Fonte</div><div style="display:flex;flex-direction:column;gap:7px;margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)"><span style="font-size:12px">&#x1F49A; Mensalidades recebidas</span><span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtR(recMesMens)+' <span style="font-size:10px;font-weight:400;color:var(--muted)">('+_gQtdPgtos+' pgtos)</span></span></div>'+_gShopLinha+_gAReceberLinha+'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px"><span style="font-size:12px;font-weight:600">Total recebido</span><span style="font-size:15px;font-weight:700;color:var(--green)">'+fmtR(recMes)+'</span></div></div></div>';
   document.getElementById('fin-content').innerHTML=`
     <div class="grid4">
       <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">${nAtivos} alunos ativos</div></div>
@@ -1002,36 +1009,7 @@ function renderFinGeral(){
     </div>
     ${despVencidas.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="contasFilter='vencida';finNavTo('contas')">⚠️ ${despVencidas.length} conta(s) vencida(s) — clique para ver</div>`:''}
     ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
-    ${(()=>{
-      const mensMes = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mesCur);
-      const totalMens = recMes; // já calculado via finResumo.historicoRec (correto)
-      const shopMes = (Array.isArray(_finShopPedidos)?_finShopPedidos:[]).filter(p=>p.status!=='cancelado'&&String(p.criado_em||'').slice(0,7)===mesCur);
-      const totalShop = shopMes.reduce((s,p)=>s+parseFloat(p.total||0),0);
-      const totalRec = totalMens + totalShop;
-      const recPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
-      const aReceber = Math.max(0, recPot - totalMens);
-      return `<div class="card" style="margin-bottom:10px">
-        <div class="card-title">💰 Receitas ${nomeMes} — Por Fonte</div>
-        <div style="display:flex;flex-direction:column;gap:7px;margin-top:6px">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)">
-            <span style="font-size:12px">💚 Mensalidades recebidas</span>
-            <span style="font-size:13px;font-weight:700;color:var(--green)">${fmtR(totalMens)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${mensMes.length} pgtos)</span></span>
-          </div>
-          ${totalShop>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8">
-            <span style="font-size:12px">🛒 Loja / Shop</span>
-            <span style="font-size:13px;font-weight:700;color:#818cf8">${fmtR(totalShop)} <span style="font-size:10px;font-weight:400;color:var(--muted)">(${shopMes.length} pedidos)</span></span>
-          </div>`:''}
-          ${aReceber>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)">
-            <span style="font-size:12px">⏳ A receber (alunos pendentes)</span>
-            <span style="font-size:13px;font-weight:700;color:var(--yellow)">${fmtR(aReceber)}</span>
-          </div>`:''}
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px">
-            <span style="font-size:12px;font-weight:600">Total recebido</span>
-            <span style="font-size:15px;font-weight:700;color:var(--green)">${fmtR(totalRec)}</span>
-          </div>
-        </div>
-      </div>`;
-    })()}
+    ${_geralReceitasHTML}
     <div class="card">
       <div class="card-title">📊 Receitas vs Despesas — 6 Meses</div>
       <div style="position:relative;height:160px"><canvas id="fin-chart-bar"></canvas></div>
