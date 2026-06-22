@@ -1115,6 +1115,7 @@ function renderFinContas(){
         <button class="btn btn-ghost btn-sm" onclick="exportarContasCSV()">📥 CSV</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirContas()">🖨️ PDF</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioAnual()">📊 Anual</button>
+        <button class="btn btn-ghost btn-sm" onclick="relatorioDRE()">💰 DRE</button>
         <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
       </div>
     </div>
@@ -1333,6 +1334,107 @@ function relatorioAnual() {
     ${totalGeralPend>0?`<span style="color:#fca5a5">Total a pagar: R$ ${totalGeralPend.toFixed(2).replace('.',',')}</span>`:''}
     ${totalGeralPago>0?`<span style="color:#86efac">Total pago: R$ ${totalGeralPago.toFixed(2).replace('.',',')}</span>`:''}
     <span style="color:#fde68a">Geral: R$ ${(totalGeralPend+totalGeralPago).toFixed(2).replace('.',',')}</span>
+  </div>
+</body></html>`);
+  w.document.close();
+}
+
+function relatorioDRE() {
+  const despesas = finResumo?.despesas || [];
+  const receitas = mensHistorico || [];
+  if (!despesas.length && !receitas.length) { alert('Nenhum dado encontrado.'); return; }
+
+  // Coleta todos os meses presentes
+  const mesesSet = new Set();
+  despesas.forEach(d => { const m=(d.data_vencimento||'').slice(0,7); if(m) mesesSet.add(m); });
+  receitas.forEach(r => { const m=(r.data||'').slice(0,7); if(m) mesesSet.add(m); });
+  const meses = [...mesesSet].sort();
+
+  const nomeMes = m => {
+    const [y,mo] = m.split('-');
+    const n=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return `${n[parseInt(mo)-1]}/${y}`;
+  };
+
+  let totalReceitaGeral=0, totalDespesaGeral=0;
+
+  const secoes = meses.map(mes => {
+    const rec = receitas.filter(r=>(r.data||'').startsWith(mes));
+    const desp = despesas.filter(d=>(d.data_vencimento||'').startsWith(mes));
+    const totalRec = rec.reduce((s,r)=>s+parseFloat(r.valor||0),0);
+    const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    const resultado = totalRec - totalDesp;
+    totalReceitaGeral += totalRec;
+    totalDespesaGeral += totalDesp;
+
+    const linhasRec = rec.length ? rec.map(r=>`
+      <tr style="background:#f0fdf4">
+        <td>💚 ${r.alunoNome||'—'}</td>
+        <td>Mensalidade</td>
+        <td>${fmtD(r.data)}</td>
+        <td style="text-align:right;color:#16a34a;font-weight:600">+ R$ ${Number(r.valor||0).toFixed(2).replace('.',',')}</td>
+        <td style="color:#16a34a;font-weight:600">Recebido</td>
+        <td>${r.metodo||'—'}</td>
+      </tr>`).join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma receita neste mês</td></tr>`;
+
+    const linhasDesp = desp.length ? desp.map(d=>{
+      const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
+      const cor = d.status==='pago'?'#dc2626':vencida?'#b91c1c':'#ca8a04';
+      const st = d.status==='pago'?'Pago':vencida?'Vencida':'Pendente';
+      const parcelaInfo = d.parcelas>1?` (${d.parcela_atual}/${d.parcelas})`:'';
+      return `<tr>
+        <td>🔴 ${d.descricao}${parcelaInfo}${d.recorrente?' 🔄':''}${d.obs?`<div style="font-size:9px;color:#777">📝 ${d.obs}</div>`:''}</td>
+        <td>${d.categoria||'—'}</td>
+        <td>${fmtD(d.data_vencimento)}</td>
+        <td style="text-align:right;color:${cor};font-weight:600">- R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
+        <td style="color:${cor};font-weight:600">${st}</td>
+        <td>${d.metodo||'—'}</td>
+      </tr>`;}).join('') : `<tr><td colspan="6" style="color:#999;font-style:italic;text-align:center">Nenhuma despesa neste mês</td></tr>`;
+
+    return `
+      <div class="mes-titulo">${nomeMes(mes)}</div>
+      <table>
+        <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead>
+        <tbody>
+          <tr><td colspan="6" style="background:#dcfce7;font-weight:700;font-size:10px;color:#15803d;padding:4px 6px">▲ RECEITAS</td></tr>
+          ${linhasRec}
+          <tr><td colspan="6" style="background:#fee2e2;font-weight:700;font-size:10px;color:#b91c1c;padding:4px 6px">▼ DESPESAS</td></tr>
+          ${linhasDesp}
+        </tbody>
+      </table>
+      <div class="mes-totais">
+        <span class="t-rec">Receitas: R$ ${totalRec.toFixed(2).replace('.',',')}</span>
+        <span class="t-pend">Despesas: R$ ${totalDesp.toFixed(2).replace('.',',')}</span>
+        <span style="padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px;background:${resultado>=0?'#dbeafe':'#fef3c7'};color:${resultado>=0?'#1d4ed8':'#b45309'}">Resultado: ${resultado>=0?'+':''}R$ ${resultado.toFixed(2).replace('.',',')}</span>
+      </div>`;
+  }).join('');
+
+  const resultadoGeral = totalReceitaGeral - totalDespesaGeral;
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DRE — Punch and Roll</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;max-width:960px;margin:0 auto}
+    h2{font-size:15px;margin-bottom:2px} .sub{font-size:10px;color:#666;margin-bottom:18px}
+    .mes-titulo{font-size:13px;font-weight:700;color:#1e40af;margin:22px 0 6px;padding:4px 8px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:2px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#f3f3f3;padding:5px 6px;text-align:left;font-size:10px;border-bottom:2px solid #ddd}
+    td{padding:5px 6px;border-bottom:1px solid #eee;font-size:10px}
+    .mes-totais{display:flex;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+    .mes-totais span{padding:4px 10px;border-radius:4px;font-weight:700;font-size:10px}
+    .t-rec{background:#dcfce7;color:#15803d} .t-pend{background:#fee2e2;color:#b91c1c}
+    .geral{margin-top:24px;padding:14px 18px;background:#0f172a;color:#fff;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
+    .geral span{font-weight:700;font-size:12px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
+  <h2>PUNCH AND ROLL — Demonstrativo de Resultado (DRE)</h2>
+  <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+  ${secoes}
+  <div class="geral">
+    <span>📅 ${meses.length} meses</span>
+    <span style="color:#86efac">Receitas: R$ ${totalReceitaGeral.toFixed(2).replace('.',',')}</span>
+    <span style="color:#fca5a5">Despesas: R$ ${totalDespesaGeral.toFixed(2).replace('.',',')}</span>
+    <span style="color:${resultadoGeral>=0?'#bef264':'#fde68a'}">Resultado Geral: ${resultadoGeral>=0?'+':''}R$ ${resultadoGeral.toFixed(2).replace('.',',')}</span>
   </div>
 </body></html>`);
   w.document.close();
