@@ -1001,9 +1001,9 @@ function renderFinGeral(){
     ${despVencidas.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="contasFilter='vencida';finNavTo('contas')">⚠️ ${despVencidas.length} conta(s) vencida(s) — clique para ver</div>`:''}
     ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
     ${(()=>{
-      const mensMes = (mensHistorico||[]).filter(p=>String(p.data||'').slice(0,7)===mesCur);
+      const mensMes = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mesCur);
       const totalMens = recMes; // já calculado via finResumo.historicoRec (correto)
-      const shopMes = (_finShopPedidos||[]).filter(p=>p.status!=='cancelado'&&String(p.criado_em||'').slice(0,7)===mesCur);
+      const shopMes = (Array.isArray(_finShopPedidos)?_finShopPedidos:[]).filter(p=>p.status!=='cancelado'&&String(p.criado_em||'').slice(0,7)===mesCur);
       const totalShop = shopMes.reduce((s,p)=>s+parseFloat(p.total||0),0);
       const totalRec = totalMens + totalShop;
       const recPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
