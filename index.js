@@ -3551,6 +3551,27 @@ app.get('/api/_recuperar-pagamentos', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/_checkin-notify-test', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  try {
+    const [rows] = await db.query(`
+      SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora
+      FROM checkins c
+      JOIN alunos a ON c.aluno_id = a.id
+      JOIN aulas au ON c.aula_id = au.id
+      WHERE c.data_checkin = CURDATE()
+      ORDER BY c.id DESC LIMIT 1
+    `);
+    if (!rows.length) return res.json({ error: 'Nenhum check-in hoje' });
+    const ck = rows[0];
+    const [total] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=CURDATE()', [ck.aula_id]);
+    const msg = `✅ *Check-in confirmado!*\n\n👤 *${ck.aluno_nome}*\n🥊 ${ck.aula_nome} — ${ck.hora}\n⏰ ${ck.hora}\n👥 ${total[0].n} aluno(s) hoje nessa turma`;
+    await notificarWA('4899225-9899', msg);
+    await notificarWA('4898463-9257', msg);
+    res.json({ ok: true, mensagem: msg, checkin: ck });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   try {
