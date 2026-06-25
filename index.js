@@ -980,13 +980,17 @@ app.post('/api/checkins', auth, async (req, res) => {
     const hora = new Date().toTimeString().slice(0,5);
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,hoje]);
     if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
-    const [aluno] = await db.query('SELECT status FROM alunos WHERE id=?',[aluno_id]);
+    const [aluno] = await db.query('SELECT nome, status FROM alunos WHERE id=?',[aluno_id]);
     if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso.' });
-    const [aula] = await db.query('SELECT vagas FROM aulas WHERE id=?',[aula_id]);
+    const [aula] = await db.query('SELECT vagas, nome, hora FROM aulas WHERE id=?',[aula_id]);
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,hoje]);
     if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
     await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,hoje,hora]);
     res.json({ message: 'Check-in confirmado! 🥊' });
+    const totalHoje = ckCount[0].n + 1;
+    const msgNotif = `✅ *Check-in confirmado!*\n\n👤 *${aluno[0]?.nome}*\n🥊 ${aula[0]?.nome} — ${aula[0]?.hora}\n⏰ ${hora}\n👥 ${totalHoje} aluno(s) hoje nessa turma`;
+    notificarWA('4899225-9899', msgNotif).catch(()=>{});
+    notificarWA('4898463-9257', msgNotif).catch(()=>{});
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -43,6 +43,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .page::-webkit-scrollbar{width:3px}
 .page::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .bottom-nav{height:56px;background:var(--dark);border-top:1px solid var(--border);display:flex;flex-shrink:0}
+.bn-checkin{background:var(--red)!important;color:#fff!important;border-radius:10px;margin:6px 2px;height:44px;flex:1.2}
 .bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:var(--muted);font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .15s}
 .bn.active{color:var(--red)}
 .bn-icon{font-size:20px;line-height:1}
@@ -196,8 +197,8 @@ textarea.fi{resize:none}
 <nav class="bottom-nav">
   <button class="bn active" id="bn-dashboard" onclick="navTo('dashboard')"><span class="bn-icon">📊</span>Início</button>
   <button class="bn" id="bn-alunos" onclick="navTo('alunos')"><span class="bn-icon">👥</span>Alunos</button>
+  <button class="bn bn-checkin" id="bn-checkins" onclick="navTo('checkins')"><span class="bn-icon">✅</span>Check-in</button>
   <button class="bn" id="bn-agenda" onclick="navTo('agenda')"><span class="bn-icon">📅</span>Agenda</button>
-  <button class="bn" id="bn-financeiro" onclick="navTo('financeiro')"><span class="bn-icon">💰</span>Financeiro</button>
   <button class="bn" id="bn-pagamentos" onclick="navTo('pagamentos')"><span class="bn-icon">💳</span>Mensalidades</button>
 </nav>
 <button class="fab" id="fab" onclick="fabAction()">+</button>
