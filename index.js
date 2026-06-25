@@ -3561,6 +3561,17 @@ app.get('/api/_recuperar-pagamentos', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/_update-vencimento-msgs', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  const msg5 = 'Olá, *{{nome}}*! 🥊\n\nPassando para avisar que seu plano na *Punch and Roll Fight Team* vence em *5 dias*.\n\nRenove com antecedência e continue treinando sem interrupção! 💪\n\n💳 *Pague pelo portal:*\nhttps://punchandroll.com.br/punch-and-roll-portal.html\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*';
+  const msg1 = 'Olá, *{{nome}}*! 🥊\n\nSeu plano na *Punch and Roll Fight Team* vence *amanhã*.\n\nRenove hoje para não perder acesso à academia! 💪\n\n💳 *Pague pelo portal:*\nhttps://punchandroll.com.br/punch-and-roll-portal.html\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*';
+  try {
+    await db.query('UPDATE wa_config SET valor=? WHERE chave=?', [msg5, 'vencimento5_wa']);
+    await db.query('UPDATE wa_config SET valor=? WHERE chave=?', [msg1, 'vencimento1_wa']);
+    res.json({ ok: true, msg5, msg1 });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/_set-vagas', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   const vagas = parseInt(req.query.v);
