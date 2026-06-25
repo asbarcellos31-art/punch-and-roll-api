@@ -931,6 +931,16 @@ app.get('/api/aulas', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/aulas/ocupacao', async (req, res) => {
+  try {
+    const hoje = new Date().toISOString().slice(0,10);
+    const [rows] = await db.query('SELECT aula_id, COUNT(*) as total FROM checkins WHERE data_checkin=? GROUP BY aula_id', [hoje]);
+    const map = {};
+    rows.forEach(r => { map[r.aula_id] = r.total; });
+    res.json(map);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/aulas', auth, adminOnly, async (req, res) => {
   try {
     const { nome, hora, dia, vagas, modalidade } = req.body;
@@ -3548,6 +3558,16 @@ app.get('/api/_recuperar-pagamentos', async (req, res) => {
       }
     }
     res.json({ ok: true, criados, alunos: alunos.length });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/_set-vagas', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  const vagas = parseInt(req.query.v);
+  if (!vagas || vagas < 1) return res.status(400).json({ error: 'Informe ?v=numero' });
+  try {
+    const [r] = await db.query('UPDATE aulas SET vagas=?', [vagas]);
+    res.json({ ok: true, atualizadas: r.affectedRows, vagas });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
