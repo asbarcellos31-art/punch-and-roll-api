@@ -261,6 +261,7 @@ async function setupDB() {
       "ALTER TABLE despesas ADD COLUMN parcela_atual INT DEFAULT 1",
       "ALTER TABLE despesas ADD COLUMN recorrente TINYINT DEFAULT 0",
       "ALTER TABLE despesas ADD COLUMN grupo_parcelas VARCHAR(36)",
+      "ALTER TABLE despesas ADD COLUMN pago_por VARCHAR(20) DEFAULT NULL",
     ]) { try { await conn.query(sql); } catch(e) {} }
 
     await conn.query(`
@@ -2319,7 +2320,7 @@ const normDate = v => v ? String(v).split('T')[0] : null;
 
 app.post('/api/despesas', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, categoria, metodo, obs, parcelas = 1, recorrente = false } = req.body;
+    const { descricao, valor, categoria, metodo, obs, parcelas = 1, recorrente = false, pago_por = null } = req.body;
     const data_vencimento = normDate(req.body.data_vencimento);
     if (!descricao || !valor || !data_vencimento) return res.status(400).json({ error: 'Preencha descrição, valor e vencimento' });
     const n = Math.min(Math.max(parseInt(parcelas) || 1, 1), 60);
@@ -2331,8 +2332,8 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
       const venc = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
       const desc = n > 1 ? `${descricao} (${i+1}/${n})` : descricao;
       const [r] = await db.query(
-        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo]
+        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas,pago_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo, pago_por||null]
       );
       ids.push(r.insertId);
     }
@@ -2348,8 +2349,8 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
         );
         if (!existente.length) {
           await db.query(
-            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,grupo_parcelas) VALUES (?,?,?,?,?,?,?,?)',
-            [descricao, valor, proxVenc, 'pendente', categoria||null, metodo||'pix', 1, grupo]
+            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,grupo_parcelas,pago_por) VALUES (?,?,?,?,?,?,?,?,?)',
+            [descricao, valor, proxVenc, 'pendente', categoria||null, metodo||'pix', 1, grupo, pago_por||null]
           );
         }
       }
@@ -2360,12 +2361,12 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
 
 app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, status, categoria, metodo, obs, recorrente } = req.body;
+    const { descricao, valor, status, categoria, metodo, obs, recorrente, pago_por } = req.body;
     const data_vencimento = normDate(req.body.data_vencimento);
     const data_pagamento = normDate(req.body.data_pagamento);
     await db.query(
-      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=? WHERE id=?',
-      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, req.params.id]
+      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=?,pago_por=? WHERE id=?',
+      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, pago_por||null, req.params.id]
     );
     // Recorrente: ao pagar, cria automaticamente a próxima mensal
     let recorrente_criado = false;

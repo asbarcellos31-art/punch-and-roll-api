@@ -937,7 +937,7 @@ async function renderCheckins() {
   } catch(e) { document.getElementById('checkins-lista').innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
 }
 
-let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente'; let _finShopPedidos=[];
+let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente'; let contasPorFilter='todos'; let _finShopPedidos=[];
 const _agora=new Date(); let contasMes=`${_agora.getFullYear()}-${String(_agora.getMonth()+1).padStart(2,'0')}`;
 function contasMesNav(delta){const[y,m]=contasMes.split('-').map(Number);const nd=new Date(y,m-1+delta,1);contasMes=`${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,'0')}`;renderFinContas();}
 function contasMesLabel(){if(!contasMes)return'Todos os meses';const[y,m]=contasMes.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});}
@@ -1111,7 +1111,8 @@ function renderFinDRE(){
 function renderFinContas(){
   const todas=finResumo?.despesas||[];
   const doMes=contasMes?todas.filter(d=>d.data_vencimento&&d.data_vencimento.startsWith(contasMes)):todas;
-  const filtradas=contasFilter==='todas'?doMes:contasFilter==='pago'?doMes.filter(d=>d.status==='pago'):contasFilter==='vencida'?doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+  const porStatus=contasFilter==='todas'?doMes:contasFilter==='pago'?doMes.filter(d=>d.status==='pago'):contasFilter==='vencida'?doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+  const filtradas=contasPorFilter==='todos'?porStatus:porStatus.filter(d=>(d.pago_por||'').toUpperCase()===contasPorFilter);
   const totalPend=doMes.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const totalPago=doMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const qtdVenc=doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
@@ -1133,6 +1134,7 @@ function renderFinContas(){
       <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:600">Resultado (rec. - desp. pagas)</span><span style="font-weight:700;color:${_resultado>=0?'var(--green)':'#f87171'}">${_resultado>=0?'+':''}${fmtR(_resultado)}</span></div>
     </div>
   </div>`;
+  const _porCores={'ANDERSON':'#818cf8','LEONARDO':'#34d399','MELQUE':'#fb923c','PR':'#f87171'};
   document.getElementById('fin-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px">
@@ -1141,12 +1143,13 @@ function renderFinContas(){
         <button onclick="contasMesNav(1)" style="width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">▶</button>
         <button onclick="contasMes='';renderFinContas()" style="padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:${!contasMes?'var(--red)':'var(--panel2)'};color:${!contasMes?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer">Todos</button>
       </div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="exportarContasCSV()">📥 CSV</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirContas()">🖨️ PDF</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioAnual()">📊 Anual</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioDRE()">💰 DRE</button>
         <button class="btn btn-ghost btn-sm" onclick="relatorioFluxo()">📈 Fluxo</button>
+        <button class="btn btn-ghost btn-sm" onclick="relatorioResponsavel()">👤 Responsável</button>
         <button class="btn btn-r btn-sm" onclick="abrirModalDespesa()">+ Despesa</button>
       </div>
     </div>
@@ -1162,21 +1165,28 @@ function renderFinContas(){
     </div>
     ${_receitasHTML}
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
-    <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
+    <div style="display:flex;gap:4px;margin-bottom:6px;overflow-x:auto;scrollbar-width:none">
       ${[['pendente','Pendentes'],['vencida','Vencidas'],['pago','Pagas'],['todas','Todas']].map(([v,l])=>
         `<button onclick="contasFilter='${v}';renderFinContas()" style="padding:6px 10px;border-radius:5px;border:1px solid var(--border);background:${contasFilter===v?'var(--red)':'var(--panel2)'};color:${contasFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
+      ).join('')}
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
+      ${[['todos','Todos'],['ANDERSON','Anderson'],['LEONARDO','Leonardo'],['MELQUE','Melque'],['PR','PR']].map(([v,l])=>
+        `<button onclick="contasPorFilter='${v}';renderFinContas()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${contasPorFilter===v?(${{ANDERSON:'#818cf8',LEONARDO:'#34d399',MELQUE:'#fb923c',PR:'#f87171',todos:'var(--muted)'}[v]||'var(--muted)'):'var(--panel2)'};color:${contasPorFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
       ).join('')}
     </div>
     ${filtradas.length===0?'<div class="loading">Nenhuma conta nesta categoria</div>':
       filtradas.map(d=>{
         const vencida=d.status==='pendente'&&d.data_vencimento<todayStr;
         const cor=d.status==='pago'?'var(--green)':vencida?'#f87171':'var(--yellow)';
+        const porCor=_porCores[d.pago_por]||'var(--muted)';
         return `<div class="item">
           <div class="item-top">
             <div style="flex:1;min-width:0">
               <div class="item-name">${d.descricao}</div>
               <div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">
                 ${d.categoria?`<span style="font-size:10px;background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25);padding:2px 6px;border-radius:3px">${d.categoria}</span>`:''}
+                ${d.pago_por?`<span style="font-size:10px;background:rgba(255,255,255,.06);color:${porCor};border:1px solid ${porCor}55;padding:2px 6px;border-radius:3px;font-weight:600">👤 ${d.pago_por}</span>`:''}
                 <span style="font-size:10px;color:var(--muted)">Venc: ${fmtD(d.data_vencimento)}</span>
                 ${d.status==='pago'?`<span style="font-size:10px;color:var(--muted)">Pago: ${fmtD(d.data_pagamento)}</span>`:''}
               </div>
@@ -1187,7 +1197,7 @@ function renderFinContas(){
             </div>
           </div>
           <div class="item-acts">
-            ${d.status!=='pago'?`<button class="btn btn-g btn-sm" style="flex:1" onclick="pagarDespesa(${d.id})">✓ Pagar</button>`:''}
+            ${d.status!=='pago'?`<button class="btn btn-g btn-sm" style="flex:1" onclick="confirmarPagamento(${d.id})">✓ Pagar</button>`:''}
             <button class="btn btn-ghost btn-sm" style="flex:1" onclick="abrirModalDespesa(${d.id})">✏️ Editar</button>
             <button class="btn btn-sm" style="background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25)" onclick="excluirDespesa(${d.id})">🗑</button>
           </div>
@@ -1198,10 +1208,11 @@ function renderFinContas(){
 function contasGetFiltradas() {
   const todas = finResumo?.despesas||[];
   const doMes = contasMes ? todas.filter(d=>d.data_vencimento&&d.data_vencimento.startsWith(contasMes)) : todas;
-  return contasFilter==='todas' ? doMes
+  const porStatus = contasFilter==='todas' ? doMes
     : contasFilter==='pago' ? doMes.filter(d=>d.status==='pago')
     : contasFilter==='vencida' ? doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr)
     : doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
+  return contasPorFilter==='todos' ? porStatus : porStatus.filter(d=>(d.pago_por||'').toUpperCase()===contasPorFilter);
 }
 
 function exportarContasCSV() {
@@ -1209,11 +1220,11 @@ function exportarContasCSV() {
   if (!dados.length) { alert('Nenhuma conta para exportar.'); return; }
   const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
   const linhas = [
-    ['Descrição','Categoria','Vencimento','Pagamento','Valor (R$)','Status','Método','Observações','Recorrente','Parcela'].map(esc).join(';'),
+    ['Descrição','Categoria','Vencimento','Pagamento','Valor (R$)','Status','Pago por','Método','Observações','Recorrente','Parcela'].map(esc).join(';'),
     ...dados.map(d => [
       d.descricao, d.categoria||'', fmtD(d.data_vencimento), d.data_pagamento?fmtD(d.data_pagamento):'',
-      Number(d.valor||0).toFixed(2).replace('.',','), d.status==='pago'?'Pago':d.data_vencimento<todayStr?'Vencida':'Pendente', d.metodo||'',
-      d.obs||'', d.recorrente?'Sim':'Não', d.parcelas>1?`${d.parcela_atual}/${d.parcelas}`:''
+      Number(d.valor||0).toFixed(2).replace('.',','), d.status==='pago'?'Pago':d.data_vencimento<todayStr?'Vencida':'Pendente',
+      d.pago_por||'', d.metodo||'', d.obs||'', d.recorrente?'Sim':'Não', d.parcelas>1?`${d.parcela_atual}/${d.parcelas}`:''
     ].map(esc).join(';'))
   ];
   const bom = '﻿';
@@ -1243,6 +1254,7 @@ function imprimirContas() {
       <td>${d.data_pagamento?fmtD(d.data_pagamento):'—'}</td>
       <td style="text-align:right;font-weight:600">R$ ${Number(d.valor||0).toFixed(2).replace('.',',')}</td>
       <td style="color:${cor};font-weight:600">${st}</td>
+      <td style="font-weight:600">${d.pago_por||'—'}</td>
       <td>${d.metodo||'—'}</td>
     </tr>`;
   }).join('');
@@ -1265,7 +1277,7 @@ function imprimirContas() {
   <h2>PUNCH AND ROLL — ${titulo}</h2>
   <div class="sub">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
   <table>
-    <thead><tr><th>Descrição / Observações</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th><th>Método</th></tr></thead>
+    <thead><tr><th>Descrição / Observações</th><th>Categoria</th><th>Vencimento</th><th>Pagamento</th><th style="text-align:right">Valor</th><th>Status</th><th>Pago por</th><th>Método</th></tr></thead>
     <tbody>${linhas}</tbody>
   </table>
   <div class="totais">
@@ -1677,6 +1689,12 @@ function abrirModalDespesa(id){
         </select>
       </div>
     </div>
+    <div class="fg"><label class="fl">Pago por</label>
+      <select class="fi" id="dp-pagoby">
+        <option value="">— Não definido —</option>
+        ${['ANDERSON','LEONARDO','MELQUE','PR'].map(p=>`<option value="${p}"${(d?.pago_por||'')===p?' selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
     <div class="fg"><label class="fl">Observações</label><textarea class="fi" id="dp-obs" rows="2" placeholder="...">${d?.obs||''}</textarea></div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-despesa').remove()">Cancelar</button>
@@ -1690,7 +1708,7 @@ async function salvarDespesa(id){
   const valor=parseFloat(document.getElementById('dp-valor').value)||0;
   const venc=document.getElementById('dp-venc').value;
   if(!desc||!valor||!venc){alert('Preencha descrição, valor e vencimento!');return;}
-  const dados={descricao:desc,valor,data_vencimento:venc,categoria:document.getElementById('dp-cat').value.trim()||null,metodo:document.getElementById('dp-metodo').value,obs:document.getElementById('dp-obs').value.trim()||null};
+  const dados={descricao:desc,valor,data_vencimento:venc,categoria:document.getElementById('dp-cat').value.trim()||null,metodo:document.getElementById('dp-metodo').value,pago_por:document.getElementById('dp-pagoby').value||null,obs:document.getElementById('dp-obs').value.trim()||null};
   if(!id||id==='null'){
     const parcelas=parseInt(document.getElementById('dp-parcelas')?.value||1);
     const recorrente=document.getElementById('dp-recorrente')?.checked||false;
@@ -1704,15 +1722,42 @@ async function salvarDespesa(id){
   }catch(e){alert('Erro: '+e.message);}
 }
 
-async function pagarDespesa(id){
+async function pagarDespesa(id, pago_por){
   const d=(finResumo?.despesas||[]).find(x=>x.id===id);
-  if(!d||!confirm('Marcar "'+d.descricao+'" como pago?'))return;
+  if(!d)return;
   try{
     const venc=d.data_vencimento?String(d.data_vencimento).split('T')[0]:null;
-    const r=await PUT('/api/despesas/'+id,{...d,data_vencimento:venc,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente});
+    const r=await PUT('/api/despesas/'+id,{...d,data_vencimento:venc,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente,pago_por:pago_por||d.pago_por||null});
     finResumo=null; renderFinanceiro();
     if(r?.recorrente_criado) setTimeout(()=>alert('🔄 Próximo mês criado automaticamente!'),400);
   }catch(e){alert('Erro: '+e.message);}
+}
+
+function confirmarPagamento(id){
+  const d=(finResumo?.despesas||[]).find(x=>x.id===id);
+  if(!d)return;
+  const box=criarModal('modal-pagar-desp','✓ Confirmar Pagamento');
+  const porCores={ANDERSON:'#818cf8',LEONARDO:'#34d399',MELQUE:'#fb923c',PR:'#f87171'};
+  box.innerHTML+=`
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">${d.descricao}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--green);margin-bottom:16px">${fmtR(d.valor)}</div>
+    <div class="fg" style="margin-bottom:16px"><label class="fl">Quem pagou?</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px" id="pagar-por-grid">
+        ${['ANDERSON','LEONARDO','MELQUE','PR'].map(p=>`
+          <button onclick="document.querySelectorAll('#pagar-por-grid button').forEach(b=>b.style.background='var(--panel2)');this.style.background='${porCores[p]}33';this.style.borderColor='${porCores[p]}';this.dataset.sel='1';document.getElementById('pagar-sel').value='${p}'"
+            style="padding:10px;border-radius:6px;border:1px solid var(--border);background:${d.pago_por===p?porCores[p]+'33':'var(--panel2)'};${d.pago_por===p?'border-color:'+porCores[p]+';':''}color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">${p}</button>`).join('')}
+      </div>
+      <input type="hidden" id="pagar-sel" value="${d.pago_por||''}">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-pagar-desp').remove()">Cancelar</button>
+      <button class="btn btn-g" style="flex:1" onclick="
+        const sel=document.getElementById('pagar-sel').value;
+        document.getElementById('modal-pagar-desp').remove();
+        pagarDespesa(${id},sel||null)
+      ">✓ Confirmar Pago</button>
+    </div>`;
+  document.body.appendChild(box.parentElement||box);
 }
 
 async function excluirDespesa(id){
@@ -1722,6 +1767,66 @@ async function excluirDespesa(id){
     await DEL('/api/despesas/'+id);
     finResumo=null; renderFinanceiro();
   }catch(e){alert('Erro: '+e.message);}
+}
+
+function relatorioResponsavel(){
+  const todas=finResumo?.despesas||[];
+  const doMes=contasMes?todas.filter(d=>d.data_vencimento&&d.data_vencimento.startsWith(contasMes)):todas;
+  const fmtV=v=>'R$ '+Number(v||0).toFixed(2).replace('.',',');
+  const periodo=contasMes?`${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(contasMes.split('-')[1])-1]}/${contasMes.split('-')[0]}`:'Todos os períodos';
+  const responsaveis=['ANDERSON','LEONARDO','MELQUE','PR'];
+  const porCores={ANDERSON:'#818cf8',LEONARDO:'#34d399',MELQUE:'#fb923c',PR:'#f87171'};
+  let totalGeral=0;
+  const secoes=responsaveis.map(resp=>{
+    const desps=doMes.filter(d=>(d.pago_por||'').toUpperCase()===resp);
+    const pagas=desps.filter(d=>d.status==='pago');
+    const pendentes=desps.filter(d=>d.status==='pendente');
+    const totalPago=pagas.reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    const totalPend=pendentes.reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    const total=totalPago+totalPend;
+    totalGeral+=totalPago;
+    if(!desps.length)return`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:12px"><div style="font-size:13px;font-weight:700;color:#6b7280">👤 ${resp}</div><div style="font-size:11px;color:#9ca3af;margin-top:4px">Nenhuma despesa no período</div></div>`;
+    const linhas=desps.map(d=>{
+      const venc=d.status==='pendente'&&(d.data_vencimento||'')<new Date().toISOString().slice(0,10);
+      const cor=d.status==='pago'?'#15803d':venc?'#b91c1c':'#b45309';
+      const st=d.status==='pago'?'✅ Pago':venc?'⚠️ Vencida':'⏳ Pendente';
+      return`<tr><td style="padding:5px 8px">${d.descricao}${d.parcelas>1?' ('+d.parcela_atual+'/'+d.parcelas+')':''}${d.recorrente?' 🔄':''}</td><td style="padding:5px 8px">${d.categoria||'—'}</td><td style="padding:5px 8px">${d.data_vencimento?new Date(d.data_vencimento+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td><td style="padding:5px 8px;text-align:right;font-weight:700;color:${cor}">${fmtV(d.valor)}</td><td style="padding:5px 8px;color:${cor};font-size:10px">${st}</td></tr>`;
+    }).join('');
+    return`<div style="background:#fff;border:2px solid ${porCores[resp]}55;border-radius:8px;margin-bottom:16px;overflow:hidden">
+      <div style="background:${porCores[resp]}18;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:14px;font-weight:700;color:#111">👤 ${resp}</div>
+        <div style="text-align:right">
+          ${totalPago>0?`<div style="font-size:12px;color:#15803d;font-weight:700">Pago: ${fmtV(totalPago)}</div>`:''}
+          ${totalPend>0?`<div style="font-size:11px;color:#b45309">Pendente: ${fmtV(totalPend)}</div>`:''}
+          <div style="font-size:13px;font-weight:700;color:${porCores[resp]}">Total: ${fmtV(total)}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:#f3f4f6"><th style="padding:5px 8px;text-align:left">Descrição</th><th style="padding:5px 8px;text-align:left">Categoria</th><th style="padding:5px 8px;text-align:left">Vencimento</th><th style="padding:5px 8px;text-align:right">Valor</th><th style="padding:5px 8px;text-align:left">Status</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  const semResponsavel=doMes.filter(d=>!d.pago_por);
+  const semSection=semResponsavel.length?`<div style="background:#fff;border:1px dashed #d1d5db;border-radius:8px;margin-bottom:16px;overflow:hidden">
+    <div style="background:#f9fafb;padding:10px 16px;display:flex;justify-content:space-between">
+      <div style="font-size:13px;font-weight:600;color:#6b7280">❓ Sem responsável (${semResponsavel.length})</div>
+      <div style="font-size:13px;font-weight:700;color:#6b7280">${fmtV(semResponsavel.reduce((s,d)=>s+parseFloat(d.valor||0),0))}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:#f3f4f6"><th style="padding:5px 8px;text-align:left">Descrição</th><th style="padding:5px 8px;text-align:left">Categoria</th><th style="padding:5px 8px;text-align:left">Vencimento</th><th style="padding:5px 8px;text-align:right">Valor</th><th style="padding:5px 8px;text-align:left">Status</th></tr></thead>
+      <tbody>${semResponsavel.map(d=>`<tr><td style="padding:5px 8px">${d.descricao}</td><td style="padding:5px 8px">${d.categoria||'—'}</td><td style="padding:5px 8px">${d.data_vencimento?new Date(d.data_vencimento+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td><td style="padding:5px 8px;text-align:right;font-weight:700">${fmtV(d.valor)}</td><td style="padding:5px 8px;font-size:10px">${d.status==='pago'?'✅ Pago':'⏳ Pendente'}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`:'';
+  const w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório por Responsável — Punch and Roll</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:20px;max-width:900px;margin:0 auto}h2{font-size:16px;margin-bottom:4px}@media print{button{display:none}}</style></head><body>'
+    +'<button onclick="window.print()" style="float:right;padding:6px 14px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>'
+    +'<h2>PUNCH AND ROLL — Despesas por Responsável</h2>'
+    +`<div style="font-size:11px;color:#6b7280;margin-bottom:20px">Período: ${periodo} | Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>`
+    +secoes+semSection
+    +`<div style="margin-top:20px;padding:14px 18px;background:#0f172a;color:#fff;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap"><span style="font-weight:700;font-size:13px">Total pago no período: <span style="color:#86efac">${fmtV(totalGeral)}</span></span></div>`
+    +'</body></html>');
+  w.document.close();
 }
 
 // ══════════════════════════════════════
