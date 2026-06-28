@@ -1134,7 +1134,7 @@ function renderFinContas(){
       <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:600">Resultado (rec. - desp. pagas)</span><span style="font-weight:700;color:${_resultado>=0?'var(--green)':'#f87171'}">${_resultado>=0?'+':''}${fmtR(_resultado)}</span></div>
     </div>
   </div>`;
-  const _porCores={'ANDERSON':'#818cf8','LEONARDO':'#34d399','MELQUE':'#fb923c','PR':'#f87171'};
+  const _porCores={'ANDERSON':'#818cf8','LEONARDO':'#34d399','MELQUE':'#fb923c','PR':'#f87171','todos':'var(--muted)'};
   document.getElementById('fin-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px">
@@ -1172,7 +1172,7 @@ function renderFinContas(){
     </div>
     <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none">
       ${[['todos','Todos'],['ANDERSON','Anderson'],['LEONARDO','Leonardo'],['MELQUE','Melque'],['PR','PR']].map(([v,l])=>
-        `<button onclick="contasPorFilter='${v}';renderFinContas()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${contasPorFilter===v?(${{ANDERSON:'#818cf8',LEONARDO:'#34d399',MELQUE:'#fb923c',PR:'#f87171',todos:'var(--muted)'}[v]||'var(--muted)'):'var(--panel2)'};color:${contasPorFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
+        `<button onclick="contasPorFilter='${v}';renderFinContas()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${contasPorFilter===v?(_porCores[v]||'var(--muted)'):'var(--panel2)'};color:${contasPorFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
       ).join('')}
     </div>
     ${filtradas.length===0?'<div class="loading">Nenhuma conta nesta categoria</div>':
