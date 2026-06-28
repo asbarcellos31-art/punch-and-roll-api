@@ -1665,7 +1665,7 @@ function abrirModalDespesa(id){
     <div class="fg"><label class="fl">Descrição *</label><input class="fi" id="dp-desc" value="${d?.descricao||''}" placeholder="Ex: Aluguel, Energia, Professor..."></div>
     <div class="frow">
       <div class="fg"><label class="fl">Valor *</label><input class="fi" type="number" step="0.01" id="dp-valor" value="${d?.valor||''}" placeholder="0,00"></div>
-      <div class="fg"><label class="fl">1º Vencimento *</label><input class="fi" type="date" id="dp-venc" value="${d?.data_vencimento||todayStr}"></div>
+      <div class="fg"><label class="fl">${id?'Vencimento':'1º Vencimento'} *</label><input class="fi" type="date" id="dp-venc" value="${d?.data_vencimento?String(d.data_vencimento).slice(0,10):todayStr}"></div>
     </div>
     ${!id?`<div class="frow">
       <div class="fg"><label class="fl">Parcelas</label>
