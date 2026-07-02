@@ -2012,9 +2012,9 @@ let mensTab='overview'; let mensHistorico=[]; let mensFiltroPor='todos';
 
 function renderPagamentos() {
   const pg = document.getElementById('page-pagamentos');
-  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
-  const ativos=cache.alunos.filter(a=>a.status==='ativo');
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado'&&!a.cortesia);
+  const vencendo=cache.alunos.filter(a=>a.status==='vencendo'&&!a.cortesia);
+  const ativos=cache.alunos.filter(a=>a.status==='ativo'&&!a.cortesia);
   pg.innerHTML = `
     <div style="display:flex;gap:3px;background:var(--panel);border-radius:8px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none">
       ${[['overview','📊 Visão Geral'],['cobranca','🔴 Cobranças'],['historico','📋 Histórico'],['renovacao','🔄 Renovação']].map(([id,label])=>
@@ -2029,12 +2029,13 @@ function mensNavTo(tab){mensTab=tab;renderPagamentos();}
 function renderMensTab(){if(mensTab==='overview')renderMensOverview();if(mensTab==='cobranca')renderMensCobranca();if(mensTab==='historico')renderMensHistorico();if(mensTab==='renovacao')renderMensRenovacao();}
 
 function renderMensOverview(){
-  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
-  const ativos=cache.alunos.filter(a=>a.status==='ativo');
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado'&&!a.cortesia);
+  const vencendo=cache.alunos.filter(a=>a.status==='vencendo'&&!a.cortesia);
+  const ativos=cache.alunos.filter(a=>a.status==='ativo'&&!a.cortesia);
+  const pagantes=cache.alunos.filter(a=>!a.cortesia);
   const recMes=ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const inadim=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-  const taxaAdim=cache.alunos.length>0?Math.round(ativos.length/cache.alunos.length*100):0;
+  const taxaAdim=pagantes.length>0?Math.round(ativos.length/pagantes.length*100):0;
   document.getElementById('mens-content').innerHTML=`
     <div class="grid4">
       <div class="kpi kg"><div class="kpi-label">Adimplentes</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">${taxaAdim}% do total</div></div>
@@ -2047,11 +2048,11 @@ function renderMensOverview(){
     ${atrasados.length===0&&vencendo.length===0?`<div class="alert alert-g">✅ Todos os alunos estão em dia!</div>`:''}
     <div class="card"><div class="card-title">👥 Situação dos Alunos</div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      ${[['todos','Todos',cache.alunos.length],['atrasado','Atrasados',atrasados.length],['vencendo','Vencendo',vencendo.length],['ativo','Em dia',ativos.length]].map(([v,l,n])=>
+      ${[['todos','Todos',pagantes.length],['atrasado','Atrasados',atrasados.length],['vencendo','Vencendo',vencendo.length],['ativo','Em dia',ativos.length]].map(([v,l,n])=>
         `<button onclick="mensFiltroPor='${v}';renderMensOverview()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${mensFiltroPor===v?'var(--red)':'var(--panel2)'};color:${mensFiltroPor===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">${l} (${n})</button>`
       ).join('')}
     </div>
-    ${(mensFiltroPor&&mensFiltroPor!=='todos'?cache.alunos.filter(a=>a.status===mensFiltroPor):cache.alunos).map(a=>`
+    ${(mensFiltroPor&&mensFiltroPor!=='todos'?pagantes.filter(a=>a.status===mensFiltroPor):pagantes).map(a=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e1e1e;gap:8px">
         <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${a.nome}</div>
         <div style="font-size:11px;color:var(--muted)">${a.plano||'—'} · Venc: ${fmtD(a.venc)}</div></div>
@@ -2067,8 +2068,8 @@ function renderMensOverview(){
 }
 
 function renderMensCobranca(){
-  const atrasados=cache.alunos.filter(a=>a.status==='atrasado');
-  const vencendo=cache.alunos.filter(a=>a.status==='vencendo');
+  const atrasados=cache.alunos.filter(a=>a.status==='atrasado'&&!a.cortesia);
+  const vencendo=cache.alunos.filter(a=>a.status==='vencendo'&&!a.cortesia);
   document.getElementById('mens-content').innerHTML=`
     ${atrasados.length===0&&vencendo.length===0?'<div class="alert alert-g">✅ Nenhuma cobrança pendente!</div>':''}
     ${atrasados.length>0?`<div class="card"><div class="card-title" style="color:#f87171">🔴 Em Atraso</div>${atrasados.map(a=>`
