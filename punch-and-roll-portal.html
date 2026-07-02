@@ -116,6 +116,7 @@ const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS_IDX = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
 const diaHoje = DIAS_IDX[new Date().getDay()]||'Segunda';
 const nowMin = new Date().getHours()*60+new Date().getMinutes();
+const hojeUTC = new Date().toISOString().split('T')[0];
 
 let _token = localStorage.getItem('pr_aluno_token')||'';
 let aluno = null;
@@ -249,7 +250,7 @@ function renderInicio() {
   if(aulasHoje.length) {
     html+='<div class="card"><div class="card-title">📅 Aulas de Hoje — '+diaHoje+'</div>';
     aulasHoje.forEach(au=>{
-      const ckFeito = cache.checkins.some(c=>c.aula_id===au.id);
+      const ckFeito = cache.checkins.some(c=>c.aula_id===au.id && String(c.data_checkin).split('T')[0]===hojeUTC);
       const [h,mi]=au.hora.split(':').map(Number);
       const diff=(h*60+mi)-nowMin;
       const podeCheckin = !bloqueado&&!ckFeito&&diff<=120&&diff>=-15;
@@ -322,7 +323,7 @@ function renderAgenda() {
   if(aulasD.length===0) { html+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem aulas neste dia</div>'; }
   else {
     aulasD.forEach(au=>{
-      const ck = cache.checkins.find(c=>c.aula_id===au.id);
+      const ck = cache.checkins.find(c=>c.aula_id===au.id && String(c.data_checkin).split('T')[0]===hojeUTC);
       const ckFeito = !!ck;
       const [h,mi]=au.hora.split(':').map(Number);
       const diff=(h*60+mi)-nowMin;
