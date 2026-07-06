@@ -2167,12 +2167,12 @@ function abrirModalRegistrarPag(alunoId){
     <div class="fg"><label class="fl">Método</label><select class="fi" id="rp-metodo"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option></select></div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-reg-pag').remove()">Cancelar</button>
-      <button class="btn btn-r" style="flex:1" onclick="confirmarPagamento()">✅ Confirmar</button>
+      <button class="btn btn-r" style="flex:1" onclick="confirmarPagamentoAluno()">✅ Confirmar</button>
     </div>`;
   document.body.appendChild(box.parentElement||box);
 }
 
-async function confirmarPagamento(){
+async function confirmarPagamentoAluno(){
   const alunoId=parseInt(document.getElementById('rp-aluno').value);
   const valor=parseFloat(document.getElementById('rp-valor').value)||0;
   const data=document.getElementById('rp-data').value||todayStr;
