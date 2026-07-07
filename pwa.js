@@ -13,8 +13,8 @@ if ('serviceWorker' in navigator) {
   style.textContent = `
     #pwa-fab {
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: 92px;
+      right: 22px;
       z-index: 99999;
       width: 58px;
       height: 58px;
@@ -39,7 +39,7 @@ if ('serviceWorker' in navigator) {
 
     #pwa-tooltip {
       position: fixed;
-      bottom: 92px;
+      bottom: 160px;
       right: 16px;
       z-index: 99999;
       background: #111827;
