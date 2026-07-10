@@ -904,18 +904,40 @@ async function excluirAula(id, nome) {
   catch(e) { alert('Erro: '+e.message); }
 }
 
+let checkinDataOffset = 0;
+function checkinDataAtual() {
+  const d = new Date(); d.setDate(d.getDate() + checkinDataOffset);
+  return d.toISOString().slice(0,10);
+}
+function checkinDataLabel() {
+  if(checkinDataOffset===0) return 'Hoje';
+  if(checkinDataOffset===-1) return 'Ontem';
+  const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
+  return d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
+}
+function checkinNavData(delta) { checkinDataOffset+=delta; renderCheckins(); }
+
 async function renderCheckins() {
   const pg = document.getElementById('page-checkins');
   const tabs = DIAS.map(d=>`<button class="day-tab${d===selectedDay?' active':''}" onclick="selectedDay='${d}';renderCheckins()">${d}</button>`).join('');
-  pg.innerHTML = `<div class="day-tabs">${tabs}</div><div id="checkins-lista"><div class="loading"><div class="spinner"></div>Carregando...</div></div>`;
+  const dataLabel = checkinDataLabel();
+  const dataStr = checkinDataAtual();
+  pg.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <button onclick="checkinNavData(-1)" style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">‹ Anterior</button>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${dataLabel} — ${dataStr}</span>
+      <button onclick="checkinNavData(1)" ${checkinDataOffset>=0?'disabled style="opacity:.3;cursor:default"':''} style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Próximo ›</button>
+    </div>
+    <div class="day-tabs">${tabs}</div>
+    <div id="checkins-lista"><div class="loading"><div class="spinner"></div>Carregando...</div></div>`;
   try {
-    const hoje = new Date().toISOString().slice(0,10);
-    const cks = await GET('/api/checkins?data='+hoje);
+    const cks = await GET('/api/checkins?data='+dataStr);
     cache.checkins = Array.isArray(cks) ? cks : [];
     const aulasHoje = cache.aulas.filter(a=>a.dia===selectedDay&&a.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
     const el = document.getElementById('checkins-lista');
     if(aulasHoje.length===0){showEmpty(el,'Sem aulas neste dia');return;}
-    el.innerHTML = aulasHoje.map(au=>{
+    const totalDia = cache.checkins.length;
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Total de check-ins em ${dataStr}: <strong style="color:var(--fg)">${totalDia}</strong></div>` + aulasHoje.map(au=>{
       const cksAula=cache.checkins.filter(c=>c.aula_id===au.id);
       const pct=au.vagas>0?Math.round(cksAula.length/au.vagas*100):0;
       return `<div class="card">

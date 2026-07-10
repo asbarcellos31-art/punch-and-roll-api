@@ -987,19 +987,29 @@ app.post('/api/checkins', auth, async (req, res) => {
   try {
     const { aula_id } = req.body;
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
-    const hoje = new Date().toISOString().slice(0,10);
     const hora = new Date().toTimeString().slice(0,5);
-    const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,hoje]);
-    if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
     const [aluno] = await db.query('SELECT nome, status FROM alunos WHERE id=?',[aluno_id]);
     if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso.' });
-    const [aula] = await db.query('SELECT vagas, nome, hora FROM aulas WHERE id=?',[aula_id]);
-    const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,hoje]);
+    const [aula] = await db.query('SELECT vagas, nome, hora, dia FROM aulas WHERE id=?',[aula_id]);
+    if (!aula[0]) return res.status(404).json({ error: 'Aula não encontrada' });
+    // Calcula a data da aula (próxima ocorrência do dia da semana da aula)
+    const DIAS_SEMANA = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
+    const diaAlvo = DIAS_SEMANA[aula[0].dia] ?? -1;
+    const agora = new Date();
+    const diaHoje = agora.getDay() || 7; // 1=Seg, 7=Dom
+    let diffDias = diaAlvo >= 0 ? diaAlvo - diaHoje : 0;
+    if (diffDias < 0) diffDias += 7;
+    const dataAula = new Date(agora);
+    dataAula.setDate(agora.getDate() + diffDias);
+    const dataCheckin = dataAula.toISOString().slice(0,10);
+    const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,dataCheckin]);
+    if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
+    const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,dataCheckin]);
     if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
-    await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,hoje,hora]);
+    await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,dataCheckin,hora]);
     res.json({ message: 'Check-in confirmado! 🥊' });
     const totalHoje = ckCount[0].n + 1;
-    const msgNotif = `✅ *Check-in confirmado!*\n\n👤 *${aluno[0]?.nome}*\n🥊 ${aula[0]?.nome} — ${aula[0]?.hora}\n⏰ ${hora}\n👥 ${totalHoje} aluno(s) hoje nessa turma`;
+    const msgNotif = `✅ *Check-in confirmado!*\n\n👤 *${aluno[0]?.nome}*\n🥊 ${aula[0]?.nome} — ${aula[0]?.hora}\n📅 ${dataCheckin}\n⏰ ${hora}\n👥 ${totalHoje} aluno(s) nessa turma`;
     notificarWA('4899225-9899', msgNotif).catch(()=>{});
     notificarWA('4898463-9257', msgNotif).catch(()=>{});
   } catch (e) { res.status(500).json({ error: e.message }); }
