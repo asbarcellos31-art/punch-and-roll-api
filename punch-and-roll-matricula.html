@@ -237,6 +237,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
   <!-- VIEW 3 — Pagamento -->
   <div class="view" id="view-3">
     <div class="resumo-box" id="resumo-pagamento"></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input class="fi" id="f-cupom" placeholder="Código do cupom (opcional)" style="flex:1;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+      <button onclick="aplicarCupom()" style="padding:0 16px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;white-space:nowrap">Aplicar</button>
+    </div>
+    <div id="cupom-msg" style="font-size:12px;margin-bottom:12px;display:none"></div>
     <div class="form-sec">💳 Forma de Pagamento</div>
     <div class="pay-tabs">
       <button class="pay-tab active" id="pay-pix-tab" onclick="setPayMethod('pix')">🔲 PIX</button>
@@ -366,7 +371,37 @@ const BENEFICIOS={
 const fmtR=v=>'R$ '+Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 const todayStr=new Date().toISOString().slice(0,10);
 const MODO_TESTE = new URLSearchParams(location.search).get('teste')==='1';
-let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null};
+let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null,cupom:null,desconto:0};
+
+const CUPONS={
+  'FAMILIAPR10':{desconto:0.10,label:'Família Punch and Roll — 10% de desconto'},
+};
+
+function aplicarCupom(){
+  const code=(document.getElementById('f-cupom').value||'').trim().toUpperCase();
+  const el=document.getElementById('cupom-msg');
+  if(!code){el.style.display='none';return;}
+  const cupom=CUPONS[code];
+  if(!cupom){
+    el.style.display='block';el.style.color='#f87171';
+    el.textContent='❌ Cupom inválido ou expirado.';
+    S.cupom=null;S.desconto=0;
+  }else{
+    el.style.display='block';el.style.color='#4ade80';
+    el.textContent='✅ Cupom aplicado: '+cupom.label;
+    S.cupom=code;S.desconto=cupom.desconto;
+  }
+  renderResumoPagamento();
+  atualizarParcelamento();
+  if(document.getElementById('pix-valor-display'))
+    document.getElementById('pix-valor-display').textContent=fmtR(valorFinal());
+}
+
+function valorFinal(){
+  if(!S.plano)return 0;
+  const total=S.plano.valor*S.plano.meses;
+  return S.desconto>0?Math.round(total*(1-S.desconto)):total;
+}
 
 function setStep(n){
   document.querySelectorAll('.view').forEach((v,i)=>v.classList.toggle('active',i===n-1));
@@ -467,7 +502,7 @@ function irParaPagamento(){
   setStep(3);
   renderResumoPagamento();
   atualizarParcelamento();
-  document.getElementById('pix-valor-display').textContent=fmtR(S.plano.valor*S.plano.meses);
+  document.getElementById('pix-valor-display').textContent=fmtR(valorFinal());
   document.getElementById('btn-pagar').innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
 }
 
@@ -786,7 +821,9 @@ function renderResumo(elId){
     '<div class="resumo-row"><span class="resumo-label">Plano</span><span>'+p.nome+' — '+p.desc+'</span></div>'+
     '<div class="resumo-row"><span class="resumo-label">Duração</span><span>'+p.meses+(p.meses===1?' mês':' meses')+'</span></div>'+
     (S.dados.nome?'<div class="resumo-row"><span class="resumo-label">Aluno</span><span>'+S.dados.nome.split(' ')[0]+'</span></div>':'')+
-    '<div class="resumo-row"><span class="resumo-label" style="font-weight:600;color:var(--white)">Total</span><span class="resumo-total">'+fmtR(p.valor*p.meses)+'</span></div>';
+    (S.desconto>0?'<div class="resumo-row"><span class="resumo-label">Subtotal</span><span>'+fmtR(p.valor*p.meses)+'</span></div>'+
+    '<div class="resumo-row"><span class="resumo-label" style="color:#4ade80">Desconto ('+Math.round(S.desconto*100)+'%)</span><span style="color:#4ade80">− '+fmtR(p.valor*p.meses*S.desconto)+'</span></div>':'')+
+    '<div class="resumo-row"><span class="resumo-label" style="font-weight:600;color:var(--white)">Total</span><span class="resumo-total">'+fmtR(valorFinal())+'</span></div>';
 }
 
 function renderResumoPagamento(){renderResumo('resumo-pagamento');renderResumo('resumo-topo');}
@@ -802,7 +839,7 @@ function setPayMethod(m){
 
 function atualizarParcelamento(){
   if(!S.plano)return;
-  const total=S.plano.valor*S.plano.meses;
+  const total=valorFinal();
   const sel=document.getElementById('f-parcelas');sel.innerHTML='';
   const max=Math.min(12,S.plano.meses>1?12:3);
   for(let i=1;i<=max;i++){
@@ -880,8 +917,8 @@ async function processarPagamento(){
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           aluno_id:S.alunoId,
-          valor:S.plano.valor*S.plano.meses,
-          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
+          valor:valorFinal(),
+          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc+(S.cupom?' ['+S.cupom+']':''),
           email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
         })
       });
@@ -968,8 +1005,8 @@ async function processarPagamento(){
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           aluno_id:alunoData.id,
-          valor:S.plano.valor*S.plano.meses,
-          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc,
+          valor:valorFinal(),
+          descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc+(S.cupom?' ['+S.cupom+']':''),
           token:cardToken.id,email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
           parcelas:document.getElementById('f-parcelas').value,
           payment_method_id:cardToken.payment_method_id,
