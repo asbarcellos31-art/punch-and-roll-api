@@ -930,12 +930,19 @@ async function processarPagamento(){
       if(!cvv||cvv.length<3){alert('CVV inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
 
       const[mes,ano]=exp.split('/');
-      const cardToken=await mp.createCardToken({
-        cardNumber:num,cardholderName:name,
-        cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
-        securityCode:cvv,
-        identificationType:'CPF',identificationNumber:S.dados.cpf.replace(/\D/g,''),
-      });
+      let cardToken;
+      try {
+        cardToken=await mp.createCardToken({
+          cardNumber:num,cardholderName:name,
+          cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
+          securityCode:cvv,
+          identificationType:'CPF',identificationNumber:(S.dados.cpf||'').replace(/\D/g,''),
+        });
+      } catch(mpErr) {
+        const mpMsg = mpErr?.message || mpErr?.cause?.[0]?.description || (Array.isArray(mpErr)?mpErr[0]?.description:null) || JSON.stringify(mpErr) || 'Dados do cartão inválidos';
+        throw new Error(mpMsg);
+      }
+      if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão. Verifique os dados.');
 
       const apiRes=await fetch(API_URL+'/api/alunos/publico',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -950,6 +957,7 @@ async function processarPagamento(){
           payMethod:'cartao',obs:'',origem:'auto-cadastro'
         })
       });
+      if(!apiRes.ok){const d=await apiRes.json();throw new Error(d.error||'Erro ao cadastrar aluno');}
       const alunoData=await apiRes.json();
       fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
 
@@ -977,7 +985,8 @@ async function processarPagamento(){
     }
   }catch(err){
     console.error(err);
-    alert('Erro: '+err.message);
+    const msg = (typeof err==='string'?err:null)||err?.message||'Erro ao processar pagamento. Tente novamente.';
+    alert('Erro: '+msg);
     btn.disabled=false;
     btn.style.background='';
     btn.innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
