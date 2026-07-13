@@ -971,13 +971,14 @@ app.delete('/api/aulas/:id', auth, adminOnly, async (req, res) => {
 // ══════════════════════════════════════
 app.get('/api/checkins', auth, async (req, res) => {
   try {
-    const { aula_id, data, aluno_id } = req.query;
+    const { aula_id, data, aluno_id, data_min } = req.query;
     let q = `SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora, au.dia FROM checkins c JOIN alunos a ON c.aluno_id = a.id JOIN aulas au ON c.aula_id = au.id WHERE 1=1`;
     const params = [];
     if (aula_id) { q += ' AND c.aula_id = ?'; params.push(aula_id); }
     if (data) { q += ' AND c.data_checkin = ?'; params.push(data); }
+    if (data_min) { q += ' AND c.data_checkin >= ?'; params.push(data_min); }
     if (aluno_id) { q += ' AND c.aluno_id = ?'; params.push(aluno_id); }
-    q += ' ORDER BY c.criado_em DESC';
+    q += ' ORDER BY c.data_checkin ASC, au.hora ASC';
     const [rows] = await db.query(q, params);
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
