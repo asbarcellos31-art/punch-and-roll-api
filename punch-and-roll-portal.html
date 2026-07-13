@@ -362,13 +362,6 @@ function renderAgenda() {
 function selecionarDia(dia) { diaSelecionado=dia; renderAgenda(); }
 
 async function fazerCheckin(aulaId) {
-  // Só 1 check-in por dia
-  const hoje = diaHoje;
-  const jaTem = cache.checkins.some(c => {
-    const dt = c.data_checkin ? String(c.data_checkin).split('T')[0] : '';
-    return dt === new Date().toISOString().split('T')[0];
-  });
-  if (jaTem) { alert('Você já tem um check-in confirmado hoje. Cancele o atual para reservar outro.'); return; }
   try {
     await api('POST','/api/checkins',{aula_id:aulaId});
     const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
