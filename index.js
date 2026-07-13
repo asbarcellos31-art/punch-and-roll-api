@@ -1025,7 +1025,7 @@ app.delete('/api/checkins/:id', auth, async (req, res) => {
       if (Number(ck.aluno_id) !== Number(req.user.id)) return res.status(403).json({ error: 'Acesso negado' });
       const hoje = new Date().toISOString().split('T')[0];
       const dtCk = ck.data_checkin instanceof Date ? ck.data_checkin.toISOString().split('T')[0] : String(ck.data_checkin).split('T')[0];
-      if (dtCk !== hoje) return res.status(400).json({ error: 'Só é possível cancelar check-in do dia atual' });
+      if (dtCk < hoje) return res.status(400).json({ error: 'Não é possível cancelar check-in de dias anteriores' });
     }
     await db.query('DELETE FROM checkins WHERE id=?', [req.params.id]);
     res.json({ ok: true });

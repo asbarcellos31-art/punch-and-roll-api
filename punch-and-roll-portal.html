@@ -117,6 +117,14 @@ const DIAS_IDX = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sáb
 const diaHoje = DIAS_IDX[new Date().getDay()]||'Segunda';
 const hojeUTC = new Date().toISOString().split('T')[0];
 function getNowMin() { return new Date().getHours()*60+new Date().getMinutes(); }
+const _DIAS_GETDAY = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
+function getDataParaAula(dia) {
+  const alvo = _DIAS_GETDAY[dia]; if(alvo==null) return hojeUTC;
+  const hoje = new Date(); const hd = hoje.getDay()||7;
+  let d = alvo-hd; if(d<0) d+=7;
+  const dt = new Date(hoje); dt.setDate(hoje.getDate()+d);
+  return dt.toISOString().split('T')[0];
+}
 
 let _token = localStorage.getItem('pr_aluno_token')||'';
 let aluno = null;
@@ -324,13 +332,14 @@ function renderAgenda() {
   else {
     const nowMinAgenda = getNowMin();
     aulasD.forEach(au=>{
-      const ck = cache.checkins.find(c=>c.aula_id===au.id && String(c.data_checkin).split('T')[0]===hojeUTC);
+      const dataAula = getDataParaAula(au.dia);
+      const ck = cache.checkins.find(c=>c.aula_id===au.id && String(c.data_checkin).split('T')[0]===dataAula);
       const ckFeito = !!ck;
       const [h,mi]=au.hora.split(':').map(Number);
       const diff=(h*60+mi)-nowMinAgenda;
       let btn='';
       if(ckFeito) {
-        const podeCanc = isHoje;
+        const podeCanc = dataAula >= hojeUTC;
         btn=`<div style="display:flex;gap:6px;align-items:center">
           <span style="padding:7px 10px;background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.4);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600">✓ Confirmado</span>
           ${podeCanc?`<button onclick="cancelarCheckin(${ck.id})" style="padding:7px 8px;background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer" title="Cancelar check-in">✕</button>`:''}
@@ -338,7 +347,6 @@ function renderAgenda() {
       }
       else if(bloqueado) btn=`<span style="font-size:10px;color:#f87171">⛔ Inadimplente</span>`;
       else if(!isHoje) btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Reservar</button>`;
-      else if(diff>120) btn=`<span style="font-size:10px;color:var(--muted)">Ainda não disponível</span>`;
       else if(diff<-15) btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
       else btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">✓ Check-in</button>`;
       html+=`<div class="aula-item">
