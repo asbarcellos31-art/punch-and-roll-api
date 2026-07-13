@@ -275,6 +275,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
         <div class="fg"><label class="fl">Validade</label><input class="fi" id="f-card-exp" placeholder="MM/AA" maxlength="5" oninput="maskExp(this)"></div>
         <div class="fg"><label class="fl">CVV</label><input class="fi" id="f-card-cvv" placeholder="•••" maxlength="4" type="password"></div>
       </div>
+      <div class="fg"><label class="fl">CPF do Titular do Cartão</label><input class="fi" id="f-card-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)"><div style="font-size:10px;color:var(--muted);margin-top:3px">CPF de quem é dono do cartão (pode ser diferente do aluno)</div></div>
       <div class="fg"><label class="fl">Parcelamento</label><select class="fi" id="f-parcelas"></select></div>
       <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--muted)">🔒 Pagamento seguro via Mercado Pago</div>
     </div>
@@ -930,13 +931,15 @@ async function processarPagamento(){
       if(!cvv||cvv.length<3){alert('CVV inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
 
       const[mes,ano]=exp.split('/');
+      const cpfTitular=(document.getElementById('f-card-cpf').value||S.dados.cpf||'').replace(/\D/g,'');
+      if(!cpfTitular||cpfTitular.length<11){alert('Informe o CPF do titular do cartão!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
       let cardToken;
       try {
         cardToken=await mp.createCardToken({
           cardNumber:num,cardholderName:name,
           cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
           securityCode:cvv,
-          identificationType:'CPF',identificationNumber:(S.dados.cpf||'').replace(/\D/g,''),
+          identificationType:'CPF',identificationNumber:cpfTitular,
         });
       } catch(mpErr) {
         const mpMsg = mpErr?.message || mpErr?.cause?.[0]?.description || (Array.isArray(mpErr)?mpErr[0]?.description:null) || JSON.stringify(mpErr) || 'Dados do cartão inválidos';
