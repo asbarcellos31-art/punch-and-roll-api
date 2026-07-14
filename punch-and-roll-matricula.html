@@ -18,6 +18,7 @@
 <meta name="twitter:image" content="https://punchandroll.com.br/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>if(location.protocol==='http:'&&location.hostname!=='localhost')location.replace(location.href.replace('http:','https:'));</script>
 <script src="https://sdk.mercadopago.com/js/v2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -979,7 +980,7 @@ async function processarPagamento(){
           identificationType:'CPF',identificationNumber:cpfTitular,
         });
       } catch(mpErr) {
-        const mpMsg = mpErr?.message || mpErr?.cause?.[0]?.description || (Array.isArray(mpErr)?mpErr[0]?.description:null) || JSON.stringify(mpErr) || 'Dados do cartão inválidos';
+        const mpMsg = mpErr?.message || mpErr?.cause?.[0]?.description || (Array.isArray(mpErr)?mpErr[0]?.description:null) || (mpErr?JSON.stringify(mpErr):null) || 'Verifique os dados do cartão e tente novamente';
         throw new Error(mpMsg);
       }
       if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão. Verifique os dados.');
