@@ -1049,7 +1049,22 @@ async function processarPagamento(){
           'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento aprovado! Você já faz parte da Punch and Roll. 🥊';
         setStep(4);
       }else{
-        throw new Error('Pagamento não aprovado. Verifique os dados do cartão.');
+        const motivos={
+          cc_rejected_insufficient_amount:'Saldo insuficiente no cartão.',
+          cc_rejected_bad_filled_card_number:'Número do cartão inválido.',
+          cc_rejected_bad_filled_security_code:'CVV incorreto.',
+          cc_rejected_bad_filled_date:'Data de validade incorreta.',
+          cc_rejected_bad_filled_other:'Dados do cartão incorretos (número, nome, validade ou CVV).',
+          cc_rejected_blacklist:'Cartão bloqueado pela operadora. Contate seu banco.',
+          cc_rejected_call_for_authorize:'Ligue para sua operadora para autorizar esta transação.',
+          cc_rejected_card_disabled:'Cartão desativado. Contate sua operadora.',
+          cc_rejected_card_error:'Erro no cartão. Tente outro cartão.',
+          cc_rejected_high_risk:'Transação recusada por segurança. Tente PIX.',
+          cc_rejected_max_attempts:'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+          cc_rejected_other_reason:'Cartão recusado pela operadora. Tente PIX.',
+        };
+        const det = cardData.status_detail||cardData.status||'';
+        throw new Error(motivos[det]||`Cartão recusado: ${det}. Tente PIX.`);
       }
     }
   }catch(err){
