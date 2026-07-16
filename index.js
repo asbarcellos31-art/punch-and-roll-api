@@ -3718,6 +3718,24 @@ app.get('/api/_checkin-notify-test', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/_mp-check', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  const token = process.env.MP_ACCESS_TOKEN || '';
+  const modo = token.startsWith('TEST-') ? 'TESTE' : token.startsWith('APP_USR-') ? 'PRODUCAO' : 'DESCONHECIDO';
+  const tokenMask = token ? token.slice(0,12)+'...' : '(não configurado)';
+  let mpOk = false, mpErro = null, payMethods = [];
+  try {
+    const r = await axios.get('https://api.mercadopago.com/v1/payment_methods', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    mpOk = true;
+    payMethods = (r.data||[]).slice(0,5).map(m=>m.id);
+  } catch(e) {
+    mpErro = e.response?.data?.message || e.message;
+  }
+  res.json({ modo, tokenMask, mpOk, mpErro, payMethods });
+});
+
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   try {
