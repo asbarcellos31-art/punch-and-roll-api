@@ -914,6 +914,19 @@ app.put('/api/auth/aluno/senha', auth, async (req, res) => {
 app.post('/api/alunos/publico', async (req, res) => {
   try {
     const d = req.body;
+    const cpfLimpo = (d.cpf||'').replace(/\D/g,'');
+    const [jaExiste] = await db.query(
+      'SELECT id, nome, status FROM alunos WHERE (email=? AND email!="") OR (cpf=? AND cpf!="")',
+      [d.email||'', cpfLimpo]
+    );
+    if (jaExiste.length) {
+      return res.status(409).json({
+        error: 'ja_cadastrado',
+        message: `${jaExiste[0].nome} já possui cadastro na Punch and Roll.`,
+        aluno_id: jaExiste[0].id,
+        status: jaExiste[0].status
+      });
+    }
     const senhaHash = await bcrypt.hash('123', 10);
     const [result] = await db.query(`
       INSERT INTO alunos (nome,cpf,nasc,sexo,tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,modalidade,nivel,plano_id,plano,valor,inicio,vencimento,pagto,obs,status,senha,origem)
@@ -1072,7 +1085,8 @@ app.post('/api/checkins', auth, async (req, res) => {
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hora = new Date().toTimeString().slice(0,5);
     const [aluno] = await db.query('SELECT nome, status FROM alunos WHERE id=?',[aluno_id]);
-    if (aluno[0]?.status === 'atrasado') return res.status(403).json({ error: 'Mensalidade em atraso.' });
+    if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
+      return res.status(403).json({ error: 'Acesso bloqueado. Regularize sua mensalidade para fazer check-in.' });
     const [aula] = await db.query('SELECT vagas, nome, hora, dia FROM aulas WHERE id=?',[aula_id]);
     if (!aula[0]) return res.status(404).json({ error: 'Aula não encontrada' });
     // Calcula a data da aula (próxima ocorrência do dia da semana da aula)
@@ -1783,6 +1797,8 @@ app.post('/api/wa/config', auth, adminOnly, async (req, res) => {
 let ultimoDiaAniversario = -1;
 let ultimoDiaAtrasados = -1;
 let ultimoDiaVencimento = -1;
+let _waConnStatus = null; // 'open' | 'close' | null
+let _waLastAlertTs = 0;
 setInterval(async () => {
   const agora = new Date();
   const hora = agora.getHours();
@@ -1928,6 +1944,39 @@ setInterval(async () => {
 
 }, 3600000);
 
+async function monitorarWA() {
+  const evoUrl = process.env.WA_EVOLUTION_URL;
+  const evoKey = process.env.WA_EVOLUTION_KEY;
+  const evoInstance = process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
+  if (!evoUrl || !evoKey) return;
+  try {
+    const r = await axios.get(`${evoUrl}/instance/fetchInstances`, { headers: { apikey: evoKey } });
+    const inst = (r.data || []).find(i => i.name === evoInstance);
+    const status = inst?.connectionStatus || 'close';
+    _waConnStatus = status;
+    if (status !== 'open') {
+      console.warn(`[WA-MONITOR] Desconectado: ${status}`);
+      const agora = Date.now();
+      if (agora - _waLastAlertTs > 60 * 60 * 1000) {
+        _waLastAlertTs = agora;
+        const adminEmail = process.env.EMAIL_ADMIN || 'asbarcellos31@gmail.com';
+        await enviarEmailAdmin(
+          '⚠️ WhatsApp desconectado — Punch and Roll',
+          `<p style="font-family:sans-serif">A instância <b>${evoInstance}</b> está desconectada (status: <b>${status}</b>).</p>
+           <p style="font-family:sans-serif">Acesse o painel admin e clique em <b>📱 QR Code</b> para reconectar.</p>
+           <p style="font-family:sans-serif"><a href="https://punchandroll.com.br/punch-and-roll-admin.html">Abrir painel admin</a></p>
+           <p style="font-family:sans-serif;color:#888;font-size:12px">Alerta enviado no máximo 1x por hora.</p>`
+        );
+        console.warn('[WA-MONITOR] Email de alerta enviado.');
+      }
+    } else {
+      _waConnStatus = 'open';
+    }
+  } catch (e) {
+    console.error('[WA-MONITOR] Erro:', e.message);
+  }
+}
+
 // ══════════════════════════════════════
 // WHATSAPP — STATUS E QR CODE
 // ══════════════════════════════════════
@@ -1957,6 +2006,10 @@ app.get('/api/whatsapp/qr', auth, adminOnly, async (req, res) => {
     if (!qr) return res.json({ ok: false, erro: 'QR não retornado pela Evolution API', raw: d });
     res.json({ ok: true, qr, code });
   } catch(e) { res.json({ ok: false, erro: e.response?.data?.message || e.message }); }
+});
+
+app.get('/api/sistema/status', async (req, res) => {
+  res.json({ wa: _waConnStatus }); // 'open', 'close', ou null (ainda não verificado)
 });
 
 // ══════════════════════════════════════
@@ -3837,6 +3890,8 @@ const PORT = process.env.PORT || 3000;
 setupDB().then(() => {
   app.listen(PORT, () => console.log(`🥊 Punch and Roll API rodando na porta ${PORT}`));
   agendarRelatorioSemanal();
+  monitorarWA();
+  setInterval(monitorarWA, 10 * 60 * 1000); // verifica WA a cada 10 minutos
 }).catch(e => {
   console.error('Erro ao configurar banco:', e.message);
   process.exit(1);

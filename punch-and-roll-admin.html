@@ -402,6 +402,26 @@ async function iniciarApp() {
   document.getElementById('app').style.display='flex';
   await carregarTudo();
   navTo('dashboard');
+  verificarStatusWASistema();
+  setInterval(verificarStatusWASistema, 5 * 60 * 1000);
+}
+
+async function verificarStatusWASistema() {
+  try {
+    const s = await fetch(API+'/api/sistema/status').then(r=>r.json());
+    const existe = document.getElementById('wa-alerta-topo');
+    if (s.wa && s.wa !== 'open') {
+      if (!existe) {
+        const b = document.createElement('div');
+        b.id = 'wa-alerta-topo';
+        b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#d97706;color:#fff;text-align:center;padding:10px 16px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:12px';
+        b.innerHTML = '⚠️ WhatsApp desconectado! <button onclick="waGerarQR()" style="background:#fff;color:#d97706;border:none;border-radius:4px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:12px">📱 Reconectar</button> <button onclick="document.getElementById(\'wa-alerta-topo\').remove()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px">×</button>';
+        document.body.prepend(b);
+      }
+    } else if (existe) {
+      existe.remove();
+    }
+  } catch(e) {}
 }
 
 async function carregarTudo() {

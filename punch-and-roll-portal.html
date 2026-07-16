@@ -179,6 +179,9 @@ async function iniciarApp() {
   document.getElementById('top-name').textContent = aluno.nome.split(' ')[0];
   await carregarTudo();
   navTo('inicio');
+  if (aluno.status==='aguardando_pagamento'||aluno.status==='inativo') {
+    setTimeout(()=>abrirRenovacao(),400);
+  }
 }
 
 async function carregarTudo() {
@@ -224,11 +227,12 @@ function navTo(pg) {
 // INÍCIO
 function renderInicio() {
   const a = aluno;
-  const sCls = a.status==='ativo'?'kg':a.status==='atrasado'?'kr':'ky';
-  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️'}[a.status]||a.status;
+  const aguardando = a.status==='aguardando_pagamento'||a.status==='inativo';
+  const sCls = a.status==='ativo'?'kg':a.status==='atrasado'?'kr':aguardando?'kr':'ky';
+  const sTxt = {ativo:'Em dia ✅',atrasado:'Em atraso ❌',vencendo:'Vencendo ⚠️',aguardando_pagamento:'Aguardando pagamento ⏳',inativo:'Inativo ⏳'}[a.status]||a.status;
   const pinned = cache.recados.filter(r=>r.pin).slice(0,2);
   const aulasHoje = cache.aulas.filter(au=>au.dia===diaHoje&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
-  const bloqueado = a.status==='atrasado';
+  const bloqueado = a.status==='atrasado'||aguardando;
   const modLabel = {boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'}[a.modalidade]||a.modalidade||'—';
 
   let html = `
@@ -241,8 +245,12 @@ function renderInicio() {
       <div class="kpi ${sCls}"><div class="kpi-label">Mensalidade</div><div class="kpi-val" style="font-size:14px">${sTxt}</div><div class="kpi-sub">Venc: ${fmtD(a.venc)}</div></div>
       <div class="kpi kb"><div class="kpi-label">Plano</div><div class="kpi-val" style="font-size:13px;line-height:1.2">${(a.plano||'—').split('—')[0].trim()}</div><div class="kpi-sub">${fmtR(a.valor)}/mês</div></div>
     </div>
-    ${bloqueado?'<div class="alert-r">🔴 Mensalidade em atraso. Check-in bloqueado.</div>':''}
-    ${a.status==='vencendo'?'<div class="alert-y">⚠️ Mensalidade vencendo em breve!</div>':''}
+    ${aguardando?`<div class="alert-r" style="text-align:center">
+      ⏳ <strong>Pagamento pendente.</strong> Complete seu pagamento para liberar o acesso.<br>
+      <button onclick="abrirRenovacao()" style="margin-top:10px;padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;cursor:pointer">💳 FAZER PAGAMENTO</button>
+    </div>`:''}
+    ${!aguardando&&bloqueado?'<div class="alert-r">🔴 Mensalidade em atraso. Check-in bloqueado.</div>':''}
+    ${!aguardando&&a.status==='vencendo'?'<div class="alert-y">⚠️ Mensalidade vencendo em breve!</div>':''}
   `;
 
   if(pinned.length) {

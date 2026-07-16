@@ -908,7 +908,21 @@ async function processarPagamento(){
           payMethod:'pix',obs:'',origem:'auto-cadastro'
         })
       });
-      if(!apiRes.ok){const err=await apiRes.json();throw new Error(err.error||'Erro ao salvar');}
+      if(!apiRes.ok){
+        const err=await apiRes.json();
+        if(apiRes.status===409){
+          document.getElementById('step3').innerHTML=`<div style="text-align:center;padding:24px">
+            <div style="font-size:48px;margin-bottom:12px">👤</div>
+            <h3 style="color:#d4111c;margin-bottom:8px">Cadastro já existe!</h3>
+            <p style="color:#555;margin-bottom:16px">${err.message||'Você já tem cadastro na Punch and Roll.'}</p>
+            <p style="color:#555;margin-bottom:20px">Acesse o portal do aluno para realizar seu pagamento.</p>
+            <a href="/punch-and-roll-portal.html" style="display:inline-block;padding:12px 32px;background:#d4111c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Acessar Portal do Aluno →</a>
+          </div>`;
+          btn.disabled=false;btn.innerHTML='PROCESSAR PAGAMENTO';
+          return;
+        }
+        throw new Error(err.error||'Erro ao salvar');
+      }
       const alunoData=await apiRes.json();
       S.alunoId=alunoData.id;
       fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
@@ -998,7 +1012,21 @@ async function processarPagamento(){
           payMethod:'cartao',obs:'',origem:'auto-cadastro'
         })
       });
-      if(!apiRes.ok){const d=await apiRes.json();throw new Error(d.error||'Erro ao cadastrar aluno');}
+      if(!apiRes.ok){
+        const d=await apiRes.json();
+        if(apiRes.status===409){
+          document.getElementById('step3').innerHTML=`<div style="text-align:center;padding:24px">
+            <div style="font-size:48px;margin-bottom:12px">👤</div>
+            <h3 style="color:#d4111c;margin-bottom:8px">Cadastro já existe!</h3>
+            <p style="color:#555;margin-bottom:16px">${d.message||'Você já tem cadastro na Punch and Roll.'}</p>
+            <p style="color:#555;margin-bottom:20px">Acesse o portal do aluno para realizar seu pagamento.</p>
+            <a href="/punch-and-roll-portal.html" style="display:inline-block;padding:12px 32px;background:#d4111c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Acessar Portal do Aluno →</a>
+          </div>`;
+          btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';
+          return;
+        }
+        throw new Error(d.error||'Erro ao cadastrar aluno');
+      }
       const alunoData=await apiRes.json();
       fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
 
