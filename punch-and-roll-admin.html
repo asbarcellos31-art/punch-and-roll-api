@@ -1852,13 +1852,12 @@ async function salvarDespesa(id){
 
 async function pagarDespesa(id, pago_por){
   const d=(finResumo?.despesas||[]).find(x=>x.id===id);
-  if(!d)return;
-  try{
-    const venc=d.data_vencimento?String(d.data_vencimento).split('T')[0]:null;
-    const r=await PUT('/api/despesas/'+id,{...d,data_vencimento:venc,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente,pago_por:pago_por||d.pago_por||null});
-    finResumo=null; renderFinanceiro();
-    if(r?.recorrente_criado) setTimeout(()=>alert('🔄 Próximo mês criado automaticamente!'),400);
-  }catch(e){alert('Erro: '+e.message);}
+  if(!d) throw new Error('Conta não encontrada. Recarregue a página e tente novamente.');
+  const venc=d.data_vencimento?String(d.data_vencimento).split('T')[0]:null;
+  const r=await PUT('/api/despesas/'+id,{...d,data_vencimento:venc,status:'pago',data_pagamento:todayStr,recorrente:d.recorrente,pago_por:pago_por||d.pago_por||null});
+  contasFilter='pago';
+  finResumo=null; renderFinanceiro();
+  if(r?.recorrente_criado) setTimeout(()=>alert('🔄 Próximo mês criado automaticamente!'),400);
 }
 
 function confirmarPagamento(id){
@@ -1872,20 +1871,32 @@ function confirmarPagamento(id){
     <div class="fg" style="margin-bottom:16px"><label class="fl">Quem pagou?</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px" id="pagar-por-grid">
         ${['ANDERSON','LEONARDO','MELQUE','PR'].map(p=>`
-          <button onclick="document.querySelectorAll('#pagar-por-grid button').forEach(b=>b.style.background='var(--panel2)');this.style.background='${porCores[p]}33';this.style.borderColor='${porCores[p]}';this.dataset.sel='1';document.getElementById('pagar-sel').value='${p}'"
-            style="padding:10px;border-radius:6px;border:1px solid var(--border);background:${d.pago_por===p?porCores[p]+'33':'var(--panel2)'};${d.pago_por===p?'border-color:'+porCores[p]+';':''}color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">${p}</button>`).join('')}
+          <button onclick="document.querySelectorAll('#pagar-por-grid button').forEach(b=>{b.style.background='var(--panel2)';b.style.borderColor='var(--border)'});this.style.background='${porCores[p]}33';this.style.borderColor='${porCores[p]}';document.getElementById('pagar-sel').value='${p}'"
+            style="padding:10px;border-radius:6px;border:1px solid ${d.pago_por===p?porCores[p]:'var(--border)'};background:${d.pago_por===p?porCores[p]+'33':'var(--panel2)'};color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">${p}</button>`).join('')}
       </div>
       <input type="hidden" id="pagar-sel" value="${d.pago_por||''}">
     </div>
+    <div id="pagar-erro" style="display:none;color:#f87171;font-size:12px;margin-bottom:8px;text-align:center"></div>
     <div style="display:flex;gap:10px">
-      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('modal-pagar-desp').remove()">Cancelar</button>
-      <button class="btn btn-g" style="flex:1" onclick="
-        const sel=document.getElementById('pagar-sel').value;
-        document.getElementById('modal-pagar-desp').remove();
-        pagarDespesa(${id},sel||null)
-      ">✓ Confirmar Pago</button>
+      <button class="btn btn-ghost" style="flex:1" id="pagar-btn-cancel" onclick="document.getElementById('modal-pagar-desp').remove()">Cancelar</button>
+      <button class="btn btn-g" style="flex:1" id="pagar-btn-ok">✓ Confirmar Pago</button>
     </div>`;
   document.body.appendChild(box.parentElement||box);
+  document.getElementById('pagar-btn-ok').onclick = async function() {
+    const sel = document.getElementById('pagar-sel').value;
+    const btn = document.getElementById('pagar-btn-ok');
+    const erroEl = document.getElementById('pagar-erro');
+    btn.disabled=true; btn.textContent='Salvando...';
+    erroEl.style.display='none';
+    try {
+      await pagarDespesa(id, sel||null);
+      document.getElementById('modal-pagar-desp')?.remove();
+    } catch(e) {
+      erroEl.textContent='Erro: '+e.message;
+      erroEl.style.display='block';
+      btn.disabled=false; btn.textContent='✓ Confirmar Pago';
+    }
+  };
 }
 
 async function excluirDespesa(id){
