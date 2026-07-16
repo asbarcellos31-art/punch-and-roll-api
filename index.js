@@ -802,6 +802,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': idKey } });
       payment = mpRes.data;
       metodo = 'cartao';
+      console.log(`[CARTAO] aluno=${aluno_id} valor=${totalValor} status=${payment.status} detail=${payment.status_detail} method=${payment.payment_method_id} last4=${payment.card?.last_four_digits}`);
     }
 
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
