@@ -1044,9 +1044,13 @@ async function processarPagamento(){
       if(!cardRes.ok){const err=await cardRes.json();throw new Error(err.error||'Erro no pagamento');}
       const cardData=await cardRes.json();
 
-      if(cardData.status==='approved'){
+      if(cardData.status==='approved'||cardData.status==='authorized'){
         document.getElementById('success-msg').textContent=
           'Parabéns, '+S.dados.nome.split(' ')[0]+'! Pagamento aprovado! Você já faz parte da Punch and Roll. 🥊';
+        setStep(4);
+      }else if(cardData.status==='in_process'||cardData.status==='pending'){
+        document.getElementById('success-msg').textContent=
+          'Olá, '+S.dados.nome.split(' ')[0]+'! Seu cadastro foi criado! O pagamento está sendo processado e você receberá a confirmação em breve. 🥊';
         setStep(4);
       }else{
         const motivos={
