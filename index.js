@@ -748,6 +748,77 @@ app.post('/api/alunos/me/solicitar-plano', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Renovação / troca de plano com pagamento real
+app.post('/api/alunos/me/renovar', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const aluno_id = req.user.id;
+    const { plano_id, plano_nome, valor, meses, payMethod, email, nome, cpf, token, payment_method_id, parcelas } = req.body;
+    if (!plano_nome || !valor || !meses) return res.status(400).json({ error: 'Dados do plano inválidos' });
+
+    const totalValor = parseFloat(valor) * parseInt(meses);
+    const descricao = `Punch and Roll — ${plano_nome}`;
+    const idKey = `renovar-${aluno_id}-${Date.now()}`;
+
+    let payment, metodo;
+
+    if (payMethod === 'pix') {
+      const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
+        transaction_amount: totalValor,
+        description: descricao,
+        payment_method_id: 'pix',
+        payer: {
+          email, first_name: (nome||'').split(' ')[0],
+          last_name: (nome||'').split(' ').slice(1).join(' ') || (nome||'').split(' ')[0],
+          identification: { type: 'CPF', number: (cpf||'').replace(/\D/g,'') }
+        },
+        notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
+      }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': idKey } });
+      payment = mpRes.data;
+      metodo = 'pix';
+      await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',
+        [aluno_id, descricao, totalValor, 'pendente', 'pix', String(payment.id)]);
+      return res.json({
+        payment_id: payment.id, status: payment.status, metodo: 'pix',
+        qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
+        qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64,
+      });
+    } else {
+      // cartão
+      const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
+        transaction_amount: totalValor,
+        token, description: descricao,
+        installments: parseInt(parcelas) || 1,
+        payment_method_id,
+        payer: {
+          email, first_name: (nome||'').split(' ')[0],
+          last_name: (nome||'').split(' ').slice(1).join(' ') || (nome||'').split(' ')[0],
+          identification: { type: 'CPF', number: (cpf||'').replace(/\D/g,'') }
+        },
+        notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
+      }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': idKey } });
+      payment = mpRes.data;
+      metodo = 'cartao';
+    }
+
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',
+      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id)]);
+
+    if (payment.status === 'approved') {
+      const hoje = new Date().toISOString().slice(0,10);
+      const venc = new Date(hoje); venc.setMonth(venc.getMonth() + parseInt(meses));
+      const vencStr = venc.toISOString().slice(0,10);
+      await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
+        [plano_nome, plano_id||null, parseFloat(valor), vencStr, metodo, aluno_id]);
+    }
+
+    res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail });
+  } catch (e) {
+    console.error('Renovar error:', e.response?.data || e.message);
+    res.status(500).json({ error: e.response?.data?.message || e.message });
+  }
+});
+
 app.get('/api/alunos/:id', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);

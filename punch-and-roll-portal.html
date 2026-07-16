@@ -8,6 +8,8 @@
 <link rel="icon" type="image/png" href="/logo-icon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#d4111c">
+<script>if(location.protocol==='http:'&&location.hostname!=='localhost')location.replace(location.href.replace('http:','https:'));</script>
+<script src="https://sdk.mercadopago.com/js/v2"></script>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Punch and Roll Fight Team">
 <meta property="og:title" content="Portal do Aluno — Punch and Roll">
@@ -410,37 +412,159 @@ const PLANOS_PORTAL = {
   ambos:[{id:'mensal_amb',nome:'Mensal — Ambos',valor:350,meses:1},{id:'semestral_amb',nome:'Semestral — Ambos',valor:330,meses:6},{id:'anual_amb',nome:'Anual — Ambos',valor:310,meses:12}],
 };
 
+const MP_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';
+let _mp = null;
+function getMp(){ if(!_mp) _mp=new MercadoPago(MP_KEY,{locale:'pt-BR'}); return _mp; }
+
 function renderAlterarPlano(a) {
   const planos = PLANOS_PORTAL[a.modalidade] || [];
   if (!planos.length) return '';
-  const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
   return `<div class="card">
-    <div class="card-title">📋 Alterar Plano</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Selecione o novo plano e envie a solicitação. Nossa equipe aplicará a mudança.</div>
+    <div class="card-title">🔄 Renovar / Alterar Plano</div>
     ${planos.map(p => {
-      const atual = a.plano_id === p.id || (a.plano||'').includes(p.nome.split('—')[0].trim());
+      const total = p.valor * p.meses;
+      const atual = a.plano_id === p.id || (a.plano||'').toLowerCase().includes(p.nome.split('—')[0].trim().toLowerCase());
       return `<div style="background:var(--panel2);border:1px solid ${atual?'var(--red)':'var(--border)'};border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
         <div style="flex:1">
           <div style="font-size:13px;font-weight:600">${p.nome}</div>
           <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}<span style="font-size:12px;font-weight:400;color:var(--muted)">/mês</span></div>
-          <div style="font-size:10px;color:var(--muted)">${p.meses===1?'Renovação mensal':p.meses===6?'Semestral — pagamento antecipado':'Anual — pagamento antecipado'}</div>
+          <div style="font-size:10px;color:var(--muted)">${p.meses===1?'Mensal':p.meses===6?'Semestral — total '+fmtR(total):'Anual — total '+fmtR(total)}</div>
         </div>
         ${atual
-          ? '<span style="font-size:10px;color:var(--red);font-weight:600;padding:4px 8px;border:1px solid rgba(212,17,28,.4);border-radius:6px;background:rgba(212,17,28,.1)">Plano atual</span>'
-          : `<button onclick="solicitarPlano('${p.nome}',${p.valor})" style="padding:7px 12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Solicitar →</button>`
+          ? '<span style="font-size:10px;color:var(--red);font-weight:600;padding:4px 8px;border:1px solid rgba(212,17,28,.4);border-radius:6px;background:rgba(212,17,28,.1)">Atual</span>'
+          : `<button onclick="abrirRenovacao('${p.id}','${p.nome}',${p.valor},${p.meses})" style="padding:7px 12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Renovar →</button>`
         }
       </div>`;
     }).join('')}
+    <button onclick="abrirRenovacao('${(PLANOS_PORTAL[a.modalidade]||[])[0]?.id}','${(PLANOS_PORTAL[a.modalidade]||[])[0]?.nome}',${(PLANOS_PORTAL[a.modalidade]||[])[0]?.valor||0},${(PLANOS_PORTAL[a.modalidade]||[])[0]?.meses||1},'same')" style="width:100%;padding:10px;background:rgba(212,17,28,.1);color:var(--red);border:1px solid rgba(212,17,28,.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">🔄 Renovar plano atual</button>
   </div>`;
 }
 
-async function solicitarPlano(nome, valor) {
-  if (!confirm(`Solicitar mudança para "${nome}" (R$ ${valor}/mês)?\n\nA equipe receberá seu pedido e aplicará a mudança.`)) return;
-  try {
-    await api('POST','/api/alunos/me/solicitar-plano',{plano_nome:nome, plano_valor:valor});
-    alert('✅ Solicitação enviada! A equipe entrará em contato em breve. 🥊');
-  } catch(e) { alert('Erro: '+e.message); }
+let _renovPlano = null;
+function abrirRenovacao(id, nome, valor, meses, tipo) {
+  // Se "same", usa o plano atual do aluno
+  if(tipo==='same') {
+    const p = (PLANOS_PORTAL[aluno.modalidade]||[]).find(x=>
+      aluno.plano_id===x.id || (aluno.plano||'').toLowerCase().includes(x.nome.split('—')[0].trim().toLowerCase())
+    ) || (PLANOS_PORTAL[aluno.modalidade]||[])[0];
+    if(p){id=p.id;nome=p.nome;valor=p.valor;meses=p.meses;}
+  }
+  _renovPlano = {id,nome,valor,meses};
+  const total = valor * meses;
+  const el = document.getElementById('modal-renovacao');
+  document.getElementById('renov-titulo').textContent = nome;
+  document.getElementById('renov-total').textContent = fmtR(total) + (meses>1?' ('+meses+'x de '+fmtR(valor)+')':'');
+  document.getElementById('renov-pix-qr').innerHTML = '';
+  document.getElementById('renov-pix-status').style.display='none';
+  document.getElementById('renov-pix-chave').style.display='none';
+  document.getElementById('renov-parcelas').innerHTML = '';
+  const maxP = Math.min(12, meses>1?12:3);
+  for(let i=1;i<=maxP;i++){
+    const op=document.createElement('option');op.value=i;
+    op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
+    document.getElementById('renov-parcelas').appendChild(op);
+  }
+  setRenovMetodo('pix');
+  el.style.display='flex';
 }
+
+function fecharRenovacao() {
+  document.getElementById('modal-renovacao').style.display='none';
+  if(window._renovInterval){clearInterval(window._renovInterval);window._renovInterval=null;}
+}
+
+function setRenovMetodo(m) {
+  document.getElementById('renov-tab-pix').style.background = m==='pix'?'var(--red)':'var(--panel2)';
+  document.getElementById('renov-tab-pix').style.color = m==='pix'?'#fff':'var(--muted)';
+  document.getElementById('renov-tab-cartao').style.background = m==='cartao'?'var(--red)':'var(--panel2)';
+  document.getElementById('renov-tab-cartao').style.color = m==='cartao'?'#fff':'var(--muted)';
+  document.getElementById('renov-form-pix').style.display = m==='pix'?'block':'none';
+  document.getElementById('renov-form-cartao').style.display = m==='cartao'?'block':'none';
+  document.getElementById('renov-btn').textContent = m==='pix'?'Gerar PIX':'Confirmar Pagamento';
+  window._renovMetodo = m;
+}
+
+async function confirmarRenovacao() {
+  const btn = document.getElementById('renov-btn');
+  btn.disabled=true; btn.textContent='Processando...';
+  const p = _renovPlano;
+  const metodo = window._renovMetodo || 'pix';
+  try {
+    if(metodo==='pix') {
+      const res = await api('POST','/api/alunos/me/renovar',{
+        plano_id:p.id, plano_nome:p.nome, valor:p.valor, meses:p.meses,
+        payMethod:'pix', email:aluno.email, nome:aluno.nome, cpf:aluno.cpf
+      });
+      if(res.qr_code_base64) document.getElementById('renov-pix-qr').innerHTML=`<img src="data:image/png;base64,${res.qr_code_base64}" style="width:180px;height:180px;border-radius:8px;background:#fff;display:block;margin:10px auto">`;
+      if(res.qr_code){
+        document.getElementById('renov-pix-chave').style.display='block';
+        document.getElementById('renov-pix-chave').textContent=res.qr_code;
+        document.getElementById('renov-pix-chave').onclick=()=>{navigator.clipboard.writeText(res.qr_code).catch(()=>{});alert('Código PIX copiado!');};
+      }
+      document.getElementById('renov-pix-status').style.display='block';
+      btn.textContent='⏳ Aguardando PIX...';
+      window._renovInterval = setInterval(async()=>{
+        try{
+          const st = await fetch(API+'/api/pagamentos/status/'+res.payment_id).then(r=>r.json());
+          if(st.status==='approved'){
+            clearInterval(window._renovInterval);
+            fecharRenovacao();
+            alert('✅ Pagamento confirmado! Plano renovado com sucesso. 🥊');
+            const novo = await api('GET','/api/alunos/me');
+            if(novo&&novo.id){aluno={...novo,venc:novo.vencimento||novo.venc||''};renderInicio();}
+          }
+        }catch(e){}
+      },5000);
+    } else {
+      // cartão
+      const num=(document.getElementById('renov-card-num').value||'').replace(/\s/g,'');
+      const nome_c=(document.getElementById('renov-card-name').value||'').trim();
+      const exp=(document.getElementById('renov-card-exp').value||'');
+      const cvv=(document.getElementById('renov-card-cvv').value||'');
+      const cpfT=(document.getElementById('renov-card-cpf').value||aluno.cpf||'').replace(/\D/g,'');
+      if(!num||num.length<15){alert('Número do cartão inválido');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      if(!nome_c){alert('Informe o nome no cartão');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      if(!exp||exp.length<5){alert('Validade inválida');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      if(!cvv||cvv.length<3){alert('CVV inválido');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      if(!cpfT||cpfT.length<11){alert('Informe o CPF do titular do cartão');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      const[mes,ano]=exp.split('/');
+      let cardToken;
+      try {
+        cardToken = await getMp().createCardToken({
+          cardNumber:num,cardholderName:nome_c,
+          cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
+          securityCode:cvv,identificationType:'CPF',identificationNumber:cpfT
+        });
+      } catch(mpErr) {
+        const msg=mpErr?.message||mpErr?.cause?.[0]?.description||(Array.isArray(mpErr)?mpErr[0]?.description:null)||(mpErr?JSON.stringify(mpErr):null)||'Verifique os dados do cartão';
+        throw new Error(msg);
+      }
+      if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão');
+      const parcelas = document.getElementById('renov-parcelas').value;
+      const res = await api('POST','/api/alunos/me/renovar',{
+        plano_id:p.id,plano_nome:p.nome,valor:p.valor,meses:p.meses,
+        payMethod:'cartao',email:aluno.email,nome:aluno.nome,cpf:cpfT,
+        token:cardToken.id,payment_method_id:cardToken.payment_method_id,parcelas
+      });
+      if(res.status==='approved'){
+        fecharRenovacao();
+        alert('✅ Pagamento aprovado! Plano renovado. 🥊');
+        const novo = await api('GET','/api/alunos/me');
+        if(novo&&novo.id){aluno={...novo,venc:novo.vencimento||novo.venc||''};renderInicio();}
+      } else {
+        throw new Error('Pagamento não aprovado: '+(res.status_detail||res.status));
+      }
+    }
+  } catch(e) {
+    alert('Erro: '+e.message);
+    btn.disabled=false;
+    btn.textContent = metodo==='pix'?'Gerar PIX':'Confirmar Pagamento';
+  }
+}
+
+function maskRenovCard(el){let v=el.value.replace(/\D/g,'').slice(0,16);v=v.replace(/(.{4})/g,'$1 ').trim();el.value=v;}
+function maskRenovExp(el){let v=el.value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);el.value=v;}
+function maskRenovCpf(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');el.value=v;}
 
 // ══ SHOP ══
 function shopSaveCart() { localStorage.setItem('pr_shop_cart', JSON.stringify(shopCart)); }
@@ -630,6 +754,65 @@ async function shopEnviarPedido() {
 })();
 </script>
 <script src="/pwa.js"></script>
+
+<!-- Modal Renovação / Troca de Plano -->
+<div id="modal-renovacao" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center">
+  <div style="background:var(--panel);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px" id="renov-titulo">Plano</div>
+        <div style="font-size:13px;color:var(--muted)" id="renov-total"></div>
+      </div>
+      <button onclick="fecharRenovacao()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+    </div>
+
+    <!-- Tabs PIX / Cartão -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="renov-tab-pix" onclick="setRenovMetodo('pix')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s">PIX</button>
+      <button id="renov-tab-cartao" onclick="setRenovMetodo('cartao')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s">Cartão</button>
+    </div>
+
+    <!-- Formulário PIX -->
+    <div id="renov-form-pix">
+      <div style="text-align:center;padding:10px 0;color:var(--muted);font-size:13px">Clique em "Gerar PIX" para receber o QR Code e pagar instantaneamente.</div>
+      <div id="renov-pix-qr" style="text-align:center"></div>
+      <div id="renov-pix-status" style="display:none;text-align:center;font-size:12px;color:var(--muted);margin-top:8px">Aguardando confirmação do pagamento...</div>
+      <div id="renov-pix-chave" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;word-break:break-all;margin-top:8px;cursor:pointer;color:var(--blue);text-align:center"></div>
+    </div>
+
+    <!-- Formulário Cartão -->
+    <div id="renov-form-cartao" style="display:none">
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Número do Cartão</label>
+        <input id="renov-card-num" type="tel" placeholder="0000 0000 0000 0000" oninput="maskRenovCard(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Nome no Cartão</label>
+        <input id="renov-card-name" type="text" placeholder="COMO ESTÁ NO CARTÃO" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;text-transform:uppercase">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Validade</label>
+          <input id="renov-card-exp" type="tel" placeholder="MM/AA" oninput="maskRenovExp(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+        </div>
+        <div>
+          <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">CVV</label>
+          <input id="renov-card-cvv" type="tel" placeholder="000" maxlength="4" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">CPF do Titular do Cartão</label>
+        <input id="renov-card-cpf" type="tel" placeholder="000.000.000-00" oninput="maskRenovCpf(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Parcelas</label>
+        <select id="renov-parcelas" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"></select>
+      </div>
+    </div>
+
+    <button id="renov-btn" onclick="confirmarRenovacao()" style="width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;margin-top:8px">Gerar PIX</button>
+  </div>
+</div>
 
 <!-- WhatsApp flutuante -->
 <a href="https://wa.me/5548984639257" target="_blank" style="position:fixed;bottom:22px;right:22px;z-index:9999;background:#25D366;color:#fff;border-radius:50%;width:58px;height:58px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.25);text-decoration:none;" title="Fale conosco no WhatsApp">
