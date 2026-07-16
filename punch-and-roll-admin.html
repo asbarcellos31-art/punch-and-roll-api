@@ -1120,8 +1120,9 @@ function renderFinGeral(){
   const _gRecPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _gAReceber = Math.max(0, _gRecPot - recMes);
   const _gShopLinha = recMesShop>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8"><span style="font-size:12px">&#x1F6D2; Loja / Shop</span><span style="font-size:13px;font-weight:700;color:#818cf8">'+fmtR(recMesShop)+'</span></div>' : '';
-  const _gAReceberLinha = _gAReceber>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)"><span style="font-size:12px">&#x23F3; A receber (alunos pendentes)</span><span style="font-size:13px;font-weight:700;color:var(--yellow)">'+fmtR(_gAReceber)+'</span></div>' : '';
-  const _geralReceitasHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">&#x1F4B0; Receitas '+nomeMes+' — Por Fonte</div><div style="display:flex;flex-direction:column;gap:7px;margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)"><span style="font-size:12px">&#x1F49A; Mensalidades recebidas</span><span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtR(recMesMens)+' <span style="font-size:10px;font-weight:400;color:var(--muted)">('+_gQtdPgtos+' pgtos)</span></span></div>'+_gShopLinha+_gAReceberLinha+'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px"><span style="font-size:12px;font-weight:600">Total recebido</span><span style="font-size:15px;font-weight:700;color:var(--green)">'+fmtR(recMes)+'</span></div></div></div>';
+  const _aReceberAlunos = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo'&&!mensHistorico.find(p=>String(p.data||'').slice(0,7)===mesCur&&p.alunoId===a.id));
+  const _gAReceberLinha = _gAReceber>0 ? '<div onclick="verAReceberDoMes()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)"><span style="font-size:12px">&#x23F3; A receber — '+_aReceberAlunos.length+' aluno(s) 👆</span><span style="font-size:13px;font-weight:700;color:var(--yellow)">'+fmtR(_gAReceber)+'</span></div>' : '';
+  const _geralReceitasHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">&#x1F4B0; Receitas '+nomeMes+' — Por Fonte</div><div style="display:flex;flex-direction:column;gap:7px;margin-top:6px"><div onclick="verPagantesDoMes(\''+mesCur+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)"><span style="font-size:12px">&#x1F49A; Mensalidades recebidas 👆</span><span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtR(recMesMens)+' <span style="font-size:10px;font-weight:400;color:var(--muted)">('+_gQtdPgtos+' pgtos)</span></span></div>'+_gShopLinha+_gAReceberLinha+'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px"><span style="font-size:12px;font-weight:600">Total recebido</span><span style="font-size:15px;font-weight:700;color:var(--green)">'+fmtR(recMes)+'</span></div></div></div>';
   document.getElementById('fin-content').innerHTML=`
     <div class="grid4">
       <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">${nAtivos} alunos ativos</div></div>
@@ -2327,6 +2328,29 @@ async function confirmarPagamentoAluno(){
 
 async function registrarPagamento(alunoId){abrirModalRegistrarPag(alunoId);}
 async function excluirHistorico(id){if(!confirm('Remover pagamento?'))return;try{await DEL('/api/pagamentos/'+id);mensHistorico=mensHistorico.filter(x=>x.id!=id);renderMensHistorico();}catch(e){alert('Erro: '+e.message);}}
+
+function verAReceberDoMes(){
+  const agora = new Date();
+  const mesCur = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
+  const pagosNoMes = new Set((mensHistorico||[]).filter(p=>String(p.data||'').slice(0,7)===mesCur).map(p=>p.alunoId));
+  const pendentes = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo'&&!pagosNoMes.has(a.id));
+  const box = criarModal('modal-a-receber','⏳ A receber — '+agora.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}));
+  box.innerHTML += pendentes.length===0
+    ? '<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">Todos pagaram! ✅</div>'
+    : pendentes.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px;background:var(--panel2);border-radius:7px;margin-bottom:5px">
+        <div>
+          <div style="font-size:13px;font-weight:600">${a.nome}</div>
+          <div style="font-size:11px;color:var(--muted)">${a.plano||'—'} · venc. ${fmtD(a.venc)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(a.valor)}</div>
+          <button onclick="cobrarWA(${a.id})" style="font-size:9px;background:rgba(37,211,102,.15);color:#25D366;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;margin-top:2px">📲 Cobrar</button>
+        </div>
+      </div>`).join('')
+    + `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>Total a receber</span><span style="color:var(--yellow)">${fmtR(pendentes.reduce((s,a)=>s+parseFloat(a.valor||0),0))}</span></div>`;
+  box.innerHTML += `<button class="btn btn-ghost btn-full" style="margin-top:12px" onclick="document.getElementById('modal-a-receber').remove()">Fechar</button>`;
+  document.body.appendChild(box.parentElement||box);
+}
 
 async function verPagantesDoMes(mes){
   const label = mes ? new Date(mes+'-02').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}) : 'Todos';
