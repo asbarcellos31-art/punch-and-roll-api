@@ -2386,8 +2386,8 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
   try {
     const [historicoRec] = await db.query(`
-      SELECT DATE_FORMAT(data_pagamento, '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
-      FROM pagamentos WHERE status='pago' AND data_pagamento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      SELECT DATE_FORMAT(COALESCE(data_pagamento, DATE(criado_em)), '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
+      FROM pagamentos WHERE status='pago' AND COALESCE(data_pagamento, DATE(criado_em)) >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
       GROUP BY mes ORDER BY mes
     `);
     const [historicoShop] = await db.query(`
