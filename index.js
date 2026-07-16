@@ -262,6 +262,9 @@ async function setupDB() {
       "ALTER TABLE despesas ADD COLUMN recorrente TINYINT DEFAULT 0",
       "ALTER TABLE despesas ADD COLUMN grupo_parcelas VARCHAR(36)",
       "ALTER TABLE despesas ADD COLUMN pago_por VARCHAR(20) DEFAULT NULL",
+      "ALTER TABLE pagamentos ADD COLUMN meses INT DEFAULT NULL",
+      "ALTER TABLE pagamentos ADD COLUMN plano_id VARCHAR(50) DEFAULT NULL",
+      "ALTER TABLE pagamentos ADD COLUMN plano_nome VARCHAR(200) DEFAULT NULL",
     ]) { try { await conn.query(sql); } catch(e) {} }
 
     await conn.query(`
@@ -776,8 +779,8 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': idKey } });
       payment = mpRes.data;
       metodo = 'pix';
-      await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',
-        [aluno_id, descricao, totalValor, 'pendente', 'pix', String(payment.id)]);
+      await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
+        [aluno_id, descricao, totalValor, 'pendente', 'pix', String(payment.id), parseInt(meses), plano_id||null, plano_nome]);
       return res.json({
         payment_id: payment.id, status: payment.status, metodo: 'pix',
         qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
@@ -801,12 +804,15 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       metodo = 'cartao';
     }
 
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',
-      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id)]);
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
+      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome]);
 
     if (payment.status === 'approved') {
       const hoje = new Date().toISOString().slice(0,10);
-      const venc = new Date(hoje); venc.setMonth(venc.getMonth() + parseInt(meses));
+      const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
+      const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+      const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+      const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
       const vencStr = venc.toISOString().slice(0,10);
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
         [plano_nome, plano_id||null, parseFloat(valor), vencStr, metodo, aluno_id]);
@@ -1312,12 +1318,24 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
       if (payment.status === 'approved') {
-        await db.query("UPDATE pagamentos SET status='pago', mp_payment_id=? WHERE mp_payment_id=?",[data.id,data.id]);
-        const [pag] = await db.query('SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?",[String(data.id)]);
+        const [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
         if (pag.length) {
-          await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[pag[0].aluno_id]);
-          const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[pag[0].aluno_id]);
-          if (aluno.length) await notificarWA(aluno[0].tel,`✅ Pagamento confirmado, ${aluno[0].nome.split(' ')[0]}! Seu acesso está ativo. 🥊`);
+          const { aluno_id, meses, plano_id, plano_nome } = pag[0];
+          const hoje = new Date().toISOString().slice(0,10);
+          const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
+          const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+          const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+          if (meses && plano_nome) {
+            const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
+            const vencStr = venc.toISOString().slice(0,10);
+            await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",
+              [vencStr, plano_nome, plano_id||null, aluno_id]);
+          } else {
+            await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+          }
+          const [[aluno]] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
+          if (aluno) await notificarWA(aluno.tel,`✅ Pagamento PIX confirmado, ${aluno.nome.split(' ')[0]}! Seu plano está ativo. 🥊`);
         }
       }
     }

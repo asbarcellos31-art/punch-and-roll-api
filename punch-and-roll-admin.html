@@ -2327,16 +2327,45 @@ async function confirmarPagamentoAluno(){
 async function registrarPagamento(alunoId){abrirModalRegistrarPag(alunoId);}
 async function excluirHistorico(id){if(!confirm('Remover pagamento?'))return;try{await DEL('/api/pagamentos/'+id);mensHistorico=mensHistorico.filter(x=>x.id!=id);renderMensHistorico();}catch(e){alert('Erro: '+e.message);}}
 
-function verHistoricoAluno(id,nome){
-  const hist=mensHistorico.filter(h=>h.alunoId===id);
+async function verHistoricoAluno(id,nome){
+  const a=cache.alunos.find(x=>x.id===id);
   const box=criarModal('modal-hist-aluno','📋 Histórico — '+nome);
-  box.innerHTML+=hist.length===0?'<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">Nenhum pagamento</div>':
-    hist.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
-      <div><div style="font-size:13px;font-weight:500">${p.referencia||'Mensalidade'}</div><div style="font-size:11px;color:var(--muted)">📅 ${fmtD(p.data)} · ${p.metodo||'—'}</div></div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}</div>
-    </div>`).join('');
-  box.innerHTML+=`<button class="btn btn-ghost btn-full" style="margin-top:12px" onclick="document.getElementById('modal-hist-aluno').remove()">Fechar</button>`;
+  box.innerHTML+=`
+    <div style="background:var(--panel2);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Plano atual</div>
+      <div style="font-size:14px;font-weight:600">${a?.plano||'—'}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px">
+        <span style="font-size:12px;color:var(--muted)">Valor: <strong style="color:var(--white)">${fmtR(a?.valor||0)}/mês</strong></span>
+        <span style="font-size:12px;color:var(--muted)">Venc: <strong style="color:${a?.venc<todayStr?'var(--red)':'var(--green)'}">${fmtD(a?.venc)}</strong></span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Pagamentos</div>
+    <div id="hist-lista">Carregando...</div>
+    <button class="btn btn-ghost btn-full" style="margin-top:12px" onclick="document.getElementById('modal-hist-aluno').remove()">Fechar</button>`;
   document.body.appendChild(box.parentElement||box);
+  try {
+    const pags = await GET('/api/pagamentos?aluno_id='+id);
+    const el = document.getElementById('hist-lista');
+    if(!el) return;
+    if(!pags.length){ el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">Nenhum pagamento registrado</div>'; return; }
+    el.innerHTML=pags.map(p=>{
+      const cor=p.status==='pago'?'var(--green)':p.status==='pendente'?'var(--yellow)':'#f87171';
+      const metLabel={pix:'PIX',cartao:'Cartão',dinheiro:'Dinheiro',debito:'Débito'}[p.metodo]||p.metodo||'—';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${p.plano_nome||p.descricao||'Mensalidade'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">📅 ${fmtD(p.data_pagamento||p.criado_em)} · ${metLabel}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}</div>
+          <div style="font-size:9px;font-weight:600;color:${cor};text-transform:uppercase">${p.status}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const el=document.getElementById('hist-lista');
+    if(el) el.innerHTML='<div style="color:#f87171;font-size:12px;text-align:center">Erro ao carregar histórico</div>';
+  }
 }
 
 function cobrarWA(id){const a=cache.alunos.find(x=>x.id===id);if(!a)return;const msg=`Olá ${a.nome.split(' ')[0]}! 🥊 Sua mensalidade da *Punch and Roll* está em atraso desde ${fmtD(a.venc)}. Regularize para manter seu acesso!`;window.open('https://wa.me/55'+(a.tel||'').replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');}
