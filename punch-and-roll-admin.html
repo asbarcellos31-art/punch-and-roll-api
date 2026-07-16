@@ -984,7 +984,13 @@ function checkinDataLabel() {
   const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
   return d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
 }
-function checkinNavData(delta) { checkinDataOffset+=delta; renderCheckins(); }
+function checkinNavData(delta) {
+  checkinDataOffset+=delta;
+  const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
+  const idx = d.getDay()-1; // 0=Dom→-1, 1=Seg→0 ... 6=Sáb→5
+  if(idx>=0 && idx<DIAS.length) selectedDay = DIAS[idx];
+  renderCheckins();
+}
 
 async function renderCheckins() {
   const pg = document.getElementById('page-checkins');
@@ -997,7 +1003,7 @@ async function renderCheckins() {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <button onclick="checkinNavData(-1)" style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">‹ Anterior</button>
       <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${dataLabel} — ${dataStr}</span>
-      <button onclick="checkinNavData(1)" ${checkinDataOffset>=0?'disabled style="opacity:.3;cursor:default"':''} style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Próximo ›</button>
+      <button onclick="checkinNavData(1)" ${checkinDataOffset>=14?'disabled style="opacity:.3;cursor:default"':''} style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Próximo ›</button>
     </div>
     <div class="day-tabs">${tabs}</div>
     <div id="checkins-lista"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
