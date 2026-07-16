@@ -543,12 +543,13 @@ async function confirmarRenovacao() {
       },5000);
     } else {
       // cartão
-      const num=(document.getElementById('renov-card-num').value||'').replace(/\s/g,'');
+      const num=(document.getElementById('renov-card-num').value||'').replace(/\D/g,'');
       const nome_c=(document.getElementById('renov-card-name').value||'').trim();
       const exp=(document.getElementById('renov-card-exp').value||'');
       const cvv=(document.getElementById('renov-card-cvv').value||'');
       const cpfT=(document.getElementById('renov-card-cpf').value||aluno.cpf||'').replace(/\D/g,'');
-      if(!num||num.length<15){alert('Número do cartão inválido');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      if(!num||num.length<15||num.length>19){alert('Número do cartão inválido ('+num.length+' dígitos)');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
+      {let s=0,o=false;for(let i=num.length-1;i>=0;i--){let d=+num[i];if(o){d*=2;if(d>9)d-=9;}s+=d;o=!o;}if(s%10!==0){alert('Número do cartão inválido — verifique cada dígito com calma.');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}}
       if(!nome_c){alert('Informe o nome no cartão');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
       if(!exp||exp.length<5){alert('Validade inválida');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
       if(!cvv||cvv.length<3){alert('CVV inválido');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
