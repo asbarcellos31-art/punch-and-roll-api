@@ -1245,7 +1245,7 @@ function renderFinContas(){
   const _recPot=(cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _qtdPgtos=(Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===_mes).length;
   const _resultado=_recTotal-totalPago;
-  const _saldo = _recTotal - totalPend;
+  const _saldo = _recTotal - totalPago;
   const _porCores={'ANDERSON':'#818cf8','LEONARDO':'#34d399','MELQUE':'#fb923c','PR':'#f87171','todos':'var(--muted)'};
   document.getElementById('fin-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
@@ -1266,24 +1266,26 @@ function renderFinContas(){
       </div>
     </div>
 
-    <!-- Resumo financeiro: Entradas × A pagar × Saldo -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+    <!-- Resumo: Entradas × Saídas (pagas) × Saldo -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">
       <div onclick="verPagantesDoMes('${_mes}')" style="cursor:pointer;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Entradas</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${fmtR(_recTotal)}</div>
         <div style="font-size:9px;color:var(--green);margin-top:2px">${_qtdPgtos} pagantes 👆</div>
       </div>
       <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">A pagar</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f87171">${fmtR(totalPend)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">${doMes.filter(d=>d.status==='pendente').length} conta(s)</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saídas pagas</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f87171">${fmtR(totalPago)}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">${doMes.filter(d=>d.status==='pago').length} conta(s)</div>
       </div>
       <div style="background:${_saldo>=0?'rgba(34,197,94,.08)':'rgba(212,17,28,.08)'};border:1px solid ${_saldo>=0?'rgba(34,197,94,.25)':'rgba(212,17,28,.25)'};border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${_saldo>=0?'Saldo':'Falta'}</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldo>=0?'var(--green)':'#f87171'}">${_saldo>=0?'+':''}${fmtR(_saldo)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − a pagar</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − saídas</div>
       </div>
     </div>
+    ${totalPend>0?`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>`:''}
+
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
     <div style="display:flex;gap:4px;margin-bottom:6px;overflow-x:auto;scrollbar-width:none">
       ${[['pendente','Pendentes'],['vencida','Vencidas'],['pago','Pagas'],['todas','Todas']].map(([v,l])=>
