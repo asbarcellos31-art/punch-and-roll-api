@@ -3750,6 +3750,32 @@ app.get('/api/_set-vagas', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/_debug-pagamento/:nome', async (req, res) => {
+  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  try {
+    const nome = '%'+req.params.nome+'%';
+    const [pags] = await db.query(`
+      SELECT p.*, a.nome as aluno_nome, a.cpf, a.email
+      FROM pagamentos p JOIN alunos a ON p.aluno_id=a.id
+      WHERE a.nome LIKE ? AND p.metodo='cartao'
+      ORDER BY p.id DESC LIMIT 5
+    `, [nome]);
+    const results = [];
+    for (const p of pags) {
+      let mpDetail = null;
+      if (p.mp_payment_id) {
+        try {
+          const r = await axios.get(`https://api.mercadopago.com/v1/payments/${p.mp_payment_id}`,
+            { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
+          mpDetail = { status: r.data.status, status_detail: r.data.status_detail, payment_method: r.data.payment_method_id };
+        } catch(e) { mpDetail = { erro: e.message }; }
+      }
+      results.push({ id: p.id, aluno: p.aluno_nome, email: p.email, valor: p.valor, status: p.status, mp_id: p.mp_payment_id, mp: mpDetail, criado: p.criado_em });
+    }
+    res.json(results);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/_checkin-notify-test', async (req, res) => {
   if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
   try {
