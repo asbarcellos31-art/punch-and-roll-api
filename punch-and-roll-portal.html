@@ -486,6 +486,11 @@ function abrirRenovacao(id, nome, valor, meses, tipo) {
     document.getElementById('renov-parcelas').appendChild(op);
   }
   setRenovMetodo('pix');
+  document.getElementById('renov-card-num').value='';
+  document.getElementById('renov-card-name').value='';
+  document.getElementById('renov-card-exp').value='';
+  document.getElementById('renov-card-cvv').value='';
+  document.getElementById('renov-card-cpf').value=aluno.cpf||'';
   el.style.display='flex';
 }
 
@@ -557,7 +562,8 @@ async function confirmarRenovacao() {
           securityCode:cvv,identificationType:'CPF',identificationNumber:cpfT
         });
       } catch(mpErr) {
-        const msg=mpErr?.message||mpErr?.cause?.[0]?.description||(Array.isArray(mpErr)?mpErr[0]?.description:null)||(mpErr?JSON.stringify(mpErr):null)||'Verifique os dados do cartão';
+        console.error('[CARTAO] SDK error:', JSON.stringify(mpErr));
+        const msg=mpErr?.message||(Array.isArray(mpErr)?mpErr[0]?.cause?.[0]?.description||mpErr[0]?.description:null)||mpErr?.cause?.[0]?.description||(mpErr?JSON.stringify(mpErr):null)||'Verifique os dados do cartão';
         throw new Error(msg);
       }
       if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão');

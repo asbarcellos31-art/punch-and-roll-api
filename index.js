@@ -822,8 +822,11 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
 
     res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail });
   } catch (e) {
-    console.error('Renovar error:', e.response?.data || e.message);
-    res.status(500).json({ error: e.response?.data?.message || e.message });
+    const mpData = e.response?.data;
+    console.error(`Renovar error [${e.response?.status||'?'}]:`, JSON.stringify(mpData||e.message));
+    const msg = mpData?.message || e.message;
+    const detail = mpData?.cause?.[0]?.description || mpData?.error || '';
+    res.status(500).json({ error: msg + (detail ? ` (${detail})` : '') });
   }
 });
 
@@ -1226,13 +1229,14 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
       payer: {
         email, first_name: nome.split(' ')[0],
         last_name: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
-        identification: { type: 'CPF', number: cpf.replace(/\D/g,'') }
+        identification: { type: 'CPF', number: (cpf||'').replace(/\D/g,'') }
       },
       notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago'
     }, {
       headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': `card-${aluno_id}-${Date.now()}` }
     });
     const payment = mpRes.data;
+    console.log(`[CARTAO-ADMIN] aluno=${aluno_id} valor=${valor} status=${payment.status} detail=${payment.status_detail}`);
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,payment.status==='approved'?'pago':'pendente','cartao',String(payment.id)]);
     if (payment.status === 'approved') {
       await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
@@ -1241,8 +1245,11 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     }
     res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail, valor });
   } catch (e) {
-    console.error('MP Cartão error:', e.response?.data || e.message);
-    res.status(500).json({ error: e.response?.data?.message || e.message });
+    const mpData = e.response?.data;
+    console.error(`MP Cartão error [${e.response?.status||'?'}]:`, JSON.stringify(mpData||e.message));
+    const msg = mpData?.message || e.message;
+    const detail = mpData?.cause?.[0]?.description || mpData?.error || '';
+    res.status(500).json({ error: msg + (detail ? ` (${detail})` : '') });
   }
 });
 
