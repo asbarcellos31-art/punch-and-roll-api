@@ -781,6 +781,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       metodo = 'pix';
       await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
         [aluno_id, descricao, totalValor, 'pendente', 'pix', String(payment.id), parseInt(meses), plano_id||null, plano_nome]);
+      // data_pagamento será preenchida pelo webhook quando PIX for confirmado
       return res.json({
         payment_id: payment.id, status: payment.status, metodo: 'pix',
         qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
@@ -805,11 +806,11 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       console.log(`[CARTAO] aluno=${aluno_id} valor=${totalValor} status=${payment.status} detail=${payment.status_detail} method=${payment.payment_method_id} last4=${payment.card?.last_four_digits}`);
     }
 
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
-      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome]);
+    const hoje = new Date().toISOString().slice(0,10);
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome, payment.status === 'approved' ? hoje : null]);
 
     if (payment.status === 'approved') {
-      const hoje = new Date().toISOString().slice(0,10);
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
       const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
       const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
@@ -1319,7 +1320,7 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
       if (payment.status === 'approved') {
-        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?",[String(data.id)]);
+        await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=?",[String(data.id)]);
         const [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
         if (pag.length) {
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
