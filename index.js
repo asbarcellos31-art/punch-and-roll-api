@@ -1090,8 +1090,10 @@ app.post('/api/checkins', auth, async (req, res) => {
     res.json({ message: 'Check-in confirmado! 🥊' });
     const totalHoje = ckCount[0].n + 1;
     const msgNotif = `✅ *Check-in confirmado!*\n\n👤 *${aluno[0]?.nome}*\n🥊 ${aula[0]?.nome} — ${aula[0]?.hora}\n📅 ${dataCheckin}\n⏰ ${hora}\n👥 ${totalHoje} aluno(s) nessa turma`;
-    notificarWA('4899225-9899', msgNotif).catch(()=>{});
-    notificarWA('4898463-9257', msgNotif).catch(()=>{});
+    const admins = [process.env.ADMIN_TEL||'4899225-9899', process.env.ADMIN_TEL2||'4898463-9257'];
+    for (const tel of admins) {
+      notificarWA(tel, msgNotif).catch(e => console.error(`[CHECKIN-WA] erro ao notificar ${tel}:`, e.message));
+    }
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1352,12 +1354,15 @@ async function notificarWA(tel, msg) {
   const url      = process.env.WA_EVOLUTION_URL || process.env.WA_API_URL;
   const instance = process.env.WA_EVOLUTION_INSTANCE || '';
   const key      = process.env.WA_EVOLUTION_KEY || process.env.WA_API_KEY;
-  if (!url || !key) return;
+  if (!url || !key) { console.log('[WA] env não configurado — WA_EVOLUTION_URL ou KEY ausente'); return; }
   try {
-    const num     = '55' + tel.replace(/\D/g,'');
-    const apiUrl  = instance ? `${url}/message/sendText/${instance}` : url;
-    await axios.post(apiUrl, { number: num, text: msg }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
-  } catch (e) { console.log('WA error:', e.message); }
+    const num    = '55' + tel.replace(/\D/g,'');
+    const apiUrl = instance ? `${url}/message/sendText/${instance}` : url;
+    const r = await axios.post(apiUrl, { number: num, text: msg }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
+    console.log(`[WA] OK → ${num} status=${r.status}`);
+  } catch (e) {
+    console.error(`[WA] ERRO → ${tel}:`, e.response?.data || e.message);
+  }
 }
 
 async function enviarEmailAdmin(assunto, html) {
