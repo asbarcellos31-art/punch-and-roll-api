@@ -810,7 +810,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome, payment.status === 'approved' ? hoje : null]);
 
-    if (payment.status === 'approved') {
+    if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
       const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
       const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
@@ -1251,8 +1251,9 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     });
     const payment = mpRes.data;
     console.log(`[CARTAO-ADMIN] aluno=${aluno_id} valor=${valor} status=${payment.status} detail=${payment.status_detail}`);
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,payment.status==='approved'?'pago':'pendente','cartao',String(payment.id)]);
-    if (payment.status === 'approved') {
+    const pagStatusOk = ['approved','authorized'].includes(payment.status);
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id)]);
+    if (pagStatusOk) {
       await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
       const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
       if (aluno.length) await notificarWA(aluno[0].tel,`✅ Pagamento aprovado, ${aluno[0].nome.split(' ')[0]}! Seu acesso está ativo. 🥊`);
