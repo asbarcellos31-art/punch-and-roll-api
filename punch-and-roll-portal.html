@@ -496,36 +496,57 @@ function aplicarCupom() {
   msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ '+cupom.label;
 }
 
+let _renovMod = 'boxe';
+function renovSelecionarMod(mod) {
+  _renovMod = mod;
+  ['boxe','jiujitsu','ambos'].forEach(m=>{
+    const b=document.getElementById('renov-mod-'+m);
+    if(b){b.style.background=m===mod?'var(--red)':'var(--panel2)';b.style.color=m===mod?'#fff':'var(--muted)';}
+  });
+  const planos = PLANOS_PORTAL[mod]||[];
+  document.getElementById('renov-planos').innerHTML = planos.map(p=>`
+    <div onclick="renovSelecionarPlano('${p.id}','${p.nome}',${p.valor},${p.meses})" id="rp-${p.id}"
+      style="padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:12px;font-weight:600">${p.nome.split('—')[1]?.trim()||p.nome}</div>
+      <div style="font-size:10px;color:var(--muted)">${p.meses===1?'Mensal':p.meses===6?'Semestral':p.meses===12?'Anual':p.meses+'x'}</div></div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}<span style="font-size:10px;color:var(--muted)">/mês</span></div>
+    </div>`).join('');
+  if(planos[0]) renovSelecionarPlano(planos[0].id,planos[0].nome,planos[0].valor,planos[0].meses);
+}
+function renovSelecionarPlano(id,nome,valor,meses) {
+  _renovPlano={id,nome,valor,meses};
+  document.querySelectorAll('[id^="rp-"]').forEach(el=>el.style.borderColor='var(--border)');
+  const sel=document.getElementById('rp-'+id);
+  if(sel) sel.style.borderColor='var(--red)';
+  _renovDesconto=0;
+  document.getElementById('renov-cupom').value='';
+  document.getElementById('renov-cupom-msg').style.display='none';
+  const total=valor*meses;
+  document.getElementById('renov-total').textContent=fmtR(total)+(meses>1?' ('+meses+'x de '+fmtR(valor)+')':'');
+  const maxP=Math.min(12,meses>1?12:3);
+  document.getElementById('renov-parcelas').innerHTML='';
+  for(let i=1;i<=maxP;i++){const op=document.createElement('option');op.value=i;op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');document.getElementById('renov-parcelas').appendChild(op);}
+}
+
 function abrirRenovacao(id, nome, valor, meses, tipo) {
-  // Se chamado sem argumentos (auto-open) ou tipo='same', usa o plano atual do aluno
-  if(id==null || tipo==='same') {
-    const p = (PLANOS_PORTAL[aluno.modalidade]||[]).find(x=>
-      aluno.plano_id===x.id || (aluno.plano||'').toLowerCase().includes(x.nome.split('—')[0].trim().toLowerCase())
-    ) || (PLANOS_PORTAL[aluno.modalidade]||[])[0];
-    if(p){id=p.id;nome=p.nome;valor=p.valor;meses=p.meses;}
-  }
-  _renovPlano = {id,nome,valor,meses};
-  const total = valor * meses;
-  const el = document.getElementById('modal-renovacao');
-  document.getElementById('renov-titulo').textContent = nome;
-  document.getElementById('renov-total').textContent = fmtR(total) + (meses>1?' ('+meses+'x de '+fmtR(valor)+')':'');
+  // Determina a modalidade inicial
+  _renovMod = aluno.modalidade || 'boxe';
+  if(!PLANOS_PORTAL[_renovMod]) _renovMod = 'boxe';
+
   document.getElementById('renov-pix-qr').innerHTML = '';
   document.getElementById('renov-pix-status').style.display='none';
   document.getElementById('renov-pix-chave').style.display='none';
-  document.getElementById('renov-parcelas').innerHTML = '';
-  const maxP = Math.min(12, meses>1?12:3);
-  for(let i=1;i<=maxP;i++){
-    const op=document.createElement('option');op.value=i;
-    op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
-    document.getElementById('renov-parcelas').appendChild(op);
-  }
   setRenovMetodo('pix');
   document.getElementById('renov-card-num').value='';
   document.getElementById('renov-card-name').value='';
   document.getElementById('renov-card-exp').value='';
   document.getElementById('renov-card-cvv').value='';
   document.getElementById('renov-card-cpf').value=aluno.cpf||'';
-  el.style.display='flex';
+  // Inicializa seletor de modalidade/plano
+  renovSelecionarMod(_renovMod);
+  // Se veio com plano específico, seleciona ele
+  if(id && id!==undefined && (PLANOS_PORTAL[_renovMod]||[]).find(x=>x.id===id)) renovSelecionarPlano(id,nome,valor,meses);
+  document.getElementById('modal-renovacao').style.display='flex';
 }
 
 function fecharRenovacao() {
@@ -843,13 +864,22 @@ async function shopEnviarPedido() {
 <!-- Modal Renovação / Troca de Plano -->
 <div id="modal-renovacao" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center">
   <div style="background:var(--panel);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;max-height:92vh;overflow-y:auto">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px" id="renov-titulo">Plano</div>
-        <div style="font-size:13px;color:var(--muted)" id="renov-total"></div>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Renovar Plano</div>
       <button onclick="fecharRenovacao()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1">✕</button>
     </div>
+
+    <!-- Seleção de Modalidade -->
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="renov-mod-boxe" onclick="renovSelecionarMod('boxe')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--red);color:#fff">🥊 Boxe</button>
+      <button id="renov-mod-jiujitsu" onclick="renovSelecionarMod('jiujitsu')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--panel2);color:var(--muted)">🟦 Jiu-Jitsu</button>
+      <button id="renov-mod-ambos" onclick="renovSelecionarMod('ambos')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--panel2);color:var(--muted)">⚡ Ambos</button>
+    </div>
+
+    <!-- Lista de Planos -->
+    <div id="renov-planos" style="margin-bottom:12px"></div>
+
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px" id="renov-total"></div>
 
     <!-- Tabs PIX / Cartão -->
     <div style="display:flex;gap:8px;margin-bottom:16px">
