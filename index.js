@@ -1353,13 +1353,14 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
           const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+          const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
           if (meses && plano_nome) {
             const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
             const vencStr = venc.toISOString().slice(0,10);
-            await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",
-              [vencStr, plano_nome, plano_id||null, aluno_id]);
+            await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto=? WHERE id=?",
+              [vencStr, plano_nome, plano_id||null, pagto, aluno_id]);
           } else {
-            await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+            await db.query("UPDATE alunos SET status='ativo',pagto=? WHERE id=?",[pagto, aluno_id]);
           }
           const [[aluno]] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
           if (aluno) await notificarWA(aluno.tel,`✅ Pagamento PIX confirmado, ${aluno.nome.split(' ')[0]}! Seu plano está ativo. 🥊`);

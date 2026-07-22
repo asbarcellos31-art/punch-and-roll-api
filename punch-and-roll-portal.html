@@ -443,7 +443,9 @@ const PLANOS_PORTAL = {
 
 const MP_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';
 let _mp = null;
-function getMp(){ if(!_mp) _mp=new MercadoPago(MP_KEY,{locale:'pt-BR'}); return _mp; }
+function getMp(){ return _mp; }
+// Inicializa o SDK cedo para o fingerprinting de dispositivo ter tempo de rodar
+window.addEventListener('load', () => { try { _mp = new MercadoPago(MP_KEY,{locale:'pt-BR'}); } catch(e){} });
 
 function renderAlterarPlano(a) {
   const planos = PLANOS_PORTAL[a.modalidade] || [];
