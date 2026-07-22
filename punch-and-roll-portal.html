@@ -475,18 +475,25 @@ let _renovDesconto = 0;
 function aplicarCupom() {
   const cod = (document.getElementById('renov-cupom').value||'').trim().toUpperCase();
   const msg = document.getElementById('renov-cupom-msg');
-  const CUPONS = { 'PRIMEIRAULA': 10, 'PUNCH10': 10, 'VOLTA': 15 };
-  const desc = CUPONS[cod];
-  if (!desc) {
+  // desconto: valor fixo em R$ ou pct: percentual (0.10 = 10%)
+  const CUPONS = {
+    'FAMILIAPR10': {pct:0.10, label:'Família Punch and Roll — 10% de desconto'},
+    'PRIMEIRAULA': {fixo:10,  label:'R$10 de desconto'},
+    'PUNCH10':     {fixo:10,  label:'R$10 de desconto'},
+    'VOLTA':       {fixo:15,  label:'R$15 de desconto'},
+  };
+  const cupom = CUPONS[cod];
+  if (!cupom) {
     _renovDesconto = 0;
-    msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='Cupom inválido.';
+    msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='❌ Cupom inválido ou expirado.';
     return;
   }
-  _renovDesconto = desc;
   const p = _renovPlano;
+  const desc = cupom.pct ? Math.round(p.valor * cupom.pct * 100) / 100 : cupom.fixo;
+  _renovDesconto = desc;
   const totalCom = (p.valor - desc) * p.meses;
   document.getElementById('renov-total').textContent = fmtR(p.valor - desc) + '/mês' + (p.meses>1?' — total '+fmtR(totalCom):'');
-  msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ Desconto de '+fmtR(desc)+'/mês aplicado!';
+  msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ '+cupom.label;
 }
 
 function abrirRenovacao(id, nome, valor, meses, tipo) {
