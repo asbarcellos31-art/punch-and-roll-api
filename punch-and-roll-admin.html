@@ -1007,18 +1007,30 @@ function checkinDataLabel() {
 function checkinNavData(delta) {
   checkinDataOffset+=delta;
   const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
-  const idx = d.getDay()-1; // 0=Dom→-1, 1=Seg→0 ... 6=Sáb→5
+  const idx = d.getDay()-1;
   if(idx>=0 && idx<DIAS.length) selectedDay = DIAS[idx];
+  renderCheckins();
+}
+
+const _DIAS_OFFSET = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
+function checkinNavPara(dia) {
+  selectedDay = dia;
+  const alvo = _DIAS_OFFSET[dia];
+  if (alvo == null) { checkinDataOffset = 0; renderCheckins(); return; }
+  const hd = (new Date().getDay()) || 7;
+  let diff = alvo - hd;
+  if (diff < 0) diff += 7;
+  checkinDataOffset = diff;
   renderCheckins();
 }
 
 async function renderCheckins() {
   const pg = document.getElementById('page-checkins');
-  const tabs = DIAS.map(d=>`<button class="day-tab${d===selectedDay?' active':''}" onclick="selectedDay='${d}';renderCheckins()">${d}</button>`).join('');
+  const tabs = DIAS.map(d=>`<button class="day-tab${d===selectedDay?' active':''}" onclick="checkinNavPara('${d}')">${d}</button>`).join('');
   const dataLabel = checkinDataLabel();
   const dataStr = checkinDataAtual();
-  const amanha = new Date(); amanha.setDate(amanha.getDate()+1);
-  const amanhaStr = amanha.toISOString().slice(0,10);
+  const amanhaDt = new Date(dataStr+'T12:00:00Z'); amanhaDt.setUTCDate(amanhaDt.getUTCDate()+1);
+  const amanhaStr = amanhaDt.toISOString().slice(0,10);
   pg.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <button onclick="checkinNavData(-1)" style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">‹ Anterior</button>
