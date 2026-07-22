@@ -633,11 +633,14 @@ async function confirmarRenovacao() {
         payMethod:'cartao',email:aluno.email,nome:aluno.nome,cpf:cpfT,
         token:cardToken.id,payment_method_id:cardToken.payment_method_id,parcelas
       });
-      if(res.status==='approved'){
+      if(['approved','authorized'].includes(res.status)){
         fecharRenovacao();
         alert('✅ Pagamento aprovado! Plano renovado. 🥊');
         const novo = await api('GET','/api/alunos/me');
         if(novo&&novo.id){aluno={...novo,venc:novo.vencimento||novo.venc||''};renderInicio();}
+      } else if(res.status==='in_process') {
+        fecharRenovacao();
+        alert('⏳ Pagamento em análise pelo banco.\n\nAssim que confirmado, seu acesso é liberado automaticamente. Para acesso imediato, use PIX.');
       } else {
         const motivos={
           cc_rejected_insufficient_amount:'Saldo insuficiente no cartão.',
@@ -650,15 +653,15 @@ async function confirmarRenovacao() {
           cc_rejected_card_disabled:'Cartão desativado. Contate sua operadora.',
           cc_rejected_card_error:'Erro no cartão. Tente outro cartão.',
           cc_rejected_duplicated_payment:'Pagamento duplicado. Aguarde antes de tentar novamente.',
-          cc_rejected_high_risk:'Transação recusada por segurança. Tente PIX.',
+          cc_rejected_high_risk:'Transação recusada por segurança. Use PIX.',
           cc_rejected_invalid_installments:'Parcelamento não permitido neste cartão.',
           cc_rejected_max_attempts:'Muitas tentativas. Aguarde e tente novamente.',
-          cc_rejected_other_reason:'Cartão recusado. Tente PIX ou outro cartão.',
+          cc_rejected_other_reason:'Cartão recusado. Use PIX ou outro cartão.',
           pending_contingency:'Processando. Aguarde alguns minutos.',
-          pending_review_manual:'Em análise. Você será notificado.',
+          pending_review_manual:'Em análise pelo banco. Tente PIX para acesso imediato.',
         };
         const det = res.status_detail||res.status||'';
-        throw new Error(motivos[det] || `Cartão recusado (${det}). Tente PIX ou outro cartão.`);
+        throw new Error(motivos[det] || `Cartão recusado (${det}). Use PIX ou outro cartão.`);
       }
     }
   } catch(e) {
