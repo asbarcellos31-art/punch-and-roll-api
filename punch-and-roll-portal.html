@@ -566,7 +566,7 @@ function setRenovMetodo(m) {
   document.getElementById('renov-tab-cartao').style.color = m==='cartao'?'#fff':'var(--muted)';
   document.getElementById('renov-form-pix').style.display = m==='pix'?'block':'none';
   document.getElementById('renov-form-cartao').style.display = m==='cartao'?'block':'none';
-  document.getElementById('renov-btn').textContent = m==='pix'?'Gerar PIX':'Confirmar Pagamento';
+  document.getElementById('renov-btn').textContent = m==='pix'?'Gerar PIX':'Pagar com Cartão →';
   window._renovMetodo = m;
 }
 
@@ -603,73 +603,19 @@ async function confirmarRenovacao() {
         }catch(e){}
       },5000);
     } else {
-      // cartão
-      const num=(document.getElementById('renov-card-num').value||'').replace(/\D/g,'');
-      const nome_c=(document.getElementById('renov-card-name').value||'').trim();
-      const exp=(document.getElementById('renov-card-exp').value||'');
-      const cvv=(document.getElementById('renov-card-cvv').value||'');
-      const cpfT=(document.getElementById('renov-card-cpf').value||aluno.cpf||'').replace(/\D/g,'');
-      if(!num||num.length<15||num.length>19){alert('Número do cartão inválido ('+num.length+' dígitos)');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
-      {let s=0,o=false;for(let i=num.length-1;i>=0;i--){let d=+num[i];if(o){d*=2;if(d>9)d-=9;}s+=d;o=!o;}if(s%10!==0){alert('Número do cartão inválido — verifique cada dígito com calma.');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}}
-      if(!nome_c){alert('Informe o nome no cartão');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
-      if(!exp||exp.length<5){alert('Validade inválida');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
-      if(!cvv||cvv.length<3){alert('CVV inválido');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
-      if(!cpfT||cpfT.length<11){alert('Informe o CPF do titular do cartão');btn.disabled=false;btn.textContent='Confirmar Pagamento';return;}
-      const[mes,ano]=exp.split('/');
-      let cardToken;
-      try {
-        cardToken = await getMp().createCardToken({
-          cardNumber:num,cardholderName:nome_c,
-          cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
-          securityCode:cvv,identificationType:'CPF',identificationNumber:cpfT
-        });
-      } catch(mpErr) {
-        console.error('[CARTAO] SDK error:', JSON.stringify(mpErr));
-        const msg=mpErr?.message||(Array.isArray(mpErr)?mpErr[0]?.cause?.[0]?.description||mpErr[0]?.description:null)||mpErr?.cause?.[0]?.description||(mpErr?JSON.stringify(mpErr):null)||'Verifique os dados do cartão';
-        throw new Error(msg);
-      }
-      if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão');
-      const parcelas = document.getElementById('renov-parcelas').value;
-      const res = await api('POST','/api/alunos/me/renovar',{
-        plano_id:p.id,plano_nome:p.nome,valor:valorFinal,meses:p.meses,
-        payMethod:'cartao',email:aluno.email,nome:aluno.nome,cpf:cpfT,
-        token:cardToken.id,payment_method_id:cardToken.payment_method_id,parcelas
+      // cartão — gera link de checkout MP (igual ao link direto que o admin envia)
+      const res = await api('POST','/api/alunos/me/preferencia',{
+        plano_id:p.id, plano_nome:p.nome, valor:valorFinal, meses:p.meses,
+        email:aluno.email, nome:aluno.nome, cpf:aluno.cpf
       });
-      if(['approved','authorized'].includes(res.status)){
-        fecharRenovacao();
-        alert('✅ Pagamento aprovado! Plano renovado. 🥊');
-        const novo = await api('GET','/api/alunos/me');
-        if(novo&&novo.id){aluno={...novo,venc:novo.vencimento||novo.venc||''};renderInicio();}
-      } else if(res.status==='in_process') {
-        fecharRenovacao();
-        alert('⏳ Pagamento em análise pelo banco.\n\nAssim que confirmado, seu acesso é liberado automaticamente. Para acesso imediato, use PIX.');
-      } else {
-        const motivos={
-          cc_rejected_insufficient_amount:'Saldo insuficiente no cartão.',
-          cc_rejected_bad_filled_card_number:'Número do cartão inválido.',
-          cc_rejected_bad_filled_security_code:'CVV incorreto.',
-          cc_rejected_bad_filled_date:'Data de validade incorreta.',
-          cc_rejected_bad_filled_other:'Dados do cartão incorretos.',
-          cc_rejected_blacklist:'Cartão bloqueado pela operadora.',
-          cc_rejected_call_for_authorize:'Ligue para sua operadora para autorizar.',
-          cc_rejected_card_disabled:'Cartão desativado. Contate sua operadora.',
-          cc_rejected_card_error:'Erro no cartão. Tente outro cartão.',
-          cc_rejected_duplicated_payment:'Pagamento duplicado. Aguarde antes de tentar novamente.',
-          cc_rejected_high_risk:'Transação recusada por segurança. Use PIX.',
-          cc_rejected_invalid_installments:'Parcelamento não permitido neste cartão.',
-          cc_rejected_max_attempts:'Muitas tentativas. Aguarde e tente novamente.',
-          cc_rejected_other_reason:'Cartão recusado. Use PIX ou outro cartão.',
-          pending_contingency:'Processando. Aguarde alguns minutos.',
-          pending_review_manual:'Em análise pelo banco. Tente PIX para acesso imediato.',
-        };
-        const det = res.status_detail||res.status||'';
-        throw new Error(motivos[det] || `Cartão recusado (${det}). Use PIX ou outro cartão.`);
-      }
+      if(!res.checkout_url) throw new Error('Não foi possível gerar o link de pagamento');
+      fecharRenovacao();
+      window.location.href = res.checkout_url;
     }
   } catch(e) {
     alert('Erro: '+e.message);
     btn.disabled=false;
-    btn.textContent = metodo==='pix'?'Gerar PIX':'Confirmar Pagamento';
+    btn.textContent = metodo==='pix'?'Gerar PIX':'Pagar com Cartão →';
   }
 }
 
@@ -900,33 +846,12 @@ async function shopEnviarPedido() {
       <div id="renov-pix-chave" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;word-break:break-all;margin-top:8px;cursor:pointer;color:var(--blue);text-align:center"></div>
     </div>
 
-    <!-- Formulário Cartão -->
+    <!-- Formulário Cartão — abre checkout seguro do Mercado Pago -->
     <div id="renov-form-cartao" style="display:none">
-      <div style="margin-bottom:10px">
-        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Número do Cartão</label>
-        <input id="renov-card-num" type="tel" placeholder="0000 0000 0000 0000" oninput="maskRenovCard(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Nome no Cartão</label>
-        <input id="renov-card-name" type="text" placeholder="COMO ESTÁ NO CARTÃO" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;text-transform:uppercase">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div>
-          <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Validade</label>
-          <input id="renov-card-exp" type="tel" placeholder="MM/AA" oninput="maskRenovExp(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
-        </div>
-        <div>
-          <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">CVV</label>
-          <input id="renov-card-cvv" type="tel" placeholder="000" maxlength="4" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
-        </div>
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">CPF do Titular do Cartão</label>
-        <input id="renov-card-cpf" type="tel" placeholder="000.000.000-00" oninput="maskRenovCpf(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px">Parcelas</label>
-        <select id="renov-parcelas" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"></select>
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;margin-bottom:10px">
+        <div style="font-size:28px;margin-bottom:8px">🔒</div>
+        <div style="font-size:14px;color:var(--fg);font-weight:600;margin-bottom:6px">Pagamento seguro via Mercado Pago</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5">Você será direcionado para a página segura do Mercado Pago para inserir os dados do cartão. Após o pagamento, seu acesso é liberado automaticamente.</div>
       </div>
     </div>
 

@@ -830,6 +830,45 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
   }
 });
 
+// Gera preferência MP (checkout externo — igual ao link direto do MP)
+app.post('/api/alunos/me/preferencia', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const aluno_id = req.user.id;
+    const { plano_id, plano_nome, valor, meses, email, nome, cpf } = req.body;
+    if (!plano_nome || !valor || !meses) return res.status(400).json({ error: 'Dados do plano inválidos' });
+    const totalValor = parseFloat(valor) * parseInt(meses);
+    const descricao = `Punch and Roll — ${plano_nome}`;
+    const extRef = `renovar_${aluno_id}_${plano_id||'plano'}_${meses}m_${Date.now()}`;
+    const mpRes = await axios.post('https://api.mercadopago.com/checkout/preferences', {
+      items: [{ title: descricao, unit_price: totalValor, quantity: 1, currency_id: 'BRL' }],
+      payer: {
+        email,
+        name: (nome||'').split(' ')[0],
+        surname: (nome||'').split(' ').slice(1).join(' ') || '-',
+        identification: { type: 'CPF', number: (cpf||'').replace(/\D/g,'') }
+      },
+      back_urls: {
+        success: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=aprovado`,
+        failure: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=falhou`,
+        pending: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=pendente`
+      },
+      auto_return: 'approved',
+      notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago',
+      external_reference: extRef,
+      payment_methods: { excluded_payment_types: [{ id: 'ticket' }], installments: 1 }
+    }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' } });
+    // Salva registro pendente com external_reference para o webhook encontrar depois
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
+      [aluno_id, descricao, totalValor, 'pendente', 'cartao', extRef, parseInt(meses), plano_id||null, plano_nome]);
+    res.json({ checkout_url: mpRes.data.init_point });
+  } catch(e) {
+    const mpData = e.response?.data;
+    console.error('Preferencia error:', JSON.stringify(mpData||e.message));
+    res.status(500).json({ error: mpData?.message || e.message });
+  }
+});
+
 app.get('/api/alunos/:id', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
@@ -1345,9 +1384,15 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
       if (payment.status === 'approved') {
-        await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=?",[String(data.id)]);
-        const [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+        // Tenta achar pelo mp_payment_id numérico primeiro
+        let [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+        // Fallback: pagamento via checkout externo — busca pelo external_reference
+        if (!pag.length && payment.external_reference) {
+          [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[payment.external_reference]);
+        }
         if (pag.length) {
+          await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? OR mp_payment_id=?",
+            [String(data.id), payment.external_reference||String(data.id)]);
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
           const hoje = new Date().toISOString().slice(0,10);
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
@@ -1363,7 +1408,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
             await db.query("UPDATE alunos SET status='ativo',pagto=? WHERE id=?",[pagto, aluno_id]);
           }
           const [[aluno]] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
-          if (aluno) await notificarWA(aluno.tel,`✅ Pagamento PIX confirmado, ${aluno.nome.split(' ')[0]}! Seu plano está ativo. 🥊`);
+          const metodoTxt = pagto === 'cartao' ? 'Cartão' : 'PIX';
+          if (aluno) await notificarWA(aluno.tel,`✅ Pagamento via ${metodoTxt} confirmado, ${aluno.nome.split(' ')[0]}! Seu plano está ativo. 🥊`);
         }
       }
     }
