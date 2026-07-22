@@ -470,9 +470,28 @@ function renderAlterarPlano(a) {
 }
 
 let _renovPlano = null;
+let _renovDesconto = 0;
+
+function aplicarCupom() {
+  const cod = (document.getElementById('renov-cupom').value||'').trim().toUpperCase();
+  const msg = document.getElementById('renov-cupom-msg');
+  const CUPONS = { 'PRIMEIRAULA': 10, 'PUNCH10': 10, 'VOLTA': 15 };
+  const desc = CUPONS[cod];
+  if (!desc) {
+    _renovDesconto = 0;
+    msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='Cupom inválido.';
+    return;
+  }
+  _renovDesconto = desc;
+  const p = _renovPlano;
+  const totalCom = (p.valor - desc) * p.meses;
+  document.getElementById('renov-total').textContent = fmtR(p.valor - desc) + '/mês' + (p.meses>1?' — total '+fmtR(totalCom):'');
+  msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ Desconto de '+fmtR(desc)+'/mês aplicado!';
+}
+
 function abrirRenovacao(id, nome, valor, meses, tipo) {
-  // Se "same", usa o plano atual do aluno
-  if(tipo==='same') {
+  // Se chamado sem argumentos (auto-open) ou tipo='same', usa o plano atual do aluno
+  if(id==null || tipo==='same') {
     const p = (PLANOS_PORTAL[aluno.modalidade]||[]).find(x=>
       aluno.plano_id===x.id || (aluno.plano||'').toLowerCase().includes(x.nome.split('—')[0].trim().toLowerCase())
     ) || (PLANOS_PORTAL[aluno.modalidade]||[])[0];
@@ -504,6 +523,9 @@ function abrirRenovacao(id, nome, valor, meses, tipo) {
 
 function fecharRenovacao() {
   document.getElementById('modal-renovacao').style.display='none';
+  document.getElementById('renov-cupom').value='';
+  document.getElementById('renov-cupom-msg').style.display='none';
+  _renovDesconto = 0;
   if(window._renovInterval){clearInterval(window._renovInterval);window._renovInterval=null;}
 }
 
@@ -522,11 +544,12 @@ async function confirmarRenovacao() {
   const btn = document.getElementById('renov-btn');
   btn.disabled=true; btn.textContent='Processando...';
   const p = _renovPlano;
+  const valorFinal = (p.valor||0) - (_renovDesconto||0);
   const metodo = window._renovMetodo || 'pix';
   try {
     if(metodo==='pix') {
       const res = await api('POST','/api/alunos/me/renovar',{
-        plano_id:p.id, plano_nome:p.nome, valor:p.valor, meses:p.meses,
+        plano_id:p.id, plano_nome:p.nome, valor:valorFinal, meses:p.meses,
         payMethod:'pix', email:aluno.email, nome:aluno.nome, cpf:aluno.cpf
       });
       if(res.qr_code_base64) document.getElementById('renov-pix-qr').innerHTML=`<img src="data:image/png;base64,${res.qr_code_base64}" style="width:180px;height:180px;border-radius:8px;background:#fff;display:block;margin:10px auto">`;
@@ -578,7 +601,7 @@ async function confirmarRenovacao() {
       if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão');
       const parcelas = document.getElementById('renov-parcelas').value;
       const res = await api('POST','/api/alunos/me/renovar',{
-        plano_id:p.id,plano_nome:p.nome,valor:p.valor,meses:p.meses,
+        plano_id:p.id,plano_nome:p.nome,valor:valorFinal,meses:p.meses,
         payMethod:'cartao',email:aluno.email,nome:aluno.nome,cpf:cpfT,
         token:cardToken.id,payment_method_id:cardToken.payment_method_id,parcelas
       });
@@ -864,6 +887,13 @@ async function shopEnviarPedido() {
         <select id="renov-parcelas" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none"></select>
       </div>
     </div>
+
+    <!-- Cupom de desconto -->
+    <div style="margin-bottom:10px;display:flex;gap:8px">
+      <input id="renov-cupom" type="text" placeholder="Cupom de desconto (opcional)" style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;text-transform:uppercase">
+      <button onclick="aplicarCupom()" style="padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap">Aplicar</button>
+    </div>
+    <div id="renov-cupom-msg" style="font-size:11px;margin-bottom:8px;display:none"></div>
 
     <button id="renov-btn" onclick="confirmarRenovacao()" style="width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;margin-top:8px">Gerar PIX</button>
   </div>
