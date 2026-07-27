@@ -6,20 +6,30 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 const multer = require('multer');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const ALLOWED_ORIGINS = [
+  'https://punchandroll.com.br',
+  'https://www.punchandroll.com.br',
+  'https://punch-and-roll-api-production.up.railway.app',
+];
+
 const app = express();
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Origin','Accept'] }));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error('Origem não permitida: ' + origin));
+  },
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','Origin','Accept'],
+}));
 app.options('/{*path}', cors());
-app.use(express.json({ limit: '20mb' }));
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  next();
-});
+app.use(express.json({ limit: '5mb' }));
 
 const db = mysql2.createPool({
   uri: process.env.DATABASE_URL,
@@ -27,7 +37,10 @@ const db = mysql2.createPool({
   connectionLimit: 10,
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'punchandroll2026secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) { console.error('❌ FATAL: JWT_SECRET não configurado! Defina a variável de ambiente no Railway.'); process.exit(1); }
+const PRIV_KEY = process.env.PRIV_KEY;
+if (!PRIV_KEY) { console.error('❌ FATAL: PRIV_KEY não configurada! Defina a variável de ambiente no Railway.'); process.exit(1); }
 
 function auth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
@@ -582,12 +595,13 @@ async function setupDB() {
 
     const [adminCount] = await conn.query('SELECT COUNT(*) as n FROM admin_users');
     if (adminCount[0].n === 0) {
-      const senha = await bcrypt.hash('admin123', 10);
+      const senhaGerada = require('crypto').randomBytes(12).toString('hex');
+      const senha = await bcrypt.hash(senhaGerada, 10);
       await conn.query(
         "INSERT INTO admin_users (nome,email,senha,nivel,permissoes,ativo) VALUES (?,?,?,?,?,?)",
         ['Admin PR','admin@punchandroll.com.br',senha,'master',JSON.stringify([]),true]
       );
-      console.log('Admin criado: admin@punchandroll.com.br / admin123');
+      console.log(`Admin criado: admin@punchandroll.com.br / ${senhaGerada} (troque a senha imediatamente!)`);
     }
 
     console.log('✅ Banco configurado!');
@@ -599,7 +613,15 @@ async function setupDB() {
 // ══════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════
-app.post('/api/auth/admin', async (req, res) => {
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+});
+
+app.post('/api/auth/admin', authLimiter, async (req, res) => {
   try {
     const { email, senha } = req.body;
     const [rows] = await db.query('SELECT * FROM admin_users WHERE email = ?', [email]);
@@ -624,7 +646,7 @@ app.post('/api/auth/admin', async (req, res) => {
   }
 });
 
-app.post('/api/auth/aluno', async (req, res) => {
+app.post('/api/auth/aluno', authLimiter, async (req, res) => {
   try {
     const { login, senha } = req.body;
     const loginLower = (login||'').toLowerCase().trim();
@@ -869,7 +891,7 @@ app.post('/api/alunos/me/preferencia', auth, async (req, res) => {
   }
 });
 
-app.get('/api/alunos/:id', auth, async (req, res) => {
+app.get('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
@@ -3749,7 +3771,7 @@ function agendarRelatorioSemanal() {
 // Disparo manual do relatório semanal (uso interno)
 // Endpoint de recuperação: cria pagamentos retroativos para alunos ativos que não têm registro no banco
 app.get('/api/_recuperar-pagamentos', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
     const [alunos] = await db.query(`SELECT * FROM alunos WHERE status='ativo' AND cortesia=0`);
     const [existing] = await db.query(`SELECT aluno_id, DATE_FORMAT(data_pagamento,'%Y-%m') as mes FROM pagamentos WHERE status='pago'`);
@@ -3779,7 +3801,7 @@ app.get('/api/_recuperar-pagamentos', async (req, res) => {
 });
 
 app.get('/api/_update-vencimento-msgs', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   const msg5 = 'Olá, *{{nome}}*! 🥊\n\nPassando para avisar que seu plano na *Punch and Roll Fight Team* vence em *5 dias*.\n\nRenove com antecedência e continue treinando sem interrupção! 💪\n\n💳 *Pague pelo portal:*\nhttps://punchandroll.com.br/punch-and-roll-portal.html\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*';
   const msg1 = 'Olá, *{{nome}}*! 🥊\n\nSeu plano na *Punch and Roll Fight Team* vence *amanhã*.\n\nRenove hoje para não perder acesso à academia! 💪\n\n💳 *Pague pelo portal:*\nhttps://punchandroll.com.br/punch-and-roll-portal.html\n\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*';
   try {
@@ -3790,7 +3812,7 @@ app.get('/api/_update-vencimento-msgs', async (req, res) => {
 });
 
 app.get('/api/_set-vagas', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   const vagas = parseInt(req.query.v);
   if (!vagas || vagas < 1) return res.status(400).json({ error: 'Informe ?v=numero' });
   try {
@@ -3800,7 +3822,7 @@ app.get('/api/_set-vagas', async (req, res) => {
 });
 
 app.get('/api/_debug-pagamento/:nome', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
     const nome = '%'+req.params.nome+'%';
     const [pags] = await db.query(`
@@ -3826,7 +3848,7 @@ app.get('/api/_debug-pagamento/:nome', async (req, res) => {
 });
 
 app.get('/api/_checkin-notify-test', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
     const [rows] = await db.query(`
       SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora
@@ -3847,7 +3869,7 @@ app.get('/api/_checkin-notify-test', async (req, res) => {
 });
 
 app.get('/api/_mp-check', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   const token = process.env.MP_ACCESS_TOKEN || '';
   const modo = token.startsWith('TEST-') ? 'TESTE' : token.startsWith('APP_USR-') ? 'PRODUCAO' : 'DESCONHECIDO';
   const tokenMask = token ? token.slice(0,12)+'...' : '(não configurado)';
@@ -3865,7 +3887,7 @@ app.get('/api/_mp-check', async (req, res) => {
 });
 
 app.get('/api/_report-now', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
     const hasKey = !!process.env.SENDGRID_API_KEY;
     const from = process.env.EMAIL_FROM || 'noreply@punchandroll.com.br';
@@ -3895,7 +3917,7 @@ app.get('/api/welcome/aprovar/:token', async (req, res) => {
 
 // Envia preview das boas-vindas para o Anderson (uso interno)
 app.get('/api/_welcome-preview', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   const d = { nome: 'NOME DO ALUNO', plano: 'Mensal — Boxe · 3x/sem', valor: 159, modalidade: 'boxe', email: 'email@aluno.com', tel: '(48) 99999-9999' };
   const waMsg = await gerarMsgWABoasVindas(d);
   const emailHtml = gerarEmailBoasVindas(d);
@@ -3932,7 +3954,7 @@ app.get('/api/_welcome-preview', async (req, res) => {
 
 // Disparo manual de boas-vindas por aluno_id (uso interno)
 app.get('/api/_welcome-manual/:aluno_id', async (req, res) => {
-  if (req.query.k !== 'pr2026priv') return res.sendStatus(403);
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id=?', [req.params.aluno_id]);
     if (!rows.length) return res.json({ ok: false, msg: 'Aluno não encontrado' });
