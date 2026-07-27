@@ -374,8 +374,12 @@ function selecionarDia(dia) { diaSelecionado=dia; renderAgenda(); }
 async function fazerCheckin(aulaId) {
   try {
     await api('POST','/api/checkins',{aula_id:aulaId});
-    const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
+    const [cks, ocup] = await Promise.all([
+      api('GET','/api/checkins?aluno_id='+aluno.id),
+      api('GET','/api/aulas/ocupacao'),
+    ]);
     cache.checkins = Array.isArray(cks)?cks:[];
+    if (ocup && typeof ocup === 'object') cache.ocupacao = ocup;
     alert('✅ Check-in confirmado! Até lá! 🥊');
     renderAgenda();
     renderInicio();
@@ -386,8 +390,12 @@ async function cancelarCheckin(ckId) {
   if (!confirm('Cancelar seu check-in desta aula?')) return;
   try {
     await api('DELETE','/api/checkins/'+ckId);
-    const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
+    const [cks, ocup] = await Promise.all([
+      api('GET','/api/checkins?aluno_id='+aluno.id),
+      api('GET','/api/aulas/ocupacao'),
+    ]);
     cache.checkins = Array.isArray(cks)?cks:[];
+    if (ocup && typeof ocup === 'object') cache.ocupacao = ocup;
     renderAgenda();
     renderInicio();
   } catch(e) { alert(e.message||'Erro ao cancelar.'); }
