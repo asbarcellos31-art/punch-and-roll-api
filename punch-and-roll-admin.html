@@ -3267,51 +3267,93 @@ async function waExcluirLista(id){
 function waImportarBase(listaId, listaNome, totalAtual){
   const modal = document.createElement('div');
   modal.className='modal-overlay open'; modal.id='modal-importar-base';
-  modal.innerHTML=`<div class="modal-box" style="max-width:440px">
+  modal.innerHTML=`<div class="modal-box" style="max-width:480px">
     <div class="modal-handle"></div>
     <div style="font-weight:700;font-size:15px;margin-bottom:4px">📥 Importar da Base de Alunos</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Lista: <strong>${listaNome}</strong></div>
-    <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="ib-modalidade">
-      <option value="todos">Todas as modalidades</option>
-      <option value="boxe">🥊 Boxe</option>
-      <option value="jiujitsu">🟦 Jiu-Jitsu</option>
-      <option value="ambos">🥊🟦 Ambos</option>
-    </select></div>
-    <div class="fg"><label class="fl">Status do aluno</label><select class="fi" id="ib-status">
-      <option value="todos">Todos</option>
-      <option value="ativo">Somente ativos</option>
-      <option value="vencendo">Somente vencendo</option>
-      <option value="atrasado">Somente atrasados</option>
-    </select></div>
-    <div id="ib-preview" style="margin-bottom:12px;font-size:13px;color:var(--muted)"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      <div class="fg" style="margin:0"><label class="fl">Modalidade</label><select class="fi" id="ib-modalidade" onchange="waPreviewBase()">
+        <option value="todos">Todas</option>
+        <option value="boxe">🥊 Boxe</option>
+        <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+        <option value="ambos">🥊🟦 Ambos</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Faixa etária</label><select class="fi" id="ib-faixa" onchange="waPreviewBase()">
+        <option value="todos">Todas</option>
+        <option value="crianca">👦 Crianças (até 15 anos)</option>
+        <option value="adulto">👤 Adultos (16+)</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Status</label><select class="fi" id="ib-status" onchange="waPreviewBase()">
+        <option value="todos">Todos</option>
+        <option value="ativo">✅ Ativos</option>
+        <option value="vencendo">⚠️ Vencendo</option>
+        <option value="atrasado">🔴 Atrasados</option>
+        <option value="inativo">⛔ Inativos</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Sexo</label><select class="fi" id="ib-sexo" onchange="waPreviewBase()">
+        <option value="todos">Todos</option>
+        <option value="masculino">Masculino</option>
+        <option value="feminino">Feminino</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Tipo de plano</label><select class="fi" id="ib-plano" onchange="waPreviewBase()">
+        <option value="todos">Todos</option>
+        <option value="mensal">Mensal</option>
+        <option value="semestral">Semestral</option>
+        <option value="anual">Anual</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Forma de pagamento</label><select class="fi" id="ib-pagto" onchange="waPreviewBase()">
+        <option value="todos">Todas</option>
+        <option value="pix">PIX</option>
+        <option value="cartao">Cartão</option>
+        <option value="dinheiro">Dinheiro</option>
+      </select></div>
+    </div>
+
+    <div id="ib-preview" style="margin:12px 0;font-size:13px;color:var(--muted);min-height:20px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="waPreviewBase()" class="btn btn-ghost btn-sm">🔍 Contar registros</button>
       <button onclick="document.getElementById('modal-importar-base').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
       <button onclick="waFazerImportarBase(${listaId})" class="btn btn-r" style="flex:1" id="ib-btn">Importar</button>
     </div>
     <div style="margin-top:10px;padding:10px;background:rgba(59,130,246,.05);border-radius:6px;font-size:11px;color:var(--muted)">ℹ️ Apenas alunos com telefone cadastrado serão importados. Duplicatas são ignoradas.</div>
   </div>`;
   document.body.appendChild(modal);
+  waPreviewBase();
+}
+
+function waGetFiltros() {
+  return {
+    modalidade:  document.getElementById('ib-modalidade')?.value || 'todos',
+    status_aluno: document.getElementById('ib-status')?.value || 'todos',
+    faixa_etaria: document.getElementById('ib-faixa')?.value || 'todos',
+    sexo:         document.getElementById('ib-sexo')?.value || 'todos',
+    tipo_plano:   document.getElementById('ib-plano')?.value || 'todos',
+    pagto:        document.getElementById('ib-pagto')?.value || 'todos',
+  };
 }
 
 async function waPreviewBase(){
-  const modalidade = document.getElementById('ib-modalidade')?.value;
-  const statusAluno = document.getElementById('ib-status')?.value;
+  const f = waGetFiltros();
   const prev = document.getElementById('ib-preview');
   if(prev) prev.textContent = 'Contando...';
   try{
-    const r = await GET(`/api/wa/listas/preview-base?modalidade=${modalidade}&status_aluno=${statusAluno}`);
-    if(prev) prev.innerHTML = `<strong style="color:var(--blue)">${r.total} contato(s) encontrado(s)</strong>`;
+    const qs = new URLSearchParams(f).toString();
+    const r = await GET(`/api/wa/listas/preview-base?${qs}`);
+    if(prev) prev.innerHTML = `<strong style="color:var(--blue)">${r.total} contato(s) encontrado(s) com estes filtros</strong>`;
   }catch(e){if(prev) prev.textContent='Erro ao contar';}
 }
 
 async function waFazerImportarBase(listaId){
-  const modalidade = document.getElementById('ib-modalidade')?.value;
-  const statusAluno = document.getElementById('ib-status')?.value;
+  const f = waGetFiltros();
   const btn = document.getElementById('ib-btn');
   if(btn){btn.disabled=true;btn.textContent='Importando...';}
   try{
-    const r = await POST(`/api/wa/listas/${listaId}/importar-base`,{modalidade,status_aluno:statusAluno});
+    const r = await POST(`/api/wa/listas/${listaId}/importar-base`, f);
     document.getElementById('modal-importar-base')?.remove();
     waListasAbertas[listaId] = true;
     await waRenderTab();

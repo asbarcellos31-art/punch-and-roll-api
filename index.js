@@ -1774,16 +1774,26 @@ app.post('/api/wa/campanhas/:id/cancelar', auth, adminOnly, async (req, res) => 
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Filtro reutilizável para importar da base ─────────────────────────────────
+function buildFiltroAlunos(filtros, seletor = 'nome,tel,cpf') {
+  let q = `SELECT ${seletor} FROM alunos WHERE tel IS NOT NULL AND tel != ''`;
+  const params = [];
+  const { modalidade, status_aluno, faixa_etaria, sexo, tipo_plano, pagto } = filtros;
+  if (modalidade && modalidade !== 'todos') { q += ' AND modalidade=?'; params.push(modalidade); }
+  if (status_aluno && status_aluno !== 'todos') { q += ' AND status=?'; params.push(status_aluno); }
+  if (faixa_etaria === 'crianca') { q += ' AND nasc IS NOT NULL AND TIMESTAMPDIFF(YEAR, nasc, CURDATE()) < 16'; }
+  else if (faixa_etaria === 'adulto') { q += ' AND nasc IS NOT NULL AND TIMESTAMPDIFF(YEAR, nasc, CURDATE()) >= 16'; }
+  if (sexo && sexo !== 'todos') { q += ' AND LOWER(sexo) LIKE ?'; params.push(`%${sexo.toLowerCase()}%`); }
+  if (tipo_plano && tipo_plano !== 'todos') { q += ' AND LOWER(COALESCE(plano_id,plano)) LIKE ?'; params.push(`%${tipo_plano}%`); }
+  if (pagto && pagto !== 'todos') { q += ' AND pagto=?'; params.push(pagto); }
+  return { q, params };
+}
+
 // ── Importar alunos para lista ────────────────────────────────────────────────
 app.post('/api/wa/listas/:id/importar-base', auth, adminOnly, async (req, res) => {
   try {
     const listaId = req.params.id;
-    const { modalidade, status_aluno } = req.body;
-    let q = 'SELECT nome,tel,cpf FROM alunos WHERE tel IS NOT NULL AND tel != ""';
-    if (modalidade && modalidade !== 'todos') { q += ' AND modalidade=?'; }
-    if (status_aluno && status_aluno !== 'todos') { q += ` AND status='${status_aluno}'`; }
-    const params = [];
-    if (modalidade && modalidade !== 'todos') params.push(modalidade);
+    const { q, params } = buildFiltroAlunos(req.body);
     const [alunos] = await db.query(q, params);
     let importados = 0;
     for (const a of alunos) {
@@ -1802,11 +1812,7 @@ app.post('/api/wa/listas/:id/importar-base', auth, adminOnly, async (req, res) =
 // Preview count alunos para importar
 app.get('/api/wa/listas/preview-base', auth, adminOnly, async (req, res) => {
   try {
-    const { modalidade, status_aluno } = req.query;
-    let q = 'SELECT COUNT(*) as total FROM alunos WHERE tel IS NOT NULL AND tel != ""';
-    const params = [];
-    if (modalidade && modalidade !== 'todos') { q += ' AND modalidade=?'; params.push(modalidade); }
-    if (status_aluno && status_aluno !== 'todos') { q += ` AND status='${status_aluno}'`; }
+    const { q, params } = buildFiltroAlunos(req.query, 'COUNT(*) as total');
     const [[row]] = await db.query(q, params);
     res.json({ total: row.total });
   } catch(e) { res.status(500).json({ error: e.message }); }
