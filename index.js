@@ -1759,9 +1759,66 @@ app.post('/api/wa/campanhas/:id/pausar', auth, adminOnly, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+async function retomarCampanha(id) {
+  if (campanhasEmExecucao.has(id)) return;
+  const [[camp]] = await db.query('SELECT * FROM wa_campanhas WHERE id=?', [id]);
+  if (!camp) return;
+
+  let todos = [];
+  if (camp.lista_id) {
+    const [rows] = await db.query('SELECT nome,telefone FROM wa_contatos WHERE lista_id=?', [camp.lista_id]);
+    todos = rows;
+  } else if (camp.segmento) {
+    let q = 'SELECT nome,tel as telefone FROM alunos WHERE tel IS NOT NULL AND tel != ""';
+    if (camp.segmento==='atrasados') q+=" AND status='atrasado'";
+    else if (camp.segmento==='vencendo') q+=" AND status='vencendo'";
+    else if (camp.segmento==='ativos') q+=" AND status='ativo'";
+    const [rows] = await db.query(q);
+    todos = rows;
+  }
+
+  const [jaEnviados] = await db.query("SELECT telefone FROM wa_envios WHERE campanha_id=? AND status='ENVIADO'", [id]);
+  const jaEnviadosSet = new Set(jaEnviados.map(r => r.telefone));
+  const pendentes = todos.filter(d => !jaEnviadosSet.has(d.telefone));
+
+  if (pendentes.length === 0) {
+    await db.query("UPDATE wa_campanhas SET status='CONCLUIDA',data_conclusao=NOW() WHERE id=?", [id]);
+    return;
+  }
+
+  await db.query("UPDATE wa_campanhas SET status='ENVIANDO',pausada=0 WHERE id=?", [id]);
+  campanhasEmExecucao.add(id);
+  (async () => {
+    let enviados = camp.total_enviados || 0;
+    let erros = camp.total_erros || 0;
+    for (const d of pendentes) {
+      const [[c]] = await db.query('SELECT * FROM wa_campanhas WHERE id=?', [id]);
+      if (!c || c.status==='CANCELADA') break;
+      if (c.pausada) { await db.query("UPDATE wa_campanhas SET status='AGENDADA' WHERE id=?", [id]); break; }
+      const msg = camp.mensagem.replace(/\{\{nome\}\}/gi, d.nome?.split(' ')[0]||d.nome||'');
+      let resultado;
+      if (camp.media_url && camp.media_type) {
+        resultado = await enviarMidiaWA(d.telefone, camp.media_url, camp.media_type, msg, camp.instancia||'punchandroll');
+      } else {
+        resultado = await enviarWA(d.telefone, msg, camp.instancia||'punchandroll');
+      }
+      await db.query('INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
+        [id, d.nome, d.telefone, msg, 'CAMPANHA', resultado.sucesso?'ENVIADO':'ERRO', resultado.erro||null]);
+      if (resultado.sucesso) enviados++; else erros++;
+      await db.query('UPDATE wa_campanhas SET total_enviados=?,total_erros=?,data_ultimo_envio=NOW() WHERE id=?', [enviados, erros, id]);
+      await new Promise(x => setTimeout(x, c.intervalo_ms || 3000));
+    }
+    const [[final]] = await db.query('SELECT status FROM wa_campanhas WHERE id=?', [id]);
+    if (final && final.status==='ENVIANDO') await db.query("UPDATE wa_campanhas SET status='CONCLUIDA',data_conclusao=NOW() WHERE id=?", [id]);
+    campanhasEmExecucao.delete(id);
+  })().catch(e => { console.error('Retomar erro:', e.message); campanhasEmExecucao.delete(id); });
+}
+
 app.post('/api/wa/campanhas/:id/retomar', auth, adminOnly, async (req, res) => {
   try {
-    await db.query('UPDATE wa_campanhas SET pausada=0 WHERE id=?',[req.params.id]);
+    const id = parseInt(req.params.id);
+    if (campanhasEmExecucao.has(id)) return res.status(400).json({ error: 'Campanha já em execução' });
+    await retomarCampanha(id);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -3990,11 +4047,19 @@ app.post('/api/_pv', async (req, res) => {
 // START
 // ══════════════════════════════════════
 const PORT = process.env.PORT || 3000;
-setupDB().then(() => {
+setupDB().then(async () => {
   app.listen(PORT, () => console.log(`🥊 Punch and Roll API rodando na porta ${PORT}`));
   agendarRelatorioSemanal();
   monitorarWA();
-  setInterval(monitorarWA, 10 * 60 * 1000); // verifica WA a cada 10 minutos
+  setInterval(monitorarWA, 10 * 60 * 1000);
+  // Retoma campanhas que estavam ENVIANDO antes do servidor reiniciar
+  try {
+    const [presas] = await db.query("SELECT id,nome FROM wa_campanhas WHERE status='ENVIANDO' AND pausada=0");
+    for (const c of presas) {
+      console.log(`🔄 Retomando campanha travada: ${c.nome} (id=${c.id})`);
+      retomarCampanha(c.id).catch(e => console.error('Erro ao retomar campanha', c.id, e.message));
+    }
+  } catch(e) { console.error('Erro ao verificar campanhas travadas:', e.message); }
 }).catch(e => {
   console.error('Erro ao configurar banco:', e.message);
   process.exit(1);
