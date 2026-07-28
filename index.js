@@ -1648,7 +1648,7 @@ app.post('/api/wa/listas/:id/upload', auth, adminOnly, upload.single('arquivo'),
 // ── Campanhas ────────────────────────────────────────────────────────────────
 app.get('/api/wa/campanhas', auth, adminOnly, async (req, res) => {
   try {
-    const [rows] = await db.query(`SELECT c.*, l.nome as lista_nome FROM wa_campanhas c LEFT JOIN wa_listas l ON c.lista_id=l.id ORDER BY c.criado_em DESC`);
+    const [rows] = await db.query(`SELECT c.*, l.nome as lista_nome, l.total_contatos as lista_total_contatos FROM wa_campanhas c LEFT JOIN wa_listas l ON c.lista_id=l.id ORDER BY c.criado_em DESC`);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
