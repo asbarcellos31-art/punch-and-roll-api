@@ -3189,8 +3189,9 @@ async function waRenderListas(c){
     const listas = await GET('/api/wa/listas');
     waListas = listas;
     c.innerHTML=`
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <button onclick="waNovaLista()" class="btn btn-ghost btn-sm">+ Nova Lista</button>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px">
+        <button onclick="waNovaLista()" class="btn btn-ghost btn-sm">+ Nova Lista vazia</button>
+        <button onclick="waCriarListaDaBase()" class="btn btn-r btn-sm">📥 Criar Lista da Base de Alunos</button>
       </div>
       ${listas.length===0?`<div style="text-align:center;padding:40px 20px;color:var(--muted);border:1px dashed var(--border);border-radius:8px">
         <div style="font-size:32px;margin-bottom:8px">📋</div>
@@ -3256,6 +3257,111 @@ async function waNovaLista(){
   const nome = prompt('Nome da lista:'); if(!nome||!nome.trim()) return;
   const desc = prompt('Descrição (opcional):')||'';
   try{ await POST('/api/wa/listas',{nome:nome.trim(),descricao:desc}); await waRenderTab(); }catch(e){alert('Erro: '+e.message);}
+}
+
+function waCriarListaDaBase(){
+  const modal = document.createElement('div');
+  modal.className='modal-overlay open'; modal.id='modal-criar-lista-base';
+  modal.innerHTML=`<div class="modal-box" style="max-width:500px">
+    <div class="modal-handle"></div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:16px">📥 Criar Lista da Base de Alunos</div>
+
+    <div class="fg"><label class="fl">Nome da lista <span style="color:var(--red)">*</span></label>
+      <input class="fi" id="clb-nome" placeholder="Ex: Jiu Kids Ativos, Boxe Mensalistas..." oninput="clbPreview()">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      <div class="fg" style="margin:0"><label class="fl">Modalidade</label><select class="fi" id="clb-modalidade" onchange="clbPreview()">
+        <option value="todos">Todas</option>
+        <option value="boxe">🥊 Boxe</option>
+        <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+        <option value="ambos">🥊🟦 Ambos</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Faixa etária</label><select class="fi" id="clb-faixa" onchange="clbPreview()">
+        <option value="todos">Todas</option>
+        <option value="crianca">👦 Crianças (até 15 anos)</option>
+        <option value="adulto">👤 Adultos (16+)</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Status</label><select class="fi" id="clb-status" onchange="clbPreview()">
+        <option value="todos">Todos</option>
+        <option value="ativo">✅ Ativos</option>
+        <option value="vencendo">⚠️ Vencendo</option>
+        <option value="atrasado">🔴 Atrasados</option>
+        <option value="inativo">⛔ Inativos</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Sexo</label><select class="fi" id="clb-sexo" onchange="clbPreview()">
+        <option value="todos">Todos</option>
+        <option value="masculino">Masculino</option>
+        <option value="feminino">Feminino</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Tipo de plano</label><select class="fi" id="clb-plano" onchange="clbPreview()">
+        <option value="todos">Todos</option>
+        <option value="mensal">Mensal</option>
+        <option value="semestral">Semestral</option>
+        <option value="anual">Anual</option>
+      </select></div>
+
+      <div class="fg" style="margin:0"><label class="fl">Forma de pagamento</label><select class="fi" id="clb-pagto" onchange="clbPreview()">
+        <option value="todos">Todas</option>
+        <option value="pix">PIX</option>
+        <option value="cartao">Cartão</option>
+        <option value="dinheiro">Dinheiro</option>
+      </select></div>
+    </div>
+
+    <div id="clb-preview" style="margin:12px 0;font-size:13px;color:var(--muted);min-height:20px">Selecione os filtros para ver o total...</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('modal-criar-lista-base').remove()" class="btn btn-ghost" style="flex:1">Cancelar</button>
+      <button onclick="clbConfirmar()" class="btn btn-r" style="flex:1" id="clb-btn">Criar e Ver Lista</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function clbGetFiltros(){
+  return {
+    modalidade:   document.getElementById('clb-modalidade')?.value||'todos',
+    status_aluno: document.getElementById('clb-status')?.value||'todos',
+    faixa_etaria: document.getElementById('clb-faixa')?.value||'todos',
+    sexo:         document.getElementById('clb-sexo')?.value||'todos',
+    tipo_plano:   document.getElementById('clb-plano')?.value||'todos',
+    pagto:        document.getElementById('clb-pagto')?.value||'todos',
+  };
+}
+
+let _clbTimer = null;
+async function clbPreview(){
+  clearTimeout(_clbTimer);
+  _clbTimer = setTimeout(async ()=>{
+    const prev = document.getElementById('clb-preview');
+    if(prev) prev.textContent = 'Contando...';
+    try{
+      const qs = new URLSearchParams(clbGetFiltros()).toString();
+      const r = await GET(`/api/wa/listas/preview-base?${qs}`);
+      if(prev) prev.innerHTML = `<strong style="color:var(--blue)">${r.total} contato(s) serão importados</strong>`;
+    }catch(e){ if(prev) prev.textContent='Erro ao contar'; }
+  }, 300);
+}
+
+async function clbConfirmar(){
+  const nome = (document.getElementById('clb-nome')?.value||'').trim();
+  if(!nome) { alert('Informe o nome da lista.'); return; }
+  const btn = document.getElementById('clb-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Criando...'; }
+  try{
+    const lista = await POST('/api/wa/listas',{nome,descricao:''});
+    const listaId = lista.id;
+    const f = clbGetFiltros();
+    const r = await POST(`/api/wa/listas/${listaId}/importar-base`, f);
+    document.getElementById('modal-criar-lista-base')?.remove();
+    waListasAbertas[listaId] = true;
+    await waRenderTab();
+    alert(`✅ Lista "${nome}" criada com ${r.importados} contato(s)!`);
+  }catch(e){ alert('Erro: '+e.message); if(btn){btn.disabled=false;btn.textContent='Criar e Ver Lista';} }
 }
 
 async function waExcluirLista(id){
