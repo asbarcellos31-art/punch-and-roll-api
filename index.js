@@ -14,11 +14,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const ALLOWED_ORIGINS = [
   'https://punchandroll.com.br',
+  'http://punchandroll.com.br',
   'https://www.punchandroll.com.br',
+  'http://www.punchandroll.com.br',
   'https://punch-and-roll-api-production.up.railway.app',
 ];
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
 app.use(cors({
   origin: (origin, cb) => {
@@ -2047,10 +2050,7 @@ setInterval(async () => {
     const [agendadas] = await db.query("SELECT * FROM wa_campanhas WHERE status='AGENDADA' AND data_agendada IS NOT NULL AND data_agendada <= NOW() AND pausada=0");
     for (const camp of agendadas) {
       console.log(`[Cron] Disparando campanha WA agendada: ${camp.nome}`);
-      try {
-        const res = await axios.post(`http://localhost:${process.env.PORT||3000}/api/wa/campanhas/${camp.id}/disparar`,
-          {}, { headers: { Authorization: 'Bearer '+process.env.CRON_TOKEN } });
-      } catch(_) {}
+      retomarCampanha(camp.id).catch(e => console.error('[Cron WA Agendada]', camp.nome, e.message));
     }
   } catch(e) { console.error('[Cron Campanhas WA]',e.message); }
 
@@ -2076,7 +2076,7 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Email Campanhas]',e.message); }
 
-}, 3600000);
+}, 60000);
 
 async function monitorarWA() {
   const evoUrl = process.env.WA_EVOLUTION_URL;
