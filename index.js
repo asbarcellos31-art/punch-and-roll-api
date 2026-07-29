@@ -1164,6 +1164,14 @@ app.post('/api/checkins', auth, async (req, res) => {
     const dataAula = new Date(agora);
     dataAula.setDate(agora.getDate() + diffDias);
     const dataCheckin = dataAula.toISOString().slice(0,10);
+    // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
+    if (diffDias === 0) {
+      const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
+      const tempoBRT = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+      const minAgora = tempoBRT.getUTCHours() * 60 + tempoBRT.getUTCMinutes();
+      if (minAgora >= hAula * 60 + mAula - 60)
+        return res.status(400).json({ error: 'Check-in encerrado! O prazo fecha 1 hora antes do início da aula.' });
+    }
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,dataCheckin]);
     if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,dataCheckin]);
