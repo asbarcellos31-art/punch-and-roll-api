@@ -1505,68 +1505,68 @@ function imprimirContas() {
     </table>
   </div>
   ${(()=>{
-    // Usa todas as despesas do mês (ignora filtro de status/pessoa)
+    // Agrupa todas as despesas do mês por responsável
     const por={};
     _todasDoMes.forEach(d=>{
       const p=(d.pago_por||'').trim().toUpperCase();
-      if(!p) return;
+      if(!p||p==='PR') return;
       if(!por[p]) por[p]={pago:0,pendente:0};
       if(d.status==='pago') por[p].pago+=parseFloat(d.valor||0);
       else por[p].pendente+=parseFloat(d.valor||0);
     });
-    const pessoas=Object.keys(por).filter(p=>p&&p!=='NÃO INFORMADO'&&p!=='PR');
-    const nPessoas=pessoas.length||1;
-    const partePorPessoa=_recTotal/nPessoas;
+    const socios=Object.keys(por);
+    if(!socios.length) return '';
+    const nSocios=socios.length;
+    // Total previsto = tudo (pago + pendente) de todos os sócios
+    const totalPrevisto=socios.reduce((s,p)=>s+por[p].pago+por[p].pendente,0);
+    const partePrevista=totalPrevisto/nSocios; // responsabilidade de cada sócio
 
-    // Saldo por pessoa = parte das entradas − total de despesas
-    const saldos={};
-    pessoas.forEach(p=>{ saldos[p]=partePorPessoa-(por[p].pago+por[p].pendente); });
-
-    const linhasPor=Object.entries(por).sort((a,b)=>(b[1].pago+b[1].pendente)-(a[1].pago+a[1].pendente)).map(([nome,v],i)=>{
+    const td=(txt,opt='')=>`<td style="padding:7px 12px;border-bottom:1px solid #eee;${opt}">${txt}</td>`;
+    const linhas=socios.sort().map((nome,i)=>{
+      const v=por[nome];
       const total=v.pago+v.pendente;
-      const saldo=saldos[nome]??null;
-      const saldoStr=saldo!==null?(saldo>=0?`<span style="color:#16a34a">+${fR(saldo)}</span>`:`<span style="color:#dc2626">−${fR(saldo)}</span>`):'—';
+      const faltaPagar=Math.max(0,partePrevista-v.pago); // ainda falta pagar da parte dele
+      const excesso=v.pago-partePrevista; // positivo = pagou mais que a parte
       return `<tr style="background:${i%2===0?'#fff':'#f9f9f9'}">
-        <td style="font-weight:600;padding:6px 12px">${nome}</td>
-        <td style="text-align:right;color:#16a34a;font-weight:600;padding:6px 12px">R$ ${v.pago.toFixed(2).replace('.',',')}</td>
-        <td style="text-align:right;color:#dc2626;font-weight:600;padding:6px 12px">R$ ${v.pendente.toFixed(2).replace('.',',')}</td>
-        <td style="text-align:right;font-weight:700;padding:6px 12px">R$ ${total.toFixed(2).replace('.',',')}</td>
-        <td style="text-align:right;padding:6px 12px">${fR(partePorPessoa)}</td>
-        <td style="text-align:right;font-weight:700;padding:6px 12px">${saldoStr}</td>
+        ${td(`<b>${nome}</b>`)}
+        ${td('R$ '+v.pago.toFixed(2).replace('.',','),'color:#16a34a;font-weight:600;text-align:right')}
+        ${td('R$ '+v.pendente.toFixed(2).replace('.',','),'color:#ca8a04;font-weight:600;text-align:right')}
+        ${td('R$ '+total.toFixed(2).replace('.',','),'font-weight:700;text-align:right')}
+        ${td('R$ '+partePrevista.toFixed(2).replace('.',','),'text-align:right;color:#555')}
+        ${td('R$ '+faltaPagar.toFixed(2).replace('.',','),`text-align:right;font-weight:700;color:${faltaPagar>0?'#dc2626':'#16a34a'}`)}
       </tr>`;
     }).join('');
 
-    // Acerto: quem tem saldo negativo (pagou mais que sua parte) recebe de quem tem positivo
+    // Acerto: quem pagou mais que a parte justa recebe do outro
+    const saldos=socios.map(p=>({nome:p,saldo:por[p].pago-partePrevista}));
     const acertos=[];
-    const devedores=Object.entries(saldos).filter(([,v])=>v>0).map(([n,v])=>({n,v})); // underpaid → devem
-    const credores=Object.entries(saldos).filter(([,v])=>v<0).map(([n,v])=>({n,v:Math.abs(v)})); // overpaid → recebem
+    const devem=saldos.filter(x=>x.saldo<0).map(x=>({nome:x.nome,v:-x.saldo})); // pagou menos → deve
+    const recebem=saldos.filter(x=>x.saldo>0).map(x=>({nome:x.nome,v:x.saldo}));  // pagou mais → recebe
     let di=0,ci=0;
-    const dCopy=devedores.map(x=>({...x})), cCopy=credores.map(x=>({...x}));
-    while(di<dCopy.length&&ci<cCopy.length){
-      const val=Math.min(dCopy[di].v,cCopy[ci].v);
-      if(val>0.01) acertos.push(`<div style="margin:6px 0;padding:10px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:12px">💸 <b>${dCopy[di].n}</b> deve repassar <b style="color:#b45309">${fR(val)}</b> para <b>${cCopy[ci].n}</b></div>`);
-      dCopy[di].v-=val; cCopy[ci].v-=val;
-      if(dCopy[di].v<0.01) di++; if(cCopy[ci].v<0.01) ci++;
+    while(di<devem.length&&ci<recebem.length){
+      const val=Math.min(devem[di].v,recebem[ci].v);
+      if(val>0.01) acertos.push(`<div style="margin:6px 0;padding:10px 16px;background:#fffbeb;border-left:4px solid #f59e0b;font-size:12px">💸 <b>${devem[di].nome}</b> deve repassar <b style="font-size:14px;color:#b45309">R$ ${val.toFixed(2).replace('.',',')}</b> para <b>${recebem[ci].nome}</b></div>`);
+      devem[di].v-=val; recebem[ci].v-=val;
+      if(devem[di].v<0.01) di++; if(recebem[ci].v<0.01) ci++;
     }
-    const acertoHtml=acertos.length?acertos.join(''):'<div style="padding:8px 12px;color:#16a34a;font-size:12px">✅ Nenhum acerto necessário</div>';
 
     return `<div style="margin-top:24px;border-top:2px solid #e5e7eb;padding-top:16px">
-      <h3 style="font-size:13px;margin-bottom:4px;color:#111">Resumo por Responsável</h3>
-      <div style="font-size:10px;color:#888;margin-bottom:8px">Entradas (${_mesAnteriorLbl}) divididas igualmente: ${fR(partePorPessoa)} por pessoa</div>
-      <table style="width:100%;border-collapse:collapse">
+      <h3 style="font-size:13px;margin-bottom:4px;color:#111">Previsão por Sócio — ${contasMesLabel()}</h3>
+      <div style="font-size:11px;color:#555;margin-bottom:10px">Total previsto de despesas: <b>R$ ${totalPrevisto.toFixed(2).replace('.',',')}</b> ÷ ${nSocios} sócios = <b>R$ ${partePrevista.toFixed(2).replace('.',',')} cada</b></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr>
-          <th style="text-align:left;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pessoa</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pago</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">A Pagar</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Total Desp.</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Parte Entr.</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Saldo</th>
+          <th style="text-align:left;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Sócio</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Já pagou</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pendente</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Total atrib.</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Parte justa</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Falta pagar</th>
         </tr></thead>
-        <tbody>${linhasPor}</tbody>
+        <tbody>${linhas}</tbody>
       </table>
       <div style="margin-top:16px">
         <h3 style="font-size:13px;margin-bottom:8px;color:#111">Acerto entre Sócios</h3>
-        ${acertoHtml}
+        ${acertos.length?acertos.join(''):'<div style="padding:8px 12px;color:#16a34a;font-size:12px">✅ Nenhum acerto necessário — despesas já equilibradas</div>'}
       </div>
     </div>`;
   })()}
