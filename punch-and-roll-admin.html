@@ -1537,8 +1537,8 @@ function imprimirContas() {
       </tr>`;
     }).join('');
 
-    // Acerto: quem pagou mais que a parte justa recebe do outro
-    const saldos=socios.map(p=>({nome:p,saldo:por[p].pago-partePrevista}));
+    // Acerto: baseado no total atribuído (pago + pendente) vs parte justa
+    const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-partePrevista}));
     const acertos=[];
     const devem=saldos.filter(x=>x.saldo<0).map(x=>({nome:x.nome,v:-x.saldo})); // pagou menos → deve
     const recebem=saldos.filter(x=>x.saldo>0).map(x=>({nome:x.nome,v:x.saldo}));  // pagou mais → recebe
