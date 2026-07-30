@@ -433,7 +433,7 @@ async function carregarTudo() {
   } catch(e) { console.error('Erro ao carregar dados:', e.message); }
   try {
     const pagamentos = await GET('/api/pagamentos');
-    mensHistorico = Array.isArray(pagamentos) ? pagamentos.map(p=>({id:p.id, alunoId:p.aluno_id, alunoNome:p.aluno_nome, valor:p.valor, data:p.data_pagamento, metodo:p.metodo, status:p.status})) : [];
+    mensHistorico = Array.isArray(pagamentos) ? pagamentos.map(p=>({id:p.id, alunoId:p.aluno_id, alunoNome:p.aluno_nome, valor:p.valor, data:p.data_pagamento||p.criado_em, metodo:p.metodo, status:p.status})) : [];
   } catch(e) { console.error('Erro ao carregar pagamentos:', e.message); }
 }
 
@@ -1318,8 +1318,9 @@ function renderFinContas(){
       </div>
     </div>
 
-    <!-- Resumo: Entradas × Saídas (pagas) × Saldo -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">
+    <!-- Resumo: Entradas × Saídas × Saldo Real × Saldo Previsto -->
+    ${(()=>{const _totalDesp=totalPago+totalPend;const _saldoPrev=_recTotal-_totalDesp;return`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
       <div onclick="verPagantesDoMes('${_mesAnterior}')" style="cursor:pointer;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Entradas (${_mesAnteriorLbl})</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${fmtR(_recTotal)}</div>
@@ -1331,11 +1332,16 @@ function renderFinContas(){
         <div style="font-size:9px;color:var(--muted);margin-top:2px">${doMes.filter(d=>d.status==='pago').length} conta(s)</div>
       </div>
       <div style="background:${_saldo>=0?'rgba(34,197,94,.08)':'rgba(212,17,28,.08)'};border:1px solid ${_saldo>=0?'rgba(34,197,94,.25)':'rgba(212,17,28,.25)'};border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${_saldo>=0?'Saldo':'Falta'}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saldo real</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldo>=0?'var(--green)':'#f87171'}">${_saldo>=0?'+':''}${fmtR(_saldo)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas (${_mesAnteriorLbl}) − saídas</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − pagas</div>
       </div>
-    </div>
+      <div style="background:${_saldoPrev>=0?'rgba(59,130,246,.08)':'rgba(245,158,11,.08)'};border:1px solid ${_saldoPrev>=0?'rgba(59,130,246,.25)':'rgba(245,158,11,.25)'};border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saldo previsto</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldoPrev>=0?'#60a5fa':'#f59e0b'}">${_saldoPrev>=0?'+':''}${fmtR(_saldoPrev)}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − todas as despesas</div>
+      </div>
+    </div>`})()}
     ${totalPend>0?`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>`:''}
 
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
