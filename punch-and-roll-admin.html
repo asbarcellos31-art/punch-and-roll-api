@@ -1421,6 +1421,19 @@ function imprimirContas() {
   const totalPend = dados.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const totalPago = dados.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const titulo = `Contas — ${contasMesLabel()} — ${({pendente:'Pendentes',vencida:'Vencidas',pago:'Pagas',todas:'Todas'})[contasFilter]||''}`;
+  // Resumo financeiro: entradas do mês anterior vs despesas do mês atual
+  const _mes=contasMes||`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const [_anoM,_numM]=_mes.split('-').map(Number);
+  const _mesAnterior=_numM===1?`${_anoM-1}-12`:`${_anoM}-${String(_numM-1).padStart(2,'0')}`;
+  const _MESES_PT=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const _mesAnteriorLbl=_MESES_PT[parseInt(_mesAnterior.split('-')[1])-1];
+  const _recTotal=parseFloat((finResumo?.historicoRec||[]).find(h=>h.mes===_mesAnterior)?.total||0)+parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mesAnterior)?.total||0);
+  const _todasDoMes=(finResumo?.despesas||[]).filter(d=>!contasMes||d.data_vencimento?.startsWith(contasMes));
+  const _totalPagoMes=_todasDoMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _totalPendMes=_todasDoMes.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _saldoReal=_recTotal-_totalPagoMes;
+  const _saldoPrev=_recTotal-_totalPagoMes-_totalPendMes;
+  const fR=v=>'R$ '+Math.abs(v).toFixed(2).replace('.',',');
   const linhas = dados.map(d => {
     const vencida = d.status==='pendente' && d.data_vencimento < todayStr;
     const cor = d.status==='pago' ? '#16a34a' : vencida ? '#dc2626' : '#ca8a04';
@@ -1464,6 +1477,32 @@ function imprimirContas() {
     ${totalPend>0?`<div class="t-pend">A pagar: R$ ${totalPend.toFixed(2).replace('.',',')}</div>`:''}
     ${totalPago>0?`<div class="t-pago">Pago: R$ ${totalPago.toFixed(2).replace('.',',')}</div>`:''}
     <div style="padding:8px 14px;background:#f3f3f3;border-radius:6px;font-weight:700">Total: R$ ${(totalPend+totalPago).toFixed(2).replace('.',',')}</div>
+  </div>
+  <!-- Resumo financeiro -->
+  <div style="margin-top:24px;border-top:2px solid #e5e7eb;padding-top:16px">
+    <h3 style="font-size:13px;margin-bottom:12px;color:#111">Resumo Financeiro — ${contasMesLabel()}</h3>
+    <table style="width:360px;border-collapse:collapse;font-size:12px">
+      <tr style="background:#f0fdf4">
+        <td style="padding:8px 12px;border-bottom:1px solid #d1fae5;color:#555">Entradas (${_mesAnteriorLbl})</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #d1fae5;text-align:right;font-weight:700;color:#16a34a">${fR(_recTotal)}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">− Despesas pagas</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#dc2626">−${fR(_totalPagoMes)}</td>
+      </tr>
+      <tr style="background:#f9f9f9">
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">= Saldo atual</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:${_saldoReal>=0?'#16a34a':'#dc2626'}">${_saldoReal>=0?'+':'−'}${fR(_saldoReal)}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">− Despesas pendentes</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#ca8a04">−${fR(_totalPendMes)}</td>
+      </tr>
+      <tr style="background:${_saldoPrev>=0?'#f0fdf4':'#fef2f2'}">
+        <td style="padding:8px 12px;font-weight:700;color:#111">= Saldo previsto</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:14px;color:${_saldoPrev>=0?'#16a34a':'#dc2626'}">${_saldoPrev>=0?'+':'−'}${fR(_saldoPrev)}</td>
+      </tr>
+    </table>
   </div>
   ${(()=>{
     const por={};
