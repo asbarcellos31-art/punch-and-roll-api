@@ -1287,9 +1287,10 @@ function renderFinContas(){
   const qtdVenc=doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
   // Receitas do mês ANTERIOR (o que entrou no mês passado paga as contas do mês atual)
   const _mes=contasMes||`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-  const _dtMesAnterior=new Date(_mes+'-01'); _dtMesAnterior.setMonth(_dtMesAnterior.getMonth()-1);
-  const _mesAnterior=`${_dtMesAnterior.getFullYear()}-${String(_dtMesAnterior.getMonth()+1).padStart(2,'0')}`;
-  const _mesAnteriorLbl=_dtMesAnterior.toLocaleString('pt-BR',{month:'short'}).replace('.','');
+  const [_anoM,_numM]=_mes.split('-').map(Number);
+  const _mesAnterior=_numM===1?`${_anoM-1}-12`:`${_anoM}-${String(_numM-1).padStart(2,'0')}`;
+  const _MESES_PT=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const _mesAnteriorLbl=_MESES_PT[parseInt(_mesAnterior.split('-')[1])-1];
   const _recMens=parseFloat((finResumo?.historicoRec||[]).find(h=>h.mes===_mesAnterior)?.total||0);
   const _recShop=parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mesAnterior)?.total||0);
   const _recTotal=_recMens+_recShop;
