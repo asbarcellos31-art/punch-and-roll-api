@@ -1954,13 +1954,13 @@ setInterval(async () => {
 
   // Atualização automática de status por vencimento (roda a cada ciclo)
   try {
-    // ativo → atrasado: vencimento já passou
+    // ativo → atrasado: vencimento passou há mais de 3 dias (grace period esgotado)
     await db.query(`
       UPDATE alunos SET status='atrasado'
       WHERE status='ativo'
         AND (cortesia IS NULL OR cortesia=0)
         AND vencimento IS NOT NULL
-        AND DATE(vencimento) < CURDATE()
+        AND DATE(vencimento) < DATE_SUB(CURDATE(), INTERVAL 3 DAY)
     `);
     // ativo → vencendo: vencimento nos próximos 5 dias
     await db.query(`
@@ -2031,6 +2031,44 @@ setInterval(async () => {
       const em5 = new Date(hoje); em5.setDate(em5.getDate()+5);
       const em1 = new Date(hoje); em1.setDate(em1.getDate()+1);
       const fmt = d => d.toISOString().slice(0,10);
+
+      // Grace period: dispara no dia do vencimento para quem acabou de vencer
+      const ontem = new Date(hoje); ontem.setDate(ontem.getDate()-1);
+      const [alunosGrace] = await db.query(
+        "SELECT id,nome,tel,email FROM alunos WHERE status IN ('ativo','vencendo') AND DATE(vencimento)=? AND (cortesia IS NULL OR cortesia=0)",
+        [fmt(ontem)]
+      );
+      for (const a of alunosGrace) {
+        const nomeFirst = a.nome.split(' ')[0];
+        const msgWA = `Olá, *${nomeFirst}*! 🥊\n\nSua mensalidade na *Punch and Roll Fight Team* venceu ontem.\n\nVocê ainda tem *3 dias* para regularizar e continuar treinando normalmente. Após esse prazo, o check-in será bloqueado automaticamente.\n\n👉 Renove agora: *punchandroll.com.br*\n📱 Dúvidas: *(48) 99225-9899*\n\nPunch and Roll Fight Team 🥊`;
+        if (a.tel) {
+          const r = await enviarWA(a.tel, msgWA);
+          const [waCamp] = await db.query(
+            `INSERT INTO wa_campanhas (nome,mensagem,segmento,status,total_enviados,total_erros) VALUES (?,?,?,?,?,?)`,
+            [`Grace Period — ${a.nome}`, msgWA, 'individual', 'CONCLUIDA', r.sucesso?1:0, r.sucesso?0:1]
+          );
+          await db.query(
+            'INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
+            [waCamp.insertId, a.nome, formatarTelWA(a.tel), msgWA, 'INDIVIDUAL', r.sucesso?'ENVIADO':'ERRO', r.erro||null]
+          );
+        }
+        if (a.email) {
+          const assunto = 'Sua mensalidade venceu — você tem 3 dias para renovar';
+          const corpo = `<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, ${nomeFirst}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Sua mensalidade na <strong>Punch and Roll Fight Team</strong> venceu ontem.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Você ainda tem <strong>3 dias</strong> para regularizar sua situação e continuar treinando normalmente. Após esse prazo, o acesso ao check-in será bloqueado automaticamente.</p><p style="margin:0 0 24px"><a href="https://punchandroll.com.br/punch-and-roll-portal.html" style="display:inline-block;background:#d4111c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">RENOVAR AGORA →</a></p>`;
+          const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f4f4f4;padding:24px"><div style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><div style="background:#ffffff;padding:28px 32px 20px;text-align:center;border-bottom:4px solid #d4111c"><img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll" style="height:130px;width:auto;display:block;margin:0 auto"></div><div style="padding:32px">${corpo}<div style="background:#f9f9f9;border-left:4px solid #d4111c;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px"><p style="color:#444;font-size:13px;line-height:1.8;margin:0">👊 Admin: (48) 99225-9899<br>🥋 Instrutor: (48) 98463-9257<br>🌐 punchandroll.com.br</p></div></div><div style="background:#111;padding:16px 32px;text-align:center"><p style="color:#888;font-size:11px;margin:0">© Punch and Roll Fight Team — R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC</p></div></div></div>`;
+          const emailOk = await enviarEmailAluno(a.email, a.nome, assunto, html).then(()=>true).catch(()=>false);
+          const [eCamp] = await db.query(
+            `INSERT INTO email_campanhas (nome,status,total_enviados,total_erros) VALUES (?,?,?,?)`,
+            [`Grace Period — ${a.nome}`, 'CONCLUIDA', emailOk?1:0, emailOk?0:1]
+          );
+          await db.query(
+            'INSERT INTO email_envios (campanha_id,contato_nome,contato_email,tipo,status) VALUES (?,?,?,?,?)',
+            [eCamp.insertId, a.nome, a.email, 'INDIVIDUAL', emailOk?'ENVIADO':'ERRO']
+          );
+        }
+        await new Promise(x=>setTimeout(x,2000));
+      }
+      if (alunosGrace.length) console.log(`[Grace Period] ${alunosGrace.length} alunos notificados`);
 
       for (const [diasLabel, dataAlvo, waChave, emailChave, atoChave] of [
         ['5 dias', em5, 'vencimento5_wa', 'vencimento5_email_corpo', 'vencimento5_ativo'],
