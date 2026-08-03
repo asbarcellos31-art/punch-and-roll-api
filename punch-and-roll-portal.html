@@ -548,11 +548,6 @@ function abrirRenovacao(id, nome, valor, meses, tipo) {
   document.getElementById('renov-pix-status').style.display='none';
   document.getElementById('renov-pix-chave').style.display='none';
   setRenovMetodo('pix');
-  document.getElementById('renov-card-num').value='';
-  document.getElementById('renov-card-name').value='';
-  document.getElementById('renov-card-exp').value='';
-  document.getElementById('renov-card-cvv').value='';
-  document.getElementById('renov-card-cpf').value=aluno.cpf||'';
   // Inicializa seletor de modalidade/plano
   renovSelecionarMod(_renovMod);
   // Se veio com plano específico, seleciona ele

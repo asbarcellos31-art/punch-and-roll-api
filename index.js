@@ -874,9 +874,9 @@ app.post('/api/alunos/me/preferencia', auth, async (req, res) => {
         identification: { type: 'CPF', number: (cpf||'').replace(/\D/g,'') }
       },
       back_urls: {
-        success: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=aprovado`,
-        failure: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=falhou`,
-        pending: `https://punch-and-roll-api-production.up.railway.app/punch-and-roll-portal.html?pagamento=pendente`
+        success: `https://punchandroll.com.br/punch-and-roll-portal.html?pagamento=aprovado`,
+        failure: `https://punchandroll.com.br/punch-and-roll-portal.html?pagamento=falhou`,
+        pending: `https://punchandroll.com.br/punch-and-roll-portal.html?pagamento=pendente`
       },
       auto_return: 'approved',
       notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago',
