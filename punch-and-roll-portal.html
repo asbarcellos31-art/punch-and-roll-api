@@ -203,7 +203,7 @@ async function carregarTudo() {
     } catch(e) { cache.checkins=[]; }
     // Atualizar dados do aluno
     try {
-      const a = await api('GET','/api/alunos/'+aluno.id);
+      const a = await api('GET','/api/alunos/me');
       if(a&&a.id) aluno = {...a, venc:a.vencimento||a.venc||''};
     } catch(e){}
   } catch(e) { console.error('Erro ao carregar:', e.message); }
@@ -534,9 +534,6 @@ function renovSelecionarPlano(id,nome,valor,meses) {
   document.getElementById('renov-cupom-msg').style.display='none';
   const total=valor*meses;
   document.getElementById('renov-total').textContent=fmtR(total)+(meses>1?' ('+meses+'x de '+fmtR(valor)+')':'');
-  const maxP=Math.min(12,meses>1?12:3);
-  document.getElementById('renov-parcelas').innerHTML='';
-  for(let i=1;i<=maxP;i++){const op=document.createElement('option');op.value=i;op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');document.getElementById('renov-parcelas').appendChild(op);}
 }
 
 function abrirRenovacao(id, nome, valor, meses, tipo) {
