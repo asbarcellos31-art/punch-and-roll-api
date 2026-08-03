@@ -20,9 +20,11 @@ const ALLOWED_ORIGINS = [
   'https://punch-and-roll-api-production.up.railway.app',
 ];
 
+const path = require('path');
 const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+app.use(express.static(path.join(__dirname), { index: 'index.html' }));
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
@@ -1949,6 +1951,34 @@ setInterval(async () => {
   const hora = agora.getHours();
   const dia = agora.getDate();
   const mes = agora.getMonth()+1;
+
+  // Atualização automática de status por vencimento (roda a cada ciclo)
+  try {
+    // ativo → atrasado: vencimento já passou
+    await db.query(`
+      UPDATE alunos SET status='atrasado'
+      WHERE status='ativo'
+        AND (cortesia IS NULL OR cortesia=0)
+        AND vencimento IS NOT NULL
+        AND DATE(vencimento) < CURDATE()
+    `);
+    // ativo → vencendo: vencimento nos próximos 5 dias
+    await db.query(`
+      UPDATE alunos SET status='vencendo'
+      WHERE status='ativo'
+        AND (cortesia IS NULL OR cortesia=0)
+        AND vencimento IS NOT NULL
+        AND DATE(vencimento) >= CURDATE()
+        AND DATE(vencimento) <= DATE_ADD(CURDATE(), INTERVAL 5 DAY)
+    `);
+    // atrasado → ativo: pagamento regularizado (vencimento futuro, status atrasado)
+    await db.query(`
+      UPDATE alunos SET status='ativo'
+      WHERE status='atrasado'
+        AND vencimento IS NOT NULL
+        AND DATE(vencimento) >= CURDATE()
+    `);
+  } catch(e) { console.error('[Cron Status]', e.message); }
 
   // Aniversariantes
   try {
