@@ -1171,8 +1171,8 @@ app.post('/api/checkins', auth, async (req, res) => {
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
-      const tempoBRT = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
-      const minAgora = tempoBRT.getUTCHours() * 60 + tempoBRT.getUTCMinutes();
+      const brt = new Date(agora.toLocaleString('en-US', {timeZone:'America/Sao_Paulo'}));
+      const minAgora = brt.getHours() * 60 + brt.getMinutes();
       if (minAgora >= hAula * 60 + mAula - 60)
         return res.status(400).json({ error: 'Check-in encerrado! O prazo fecha 1 hora antes do início da aula.' });
     }
@@ -1974,9 +1974,10 @@ let _waConnStatus = null; // 'open' | 'close' | null
 let _waLastAlertTs = 0;
 setInterval(async () => {
   const agora = new Date();
-  const hora = agora.getHours();
-  const dia = agora.getDate();
-  const mes = agora.getMonth()+1;
+  const brtAgora = new Date(agora.toLocaleString('en-US', {timeZone:'America/Sao_Paulo'}));
+  const hora = brtAgora.getHours();
+  const dia = brtAgora.getDate();
+  const mes = brtAgora.getMonth()+1;
 
   // Atualização automática de status por vencimento (roda a cada ciclo)
   try {
@@ -1997,12 +1998,13 @@ setInterval(async () => {
         AND DATE(vencimento) >= CURDATE()
         AND DATE(vencimento) <= DATE_ADD(CURDATE(), INTERVAL 5 DAY)
     `);
-    // atrasado → ativo: pagamento regularizado (vencimento futuro, status atrasado)
+    // vencendo → ativo: vencimento voltou a ser > 5 dias (pagou e renovou)
     await db.query(`
       UPDATE alunos SET status='ativo'
-      WHERE status='atrasado'
+      WHERE status='vencendo'
+        AND (cortesia IS NULL OR cortesia=0)
         AND vencimento IS NOT NULL
-        AND DATE(vencimento) >= CURDATE()
+        AND DATE(vencimento) > DATE_ADD(CURDATE(), INTERVAL 5 DAY)
     `);
   } catch(e) { console.error('[Cron Status]', e.message); }
 
@@ -2066,10 +2068,14 @@ setInterval(async () => {
            AND DATE(vencimento)=?
            AND (cortesia IS NULL OR cortesia=0)
            AND id NOT IN (
-             SELECT DISTINCT aluno_id FROM pagamentos
-             WHERE status='pendente' AND DATE(criado_em) >= ?
+             SELECT aluno_id FROM pagamentos
+             WHERE status='pago' AND DATE(data_pagamento) >= ?
+           )
+           AND nome NOT IN (
+             SELECT nome FROM wa_campanhas
+             WHERE nome LIKE 'Grace Period%' AND DATE(criado_em) >= ?
            )`,
-        [fmt(ontem), fmt(ontem)]
+        [fmt(ontem), fmt(ontem), fmt(ontem)]
       );
       for (const a of alunosGrace) {
         const nomeFirst = a.nome.split(' ')[0];
