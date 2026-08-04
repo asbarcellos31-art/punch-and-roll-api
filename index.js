@@ -1134,12 +1134,14 @@ app.delete('/api/aulas/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/checkins', auth, async (req, res) => {
   try {
     const { aula_id, data, aluno_id, data_min } = req.query;
+    // Aluno só pode ver os próprios check-ins
+    const alunoIdFiltro = req.user.tipo === 'aluno' ? req.user.id : aluno_id;
     let q = `SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora, au.dia FROM checkins c JOIN alunos a ON c.aluno_id = a.id JOIN aulas au ON c.aula_id = au.id WHERE 1=1`;
     const params = [];
     if (aula_id) { q += ' AND c.aula_id = ?'; params.push(aula_id); }
     if (data) { q += ' AND c.data_checkin = ?'; params.push(data); }
     if (data_min) { q += ' AND c.data_checkin >= ?'; params.push(data_min); }
-    if (aluno_id) { q += ' AND c.aluno_id = ?'; params.push(aluno_id); }
+    if (alunoIdFiltro) { q += ' AND c.aluno_id = ?'; params.push(alunoIdFiltro); }
     q += ' ORDER BY c.data_checkin ASC, au.hora ASC';
     const [rows] = await db.query(q, params);
     res.json(rows);
@@ -1277,7 +1279,7 @@ app.delete('/api/pagamentos/:id', auth, adminOnly, async (req, res) => {
 // ── MERCADO PAGO — PIX ──
 app.post('/api/pagamentos/pix', async (req, res) => {
   try {
-    const { aluno_id, valor, descricao, email, nome, cpf } = req.body;
+    const { aluno_id, valor, descricao, email, nome, cpf, meses, plano_id, plano_nome } = req.body;
     const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
       transaction_amount: parseFloat(valor),
       description: descricao || 'Mensalidade Punch and Roll',
@@ -1292,7 +1294,8 @@ app.post('/api/pagamentos/pix', async (req, res) => {
       headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': `pix-${aluno_id}-${Date.now()}` }
     });
     const payment = mpRes.data;
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,'pendente','pix',String(payment.id)]);
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
+      [aluno_id,descricao,valor,'pendente','pix',String(payment.id),meses||null,plano_id||null,plano_nome||null]);
     res.json({
       payment_id: payment.id, status: payment.status,
       qr_code: payment.point_of_interaction?.transaction_data?.qr_code,
@@ -1327,9 +1330,21 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     const payment = mpRes.data;
     console.log(`[CARTAO-ADMIN] aluno=${aluno_id} valor=${valor} status=${payment.status} detail=${payment.status_detail}`);
     const pagStatusOk = ['approved','authorized'].includes(payment.status);
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id)]);
+    const { meses, plano_id, plano_nome } = req.body;
+    const hoje = new Date().toISOString().slice(0,10);
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id),meses||null,plano_id||null,plano_nome||null,pagStatusOk?hoje:null]);
     if (pagStatusOk) {
-      await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+      if (meses && plano_nome) {
+        const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
+        const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+        const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+        const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
+        const vencStr = venc.toISOString().slice(0,10);
+        await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
+      } else {
+        await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+      }
       const [aluno] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
       if (aluno.length) await notificarWA(aluno[0].tel,`✅ Pagamento aprovado, ${aluno[0].nome.split(' ')[0]}! Seu acesso está ativo. 🥊`);
     }
@@ -1349,10 +1364,21 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
     const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${req.params.payment_id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
     const payment = mpRes.data;
     if (payment.status === 'approved') {
-      const [pag] = await db.query("SELECT aluno_id FROM pagamentos WHERE mp_payment_id=?",[String(req.params.payment_id)]);
+      const [pag] = await db.query("SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?",[String(req.params.payment_id)]);
       if (pag.length) {
-        await db.query("UPDATE pagamentos SET status='pago' WHERE mp_payment_id=?",[String(req.params.payment_id)]);
-        await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[pag[0].aluno_id]);
+        await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=?",[String(req.params.payment_id)]);
+        const { aluno_id, meses, plano_id, plano_nome } = pag[0];
+        const hoje = new Date().toISOString().slice(0,10);
+        if (meses && plano_nome) {
+          const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
+          const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+          const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+          const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
+          const vencStr = venc.toISOString().slice(0,10);
+          await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
+        } else {
+          await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
+        }
       }
     }
     res.json({ status: payment.status, status_detail: payment.status_detail });
@@ -1378,7 +1404,7 @@ app.get('/api/dashboard', auth, adminOnly, async (req, res) => {
         ativos: ativos.n, atrasados: atrasados.n, vencendo: vencendo.n,
         total: ativos.n + atrasados.n + vencendo.n,
         cortesias: cortesias.n,
-        pagantes: ativos.n + atrasados.n + vencendo.n,
+        pagantes: ativos.n + vencendo.n,
       },
       receita_mes: receitaMes.total,
       checkins_hoje: checkinsHoje.n,
@@ -2035,8 +2061,15 @@ setInterval(async () => {
       // Grace period: dispara no dia do vencimento para quem acabou de vencer
       const ontem = new Date(hoje); ontem.setDate(ontem.getDate()-1);
       const [alunosGrace] = await db.query(
-        "SELECT id,nome,tel,email FROM alunos WHERE status IN ('ativo','vencendo') AND DATE(vencimento)=? AND (cortesia IS NULL OR cortesia=0)",
-        [fmt(ontem)]
+        `SELECT id,nome,tel,email FROM alunos
+         WHERE status IN ('ativo','vencendo')
+           AND DATE(vencimento)=?
+           AND (cortesia IS NULL OR cortesia=0)
+           AND id NOT IN (
+             SELECT DISTINCT aluno_id FROM pagamentos
+             WHERE status='pendente' AND DATE(criado_em) >= ?
+           )`,
+        [fmt(ontem), fmt(ontem)]
       );
       for (const a of alunosGrace) {
         const nomeFirst = a.nome.split(' ')[0];
