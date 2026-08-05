@@ -4183,10 +4183,22 @@ app.post('/api/_pv', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 setupDB().then(async () => {
   app.listen(PORT, () => console.log(`🥊 Punch and Roll API rodando na porta ${PORT}`));
-  // Fix único: corrige datas de check-ins com dia da semana errado (bug UTC→BRT)
+  // Fix: corrige datas de check-ins com dia da semana errado (bug UTC→BRT)
   try {
-    const [r] = await db.query(`UPDATE checkins c JOIN aulas a ON c.aula_id=a.id SET c.data_checkin=DATE_ADD(c.data_checkin,INTERVAL 1 DAY) WHERE DAYOFWEEK(c.data_checkin)!=CASE a.dia WHEN 'Segunda' THEN 2 WHEN 'Terça' THEN 3 WHEN 'Quarta' THEN 4 WHEN 'Quinta' THEN 5 WHEN 'Sexta' THEN 6 WHEN 'Sábado' THEN 7 ELSE DAYOFWEEK(c.data_checkin) END`);
-    if(r.affectedRows>0) console.log(`[FIX-DATES] ${r.affectedRows} check-ins corrigidos`);
+    const DIAS_JS = {Segunda:1,Terca:2,Quarta:3,Quinta:4,Sexta:5,Sabado:6};
+    const normalize = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'');
+    const [cks] = await db.query('SELECT c.id, c.data_checkin, a.dia FROM checkins c JOIN aulas a ON c.aula_id=a.id WHERE c.data_checkin >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)');
+    let fixed = 0;
+    for (const ck of cks) {
+      const d = new Date(ck.data_checkin);
+      const storedDay = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+      const expected = DIAS_JS[normalize(ck.dia)] ?? -1;
+      if (expected > 0 && storedDay !== expected) {
+        await db.query('UPDATE checkins SET data_checkin=DATE_ADD(data_checkin,INTERVAL 1 DAY) WHERE id=?',[ck.id]);
+        fixed++;
+      }
+    }
+    if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
