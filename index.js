@@ -1134,8 +1134,11 @@ app.delete('/api/aulas/:id', auth, adminOnly, async (req, res) => {
 app.get('/api/checkins', auth, async (req, res) => {
   try {
     const { aula_id, data, aluno_id, data_min } = req.query;
-    // Aluno só pode ver os próprios check-ins
-    const alunoIdFiltro = req.user.tipo === 'aluno' ? req.user.id : aluno_id;
+    // Aluno vê todos os check-ins se filtrar por aula_id (lista de turma)
+    // Sem aula_id, vê só os próprios
+    const alunoIdFiltro = req.user.tipo === 'aluno'
+      ? (aula_id ? null : req.user.id)
+      : aluno_id;
     let q = `SELECT c.*, a.nome as aluno_nome, au.nome as aula_nome, au.hora, au.dia FROM checkins c JOIN alunos a ON c.aluno_id = a.id JOIN aulas au ON c.aula_id = au.id WHERE 1=1`;
     const params = [];
     if (aula_id) { q += ' AND c.aula_id = ?'; params.push(aula_id); }
