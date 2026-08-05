@@ -4067,6 +4067,22 @@ app.get('/api/_mp-check', async (req, res) => {
   res.json({ modo, tokenMask, mpOk, mpErro, payMethods });
 });
 
+app.get('/api/_fix-checkin-dates', async (req, res) => {
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
+  try {
+    const [result] = await db.query(`
+      UPDATE checkins c
+      JOIN aulas a ON c.aula_id = a.id
+      SET c.data_checkin = DATE_ADD(c.data_checkin, INTERVAL 1 DAY)
+      WHERE DAYOFWEEK(c.data_checkin) != CASE a.dia
+        WHEN 'Segunda' THEN 2 WHEN 'Terça' THEN 3 WHEN 'Quarta' THEN 4
+        WHEN 'Quinta' THEN 5 WHEN 'Sexta' THEN 6 WHEN 'Sábado' THEN 7
+        ELSE DAYOFWEEK(c.data_checkin) END
+    `);
+    res.json({ corrigidos: result.affectedRows });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
