@@ -1,4 +1,4 @@
-const CACHE = 'punch-and-roll-v5';
+const CACHE = 'punch-and-roll-v6';
 
 const PRECACHE = [
   '/',

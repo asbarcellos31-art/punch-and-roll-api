@@ -1046,31 +1046,36 @@ async function renderCheckins() {
       GET('/api/checkins?data_min='+amanhaStr)
     ]);
     cache.checkins = Array.isArray(cks) ? cks : [];
-    const aulasHoje = cache.aulas.filter(a=>a.dia===selectedDay&&a.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
     const el = document.getElementById('checkins-lista');
-    if(aulasHoje.length===0){showEmpty(el,'Sem aulas neste dia');}
-    else {
-      const totalDia = cache.checkins.length;
-      el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Total de check-ins em ${dataStr}: <strong style="color:var(--fg)">${totalDia}</strong></div>` + aulasHoje.map(au=>{
-        const cksAula=cache.checkins.filter(c=>c.aula_id===au.id);
-        const pct=au.vagas>0?Math.round(cksAula.length/au.vagas*100):0;
+    const totalDia = cache.checkins.length;
+    if(totalDia===0){showEmpty(el,'Nenhum check-in neste dia');return;}
+    // Agrupa check-ins pelo aula_id real do próprio registro
+    const aulaMap = {};
+    cache.checkins.forEach(c=>{
+      if(!aulaMap[c.aula_id]) aulaMap[c.aula_id]={nome:c.aula_nome||'—',hora:c.hora||'—',checkins:[],vagas:null};
+      aulaMap[c.aula_id].checkins.push(c);
+    });
+    // Pega vagas da cache de aulas
+    cache.aulas.forEach(a=>{ if(aulaMap[a.id]) aulaMap[a.id].vagas=a.vagas; });
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Total de check-ins em ${dataStr}: <strong style="color:var(--fg)">${totalDia}</strong></div>` +
+      Object.entries(aulaMap).sort((a,b)=>a[1].hora.localeCompare(b[1].hora)).map(([aulaId,info])=>{
+        const vagas=info.vagas||12;
+        const pct=Math.round(info.checkins.length/vagas*100);
         return `<div class="card">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-            <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${au.hora} — ${au.nome}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">${cksAula.length}/${au.vagas} confirmados</div></div>
+            <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${info.hora} — ${info.nome}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${info.checkins.length}/${vagas} confirmados</div></div>
             <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${pct>=90?'#f87171':pct>=70?'var(--yellow)':'var(--green)'}">${pct}%</div></div>
           </div>
           <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:10px">
             <div style="height:100%;width:${pct}%;background:${pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)'};border-radius:4px"></div>
           </div>
-          ${cksAula.length===0?'<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px">Nenhum check-in ainda</div>':
-            cksAula.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:6px;margin-bottom:4px">
-              <div style="font-size:13px;font-weight:500">${c.aluno_nome||'—'}</div>
-              <span style="font-size:11px;color:var(--muted)">⏰ ${c.hora||'—'}</span>
-            </div>`).join('')}
+          ${info.checkins.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:6px;margin-bottom:4px">
+            <div style="font-size:13px;font-weight:500">${c.aluno_nome||'—'}</div>
+            <span style="font-size:11px;color:var(--muted)">⏰ ${c.hora||'—'}</span>
+          </div>`).join('')}
         </div>`;
       }).join('');
-    }
     // Seção de reservas futuras
     const elF = document.getElementById('checkins-futuros');
     const futArr = Array.isArray(futuros) ? futuros : [];

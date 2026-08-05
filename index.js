@@ -1161,16 +1161,16 @@ app.post('/api/checkins', auth, async (req, res) => {
       return res.status(403).json({ error: 'Acesso bloqueado. Regularize sua mensalidade para fazer check-in.' });
     const [aula] = await db.query('SELECT vagas, nome, hora, dia FROM aulas WHERE id=?',[aula_id]);
     if (!aula[0]) return res.status(404).json({ error: 'Aula não encontrada' });
-    // Calcula a data da aula (próxima ocorrência do dia da semana da aula)
+    // Calcula a data da aula usando horário de Brasília (BRT), não UTC
     const DIAS_SEMANA = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
     const diaAlvo = DIAS_SEMANA[aula[0].dia] ?? -1;
     const agora = new Date();
-    const diaHoje = agora.getDay() || 7; // 1=Seg, 7=Dom
+    const brtNow = new Date(agora.toLocaleString('en-US', {timeZone:'America/Sao_Paulo'}));
+    const diaHoje = brtNow.getDay() || 7; // 1=Seg, 7=Dom em BRT
     let diffDias = diaAlvo >= 0 ? diaAlvo - diaHoje : 0;
     if (diffDias < 0) diffDias += 7;
-    const dataAula = new Date(agora);
-    dataAula.setDate(agora.getDate() + diffDias);
-    const dataCheckin = dataAula.toISOString().slice(0,10);
+    const dataAulaUTC = new Date(Date.UTC(brtNow.getFullYear(), brtNow.getMonth(), brtNow.getDate() + diffDias));
+    const dataCheckin = dataAulaUTC.toISOString().slice(0,10);
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
