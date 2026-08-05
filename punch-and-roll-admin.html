@@ -308,7 +308,8 @@ textarea.fi{resize:none}
 const API = 'https://punch-and-roll-api-production.up.railway.app';
 const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
 const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return `${dd}/${m}/${y}`; };
-const todayStr = new Date().toISOString().slice(0,10);
+function _localDateStr(dt) { const d=dt||new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+const todayStr = _localDateStr();
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const PLANOS = {
   boxe:[
@@ -533,9 +534,9 @@ async function renderDashboard() {
   const cortesias = cache.alunos.filter(a=>a.cortesia).length;
   // Dia da semana real (não usa selectedDay que pode estar desincronizado)
   const diaAtualAdmin = DIAS[new Date().getDay()-1] || null; // null = domingo
-  const hojeStr = new Date().toISOString().slice(0,10);
+  const hojeStr = _localDateStr();
   const amanhaD = new Date(); amanhaD.setDate(amanhaD.getDate()+1);
-  const amanhaStr = amanhaD.toISOString().slice(0,10);
+  const amanhaStr = _localDateStr(amanhaD);
   let ocup = {};
   let cksHoje = [];
   let futurosDash = [];
@@ -996,7 +997,7 @@ async function excluirAula(id, nome) {
 let checkinDataOffset = 0;
 function checkinDataAtual() {
   const d = new Date(); d.setDate(d.getDate() + checkinDataOffset);
-  return d.toISOString().slice(0,10);
+  return _localDateStr(d);
 }
 function checkinDataLabel() {
   if(checkinDataOffset===0) return 'Hoje';

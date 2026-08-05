@@ -117,7 +117,8 @@ const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slic
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS_IDX = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
 const diaHoje = DIAS_IDX[new Date().getDay()]||'Segunda';
-const hojeUTC = new Date().toISOString().split('T')[0];
+function _localDateStr(dt) { const d=dt||new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+const hojeUTC = _localDateStr();
 function getNowMin() { return new Date().getHours()*60+new Date().getMinutes(); }
 const _DIAS_GETDAY = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
 function getDataParaAula(dia) {
@@ -125,7 +126,7 @@ function getDataParaAula(dia) {
   const hoje = new Date(); const hd = hoje.getDay()||7;
   let d = alvo-hd; if(d<0) d+=7;
   const dt = new Date(hoje); dt.setDate(hoje.getDate()+d);
-  return dt.toISOString().split('T')[0];
+  return _localDateStr(dt);
 }
 
 let _token = localStorage.getItem('pr_aluno_token')||'';
