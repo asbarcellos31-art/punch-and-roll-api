@@ -285,6 +285,22 @@ function renderInicio() {
     html+=`<button onclick="navTo('agenda')" style="width:100%;padding:7px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;margin-top:8px">Ver agenda completa →</button></div>`;
   }
 
+  // Histórico de check-ins recentes
+  const ckRecentes = cache.checkins.slice().reverse().slice(0,10);
+  if(ckRecentes.length) {
+    html+='<div class="card"><div class="card-title">📊 Meus Check-ins Recentes</div>';
+    ckRecentes.forEach(c=>{
+      const dtStr = String(c.data_checkin).slice(0,10);
+      const [y,m,d]=dtStr.split('-');
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e1e1e">
+        <div><div style="font-size:13px;font-weight:500">${c.aula_nome||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${d}/${m}/${y} · ${c.hora||'—'}</div></div>
+        <span style="font-size:11px;color:var(--green);font-weight:600">✓ Presente</span>
+      </div>`;
+    });
+    html+='</div>';
+  }
+
   document.getElementById('page-inicio').innerHTML = html;
 }
 

@@ -2527,14 +2527,19 @@ async function verHistoricoAluno(id,nome){
     </div>
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Pagamentos</div>
     <div id="hist-lista">Carregando...</div>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px">✅ Check-ins</div>
+    <div id="hist-checkins">Carregando...</div>
     <button class="btn btn-ghost btn-full" style="margin-top:12px" onclick="document.getElementById('modal-hist-aluno').remove()">Fechar</button>`;
   document.body.appendChild(box.parentElement||box);
   try {
-    const pags = await GET('/api/pagamentos?aluno_id='+id);
+    const [pags, cks] = await Promise.all([
+      GET('/api/pagamentos?aluno_id='+id),
+      GET('/api/checkins?aluno_id='+id)
+    ]);
     const el = document.getElementById('hist-lista');
     if(!el) return;
-    if(!pags.length){ el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">Nenhum pagamento registrado</div>'; return; }
-    el.innerHTML=pags.map(p=>{
+    if(!pags.length){ el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">Nenhum pagamento registrado</div>'; }
+    else el.innerHTML=pags.map(p=>{
       const cor=p.status==='pago'?'var(--green)':p.status==='pendente'?'var(--yellow)':'#f87171';
       const metLabel={pix:'PIX',cartao:'Cartão',dinheiro:'Dinheiro',debito:'Débito'}[p.metodo]||p.metodo||'—';
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
@@ -2546,6 +2551,19 @@ async function verHistoricoAluno(id,nome){
           <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green)">${fmtR(p.valor)}</div>
           <div style="font-size:9px;font-weight:600;color:${cor};text-transform:uppercase">${p.status}</div>
         </div>
+      </div>`;
+    }).join('');
+    const elCk = document.getElementById('hist-checkins');
+    if(!elCk) return;
+    const cksArr = Array.isArray(cks) ? cks.slice().reverse().slice(0,20) : [];
+    if(!cksArr.length){ elCk.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:12px">Nenhum check-in registrado</div>'; }
+    else elCk.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Total: ${Array.isArray(cks)?cks.length:0} check-ins</div>`+cksArr.map(c=>{
+      const dtStr=String(c.data_checkin).slice(0,10);
+      const [y,m,d]=dtStr.split('-');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
+        <div><div style="font-size:13px;font-weight:500">${c.aula_nome||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${d}/${m}/${y} · ${c.hora||'—'}</div></div>
+        <span style="font-size:11px;color:var(--green);font-weight:600">✓</span>
       </div>`;
     }).join('');
   } catch(e) {
