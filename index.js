@@ -4200,6 +4200,12 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
+  // Fix pontual: corrige vencimento da Aline para 22/08/2026
+  try {
+    const [res] = await db.query("UPDATE alunos SET venc='2026-08-22' WHERE nome LIKE '%Aline%' AND venc='2026-09-16'");
+    if(res.affectedRows>0) console.log('[FIX-ALINE] Vencimento corrigido para 2026-08-22');
+    else console.log('[FIX-ALINE] Nenhum registro alterado (verifique nome/vencimento)');
+  } catch(e) { console.error('[FIX-ALINE] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
   setInterval(monitorarWA, 10 * 60 * 1000);
