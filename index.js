@@ -11,6 +11,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+// Retorna data local BRT (evita UTC deslocado após 21h)
+function hojeBRT() { const d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 const ALLOWED_ORIGINS = [
   'https://punchandroll.com.br',
@@ -833,7 +835,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       console.log(`[CARTAO] aluno=${aluno_id} valor=${totalValor} status=${payment.status} detail=${payment.status_detail} method=${payment.payment_method_id} last4=${payment.card?.last_four_digits}`);
     }
 
-    const hoje = new Date().toISOString().slice(0,10);
+    const hoje = hojeBRT();
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome, payment.status === 'approved' ? hoje : null]);
 
@@ -842,7 +844,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
       const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
       const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
-      const vencStr = venc.toISOString().slice(0,10);
+      const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
         [plano_nome, plano_id||null, parseFloat(valor), vencStr, metodo, aluno_id]);
     }
@@ -1096,7 +1098,7 @@ app.get('/api/aulas', async (req, res) => {
 
 app.get('/api/aulas/ocupacao', async (req, res) => {
   try {
-    const hoje = new Date().toISOString().slice(0,10);
+    const hoje = hojeBRT();
     const [rows] = await db.query('SELECT aula_id, COUNT(*) as total FROM checkins WHERE data_checkin=? GROUP BY aula_id', [hoje]);
     const map = {};
     rows.forEach(r => { map[r.aula_id] = r.total; });
@@ -1202,7 +1204,7 @@ app.delete('/api/checkins/:id', auth, async (req, res) => {
     // Aluno só pode cancelar o próprio check-in e apenas no mesmo dia
     if (req.user.tipo === 'aluno') {
       if (Number(ck.aluno_id) !== Number(req.user.id)) return res.status(403).json({ error: 'Acesso negado' });
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = hojeBRT();
       const dtCk = ck.data_checkin instanceof Date ? ck.data_checkin.toISOString().split('T')[0] : String(ck.data_checkin).split('T')[0];
       if (dtCk < hoje) return res.status(400).json({ error: 'Não é possível cancelar check-in de dias anteriores' });
     }
@@ -1334,7 +1336,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     console.log(`[CARTAO-ADMIN] aluno=${aluno_id} valor=${valor} status=${payment.status} detail=${payment.status_detail}`);
     const pagStatusOk = ['approved','authorized'].includes(payment.status);
     const { meses, plano_id, plano_nome } = req.body;
-    const hoje = new Date().toISOString().slice(0,10);
+    const hoje = hojeBRT();
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id),meses||null,plano_id||null,plano_nome||null,pagStatusOk?hoje:null]);
     if (pagStatusOk) {
@@ -1343,7 +1345,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
         const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
         const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
-        const vencStr = venc.toISOString().slice(0,10);
+        const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
         await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
       } else {
         await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
@@ -1371,13 +1373,13 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
       if (pag.length) {
         await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=?",[String(req.params.payment_id)]);
         const { aluno_id, meses, plano_id, plano_nome } = pag[0];
-        const hoje = new Date().toISOString().slice(0,10);
+        const hoje = hojeBRT();
         if (meses && plano_nome) {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
           const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
-          const vencStr = venc.toISOString().slice(0,10);
+          const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
           await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
         } else {
           await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
@@ -1458,14 +1460,14 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? OR mp_payment_id=?",
             [String(data.id), payment.external_reference||String(data.id)]);
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
-          const hoje = new Date().toISOString().slice(0,10);
+          const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
           const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
           const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
           if (meses && plano_nome) {
             const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
-            const vencStr = venc.toISOString().slice(0,10);
+            const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto=? WHERE id=?",
               [vencStr, plano_nome, plano_id||null, pagto, aluno_id]);
           } else {
@@ -4200,12 +4202,13 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
-  // Fix pontual: corrige vencimento da Aline para 22/08/2026
+  // Fix pontual: corrige vencimentos incorretos
   try {
-    const [res] = await db.query("UPDATE alunos SET venc='2026-08-22' WHERE nome LIKE '%Aline%' AND venc='2026-09-16'");
-    if(res.affectedRows>0) console.log('[FIX-ALINE] Vencimento corrigido para 2026-08-22');
-    else console.log('[FIX-ALINE] Nenhum registro alterado (verifique nome/vencimento)');
-  } catch(e) { console.error('[FIX-ALINE] Erro:', e.message); }
+    const [aline] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%Aline%'");
+    if(aline.affectedRows>0) console.log('[FIX-VENC] Aline → 2026-08-22');
+    const [luna] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Luna%'");
+    if(luna.length>0) console.log('[FIX-VENC] Luna atual:', luna.map(a=>`${a.nome}: ${String(a.vencimento).slice(0,10)}`).join(', '));
+  } catch(e) { console.error('[FIX-VENC] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
   setInterval(monitorarWA, 10 * 60 * 1000);
