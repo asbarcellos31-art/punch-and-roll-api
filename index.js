@@ -842,7 +842,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
     if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
       const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-      const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+      const base = vencAtual || hoje; // dia fixo: sempre estende do vencimento atual
       const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
       const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
@@ -1343,7 +1343,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
       if (meses && plano_nome) {
         const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
         const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-        const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+        const base = vencAtual || hoje; // dia fixo: sempre estende do vencimento atual
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
         const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
         await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1377,7 +1377,7 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
         if (meses && plano_nome) {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-          const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+          const base = vencAtual || hoje; // dia fixo: sempre estende do vencimento atual
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
           const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
           await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1463,7 +1463,7 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-          const base = vencAtual && vencAtual > hoje ? vencAtual : hoje;
+          const base = vencAtual || hoje; // dia fixo: sempre estende do vencimento atual
           const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
           if (meses && plano_nome) {
             const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
@@ -4202,14 +4202,12 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
-  // Fix pontual: lista alunos e corrige vencimentos
+  // Fix pontual: corrige vencimento da Aline para dia fixo 22
   try {
-    const [todos] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Aline%' OR nome LIKE '%Luna%'");
-    console.log('[FIX-VENC] Encontrados:', todos.map(a=>`id=${a.id} "${a.nome}" venc=${String(a.vencimento).slice(0,10)}`).join(' | '));
-    const [aline] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%line%'");
-    console.log('[FIX-VENC] Aline update:', aline.affectedRows, 'linha(s)');
-    const [luna] = await db.query("UPDATE alunos SET vencimento='2026-08-21' WHERE nome LIKE '%Luna%'");
-    console.log('[FIX-VENC] Luna update:', luna.affectedRows, 'linha(s)');
+    const [todos] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Aline%'");
+    console.log('[FIX-VENC] Aline encontrada:', todos.map(a=>`id=${a.id} "${a.nome}" venc=${String(a.vencimento).slice(0,10)}`).join(' | '));
+    const [res] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%Aline%'");
+    console.log('[FIX-VENC] Aline → 2026-08-22, linhas:', res.affectedRows);
   } catch(e) { console.error('[FIX-VENC] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
