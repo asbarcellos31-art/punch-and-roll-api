@@ -4202,12 +4202,12 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
-  // Fix pontual: corrige vencimento da Aline para dia fixo 22
+  // Fix pontual: corrige vencimentos para dia fixo
   try {
-    const [todos] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Aline%'");
-    console.log('[FIX-VENC] Aline encontrada:', todos.map(a=>`id=${a.id} "${a.nome}" venc=${String(a.vencimento).slice(0,10)}`).join(' | '));
-    const [res] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%Aline%'");
-    console.log('[FIX-VENC] Aline → 2026-08-22, linhas:', res.affectedRows);
+    const [r1] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%Aline%'");
+    console.log('[FIX-VENC] Aline → 22/08, linhas:', r1.affectedRows);
+    const [r2] = await db.query("UPDATE alunos SET vencimento='2026-08-21' WHERE nome LIKE '%Luna%'");
+    console.log('[FIX-VENC] Luna → 21/08, linhas:', r2.affectedRows);
   } catch(e) { console.error('[FIX-VENC] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
