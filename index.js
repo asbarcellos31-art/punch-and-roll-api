@@ -4202,12 +4202,14 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
-  // Fix pontual: corrige vencimentos incorretos
+  // Fix pontual: lista alunos e corrige vencimentos
   try {
-    const [aline] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%Aline%'");
-    if(aline.affectedRows>0) console.log('[FIX-VENC] Aline → 2026-08-22');
-    const [luna] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Luna%'");
-    if(luna.length>0) console.log('[FIX-VENC] Luna atual:', luna.map(a=>`${a.nome}: ${String(a.vencimento).slice(0,10)}`).join(', '));
+    const [todos] = await db.query("SELECT id, nome, vencimento FROM alunos WHERE nome LIKE '%Aline%' OR nome LIKE '%Luna%'");
+    console.log('[FIX-VENC] Encontrados:', todos.map(a=>`id=${a.id} "${a.nome}" venc=${String(a.vencimento).slice(0,10)}`).join(' | '));
+    const [aline] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE nome LIKE '%line%'");
+    console.log('[FIX-VENC] Aline update:', aline.affectedRows, 'linha(s)');
+    const [luna] = await db.query("UPDATE alunos SET vencimento='2026-08-21' WHERE nome LIKE '%Luna%'");
+    console.log('[FIX-VENC] Luna update:', luna.affectedRows, 'linha(s)');
   } catch(e) { console.error('[FIX-VENC] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
