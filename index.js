@@ -4202,10 +4202,10 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
-  // Fix pontual: corrige vencimentos para dia fixo
+  // Fix pontual: corrige vencimento da Alinne (id=25) para dia fixo 22
   try {
-    const [todos] = await db.query("SELECT id, nome, vencimento FROM alunos ORDER BY nome");
-    console.log('[FIX-VENC] Todos alunos:', todos.map(a=>`[${a.id}] ${a.nome} | ${String(a.vencimento).slice(0,10)}`).join(' || '));
+    const [r] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE id=25");
+    console.log('[FIX-VENC] Alinne → 22/08, linhas:', r.affectedRows);
   } catch(e) { console.error('[FIX-VENC] Erro:', e.message); }
   agendarRelatorioSemanal();
   monitorarWA();
