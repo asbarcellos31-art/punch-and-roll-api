@@ -89,7 +89,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   <div class="topbar">
     <img src="/logo-icon.png" alt="PR" style="height:52px;width:auto">
     <div class="topbar-title" id="page-title">Início</div>
-    <div class="user-chip" onclick="doLogout()">
+    <div class="user-chip" onclick="abrirPerfil()">
       <div class="user-avatar" id="top-avatar">?</div>
       <span style="font-size:11px" id="top-name">—</span>
     </div>
@@ -839,6 +839,90 @@ async function shopEnviarPedido() {
   }
 }
 
+// ══ PERFIL ══
+function abrirPerfil() {
+  const a = aluno;
+  document.getElementById('perfil-avatar').textContent = a.nome[0];
+  document.getElementById('perfil-nome').textContent = a.nome;
+  document.getElementById('perfil-cpf').textContent = a.cpf ? 'CPF: '+a.cpf : 'Aluno #'+a.id;
+  document.getElementById('pf-tel').value = a.tel||'';
+  document.getElementById('pf-email').value = a.email||'';
+  document.getElementById('pf-end').value = a.endereco||'';
+  document.getElementById('pf-cidade').value = a.cidade||'São José';
+  document.getElementById('pf-cep').value = a.cep||'';
+  document.getElementById('pf-emerg-nome').value = a.emerg_nome||'';
+  document.getElementById('pf-emerg-tel').value = a.emerg_tel||'';
+  document.getElementById('pf-parentesco').value = a.parentesco||'';
+  perfilSetTab('dados');
+  document.getElementById('modal-perfil').style.display = 'flex';
+}
+
+function fecharPerfil() { document.getElementById('modal-perfil').style.display='none'; }
+
+function perfilSetTab(tab) {
+  ['dados','senha'].forEach(t => {
+    const btn = document.getElementById('perfil-tab-'+t);
+    btn.style.background = t===tab ? 'var(--red)' : 'var(--panel2)';
+    btn.style.color = t===tab ? '#fff' : 'var(--muted)';
+    document.getElementById('perfil-form-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.getElementById('perfil-dados-msg').style.display='none';
+  document.getElementById('perfil-senha-msg').style.display='none';
+}
+
+function perfilMaskTel(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>10)v=v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');else if(v.length>6)v=v.replace(/(\d{2})(\d{4,5})(\d{0,4})/,'($1) $2-$3');else if(v.length>2)v=v.replace(/(\d{2})(\d*)/,'($1) $2');el.value=v;}
+function perfilMaskCEP(el){let v=el.value.replace(/\D/g,'').slice(0,8);if(v.length>5)v=v.replace(/(\d{5})(\d{0,3})/,'$1-$2');el.value=v;}
+
+async function salvarDadosPerfil() {
+  const btn = document.getElementById('perfil-dados-btn');
+  btn.disabled=true; btn.textContent='Salvando...';
+  const msg = document.getElementById('perfil-dados-msg');
+  msg.style.display='none';
+  try {
+    const updated = await api('PUT','/api/alunos/me',{
+      tel:document.getElementById('pf-tel').value.trim(),
+      email:document.getElementById('pf-email').value.trim(),
+      endereco:document.getElementById('pf-end').value.trim(),
+      cidade:document.getElementById('pf-cidade').value.trim(),
+      cep:document.getElementById('pf-cep').value.trim(),
+      emerg_nome:document.getElementById('pf-emerg-nome').value.trim(),
+      emerg_tel:document.getElementById('pf-emerg-tel').value.trim(),
+      parentesco:document.getElementById('pf-parentesco').value,
+      saude:aluno.saude||'',
+      alergia:aluno.alergia||'',
+    });
+    aluno = {...aluno, ...updated, venc:updated.vencimento||aluno.venc};
+    msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ Dados atualizados!';
+    document.getElementById('top-name').textContent = aluno.nome.split(' ')[0];
+  } catch(e) {
+    msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='❌ '+e.message;
+  }
+  btn.disabled=false; btn.textContent='SALVAR DADOS';
+}
+
+async function alterarSenhaPerfil() {
+  const btn = document.getElementById('perfil-senha-btn');
+  btn.disabled=true; btn.textContent='Alterando...';
+  const msg = document.getElementById('perfil-senha-msg');
+  msg.style.display='none';
+  const atual = document.getElementById('pf-senha-atual').value;
+  const nova = document.getElementById('pf-nova-senha').value;
+  const conf = document.getElementById('pf-confirm-senha').value;
+  if(!atual||!nova||!conf){msg.style.display='block';msg.style.color='#f87171';msg.textContent='❌ Preencha todos os campos.';btn.disabled=false;btn.textContent='ALTERAR SENHA';return;}
+  if(nova.length<4){msg.style.display='block';msg.style.color='#f87171';msg.textContent='❌ Senha muito curta (mín. 4 caracteres).';btn.disabled=false;btn.textContent='ALTERAR SENHA';return;}
+  if(nova!==conf){msg.style.display='block';msg.style.color='#f87171';msg.textContent='❌ As senhas não coincidem.';btn.disabled=false;btn.textContent='ALTERAR SENHA';return;}
+  try {
+    await api('PUT','/api/auth/aluno/senha',{senha_atual:atual,nova_senha:nova});
+    msg.style.display='block'; msg.style.color='#4ade80'; msg.textContent='✅ Senha alterada com sucesso!';
+    document.getElementById('pf-senha-atual').value='';
+    document.getElementById('pf-nova-senha').value='';
+    document.getElementById('pf-confirm-senha').value='';
+  } catch(e) {
+    msg.style.display='block'; msg.style.color='#f87171'; msg.textContent='❌ '+e.message;
+  }
+  btn.disabled=false; btn.textContent='ALTERAR SENHA';
+}
+
 // Auto-login com token salvo
 (async function(){
   if(!_token) return;
@@ -908,6 +992,98 @@ async function shopEnviarPedido() {
     <div id="renov-cupom-msg" style="font-size:11px;margin-bottom:8px;display:none"></div>
 
     <button id="renov-btn" onclick="confirmarRenovacao()" style="width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer;margin-top:8px">Gerar PIX</button>
+  </div>
+</div>
+
+<!-- Modal Perfil -->
+<div id="modal-perfil" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center" onclick="if(event.target===this)fecharPerfil()">
+  <div style="background:var(--panel);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;max-height:92vh;overflow-y:auto">
+    <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Meu Perfil</div>
+      <button onclick="fecharPerfil()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:12px;background:var(--panel2);border:1px solid var(--border);border-radius:10px">
+      <div id="perfil-avatar" style="width:46px;height:46px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0"></div>
+      <div><div id="perfil-nome" style="font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px"></div>
+      <div id="perfil-cpf" style="font-size:11px;color:var(--muted);margin-top:2px"></div></div>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button id="perfil-tab-dados" onclick="perfilSetTab('dados')" style="flex:1;padding:9px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--red);color:#fff">Meus Dados</button>
+      <button id="perfil-tab-senha" onclick="perfilSetTab('senha')" style="flex:1;padding:9px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--panel2);color:var(--muted)">Senha</button>
+    </div>
+
+    <!-- ABA DADOS -->
+    <div id="perfil-form-dados">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">WhatsApp</label>
+          <input id="pf-tel" oninput="perfilMaskTel(this)" maxlength="15" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="(48) 99999-0000">
+        </div>
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">E-mail</label>
+          <input id="pf-email" type="email" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="seu@email.com">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Endereço</label>
+        <input id="pf-end" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="Rua, número, bairro">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Cidade</label>
+          <input id="pf-cidade" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="São José">
+        </div>
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">CEP</label>
+          <input id="pf-cep" oninput="perfilMaskCEP(this)" maxlength="9" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="00000-000">
+        </div>
+      </div>
+      <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--red);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">Contato de Emergência</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Nome</label>
+          <input id="pf-emerg-nome" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="Responsável">
+        </div>
+        <div>
+          <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Telefone</label>
+          <input id="pf-emerg-tel" oninput="perfilMaskTel(this)" maxlength="15" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none" placeholder="(48) 99999-0000">
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Parentesco</label>
+        <select id="pf-parentesco" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;-webkit-appearance:none">
+          <option value="">Selecione</option>
+          <option>Pai/Mãe</option><option>Cônjuge</option><option>Filho(a)</option><option>Irmão/Irmã</option><option>Outro</option>
+        </select>
+      </div>
+      <div id="perfil-dados-msg" style="display:none;font-size:13px;margin-bottom:10px;padding:10px;border-radius:6px;background:var(--panel2)"></div>
+      <button id="perfil-dados-btn" onclick="salvarDadosPerfil()" style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">SALVAR DADOS</button>
+    </div>
+
+    <!-- ABA SENHA -->
+    <div id="perfil-form-senha" style="display:none">
+      <div style="margin-bottom:10px">
+        <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Senha Atual</label>
+        <input id="pf-senha-atual" type="password" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="Senha atual">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Nova Senha</label>
+        <input id="pf-nova-senha" type="password" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="Nova senha (mín. 4 caracteres)">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block">Confirmar Nova Senha</label>
+        <input id="pf-confirm-senha" type="password" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="Repita a nova senha">
+      </div>
+      <div id="perfil-senha-msg" style="display:none;font-size:13px;margin-bottom:10px;padding:10px;border-radius:6px;background:var(--panel2)"></div>
+      <button id="perfil-senha-btn" onclick="alterarSenhaPerfil()" style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">ALTERAR SENHA</button>
+    </div>
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <button onclick="fecharPerfil();doLogout()" style="width:100%;padding:11px;background:transparent;color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer">🚪 Sair da conta</button>
+    </div>
   </div>
 </div>
 

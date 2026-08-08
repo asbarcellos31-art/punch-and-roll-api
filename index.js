@@ -761,6 +761,19 @@ app.get('/api/alunos/me', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.put('/api/alunos/me', auth, async (req, res) => {
+  try {
+    if(req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const { tel, email, endereco, cidade, cep, emerg_nome, emerg_tel, parentesco, saude, alergia } = req.body;
+    await db.query(
+      'UPDATE alunos SET tel=?,email=?,endereco=?,cidade=?,cep=?,emerg_nome=?,emerg_tel=?,parentesco=?,saude=?,alergia=? WHERE id=?',
+      [tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,req.user.id]
+    );
+    const [rows] = await db.query('SELECT * FROM alunos WHERE id=?', [req.user.id]);
+    res.json({...rows[0], venc: rows[0].vencimento});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Aluno solicita mudança de plano
 app.post('/api/alunos/me/solicitar-plano', auth, async (req, res) => {
   try {
