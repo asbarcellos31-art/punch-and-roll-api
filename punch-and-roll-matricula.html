@@ -291,9 +291,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--black);color:var(--white)
       ⚠️ <strong>MODO SIMULAÇÃO</strong> — Nenhum pagamento será cobrado. O aluno será criado no banco de dados normalmente para teste.
     </div>
 
+    <div id="pay-error-box" style="display:none;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:14px;margin-bottom:4px;font-size:13px"></div>
     <div style="height:20px"></div>
     <button class="btn-submit" id="btn-pagar" onclick="processarPagamento()">GERAR PIX</button>
-    <button class="btn-back" id="btn-voltar" onclick="setStep(2)">← Voltar</button>
+    <button class="btn-back" id="btn-voltar" onclick="S.alunoId=null;setStep(2)">← Voltar</button>
     <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)" id="rodape-pag">🔒 SSL · Dados criptografados · Mercado Pago</div>
   </div>
 
@@ -370,7 +371,8 @@ const BENEFICIOS={
 };
 
 const fmtR=v=>'R$ '+Number(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-const todayStr=new Date().toISOString().slice(0,10);
+function _localDateStr(dt){const d=dt||new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+const todayStr=_localDateStr();
 const MODO_TESTE = new URLSearchParams(location.search).get('teste')==='1';
 let S={modalidade:'boxe',freq:'3x',planoId:null,plano:null,payMethod:'pix',dados:{},alunoId:null,pixPaymentId:null,pixInterval:null,cupom:null,desconto:0};
 
@@ -857,7 +859,7 @@ function copiarPIX(){
   .catch(()=>{const el=document.createElement('textarea');el.value=chave;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);hint.textContent='✓ Copiado!';setTimeout(()=>hint.textContent='',2000);});
 }
 
-function calcVenc(inicio,meses){const d=new Date(inicio);d.setMonth(d.getMonth()+meses);return d.toISOString().slice(0,10);}
+function calcVenc(inicio,meses){const d=new Date(inicio+'T12:00:00');d.setMonth(d.getMonth()+meses);return _localDateStr(d);}
 
 async function simularMatricula(){
   const btn=document.getElementById('btn-pagar');
@@ -888,46 +890,49 @@ async function simularMatricula(){
   }
 }
 
+function mostrarErro(msg){
+  const btn=document.getElementById('btn-pagar');
+  btn.disabled=false;btn.style.background='';
+  btn.innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
+  const box=document.getElementById('pay-error-box');
+  box.style.display='block';
+  box.innerHTML='<div style="color:#f87171;font-weight:600;margin-bottom:10px">❌ '+msg+'</div>'+
+    (S.payMethod==='credito'?'<button onclick="setPayMethod(\'pix\');document.getElementById(\'pay-error-box\').style.display=\'none\'" style="width:100%;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-family:\'DM Sans\',sans-serif;font-size:13px;cursor:pointer;color:var(--white);margin-top:4px">🔲 Tentar pagar com PIX</button>':'');
+}
+
+async function salvarAlunoSeNecessario(payMethod){
+  if(S.alunoId) return;
+  const apiRes=await fetch(API_URL+'/api/alunos/publico',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
+      tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
+      cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
+      parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
+      nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
+      plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
+      inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
+      payMethod:payMethod,obs:'',origem:'auto-cadastro'
+    })
+  });
+  const data=await apiRes.json();
+  if(!apiRes.ok){
+    if(apiRes.status===409&&data.aluno_id){S.alunoId=data.aluno_id;return;}
+    throw new Error(data.error||'Erro ao salvar dados');
+  }
+  S.alunoId=data.id;
+  fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
+}
+
 async function processarPagamento(){
   const btn=document.getElementById('btn-pagar');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>PROCESSANDO...';
+  document.getElementById('pay-error-box').style.display='none';
 
   try{
     if(S.payMethod==='pix'){
-      // 1. Salva aluno
-      const apiRes=await fetch(API_URL+'/api/alunos/publico',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
-          tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
-          cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
-          parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
-          nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
-          plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
-          inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
-          payMethod:'pix',obs:'',origem:'auto-cadastro'
-        })
-      });
-      if(!apiRes.ok){
-        const err=await apiRes.json();
-        if(apiRes.status===409){
-          document.getElementById('step3').innerHTML=`<div style="text-align:center;padding:24px">
-            <div style="font-size:48px;margin-bottom:12px">👤</div>
-            <h3 style="color:#d4111c;margin-bottom:8px">Cadastro já existe!</h3>
-            <p style="color:#555;margin-bottom:16px">${err.message||'Você já tem cadastro na Punch and Roll.'}</p>
-            <p style="color:#555;margin-bottom:20px">Acesse o portal do aluno para realizar seu pagamento.</p>
-            <a href="/punch-and-roll-portal.html" style="display:inline-block;padding:12px 32px;background:#d4111c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Acessar Portal do Aluno →</a>
-          </div>`;
-          btn.disabled=false;btn.innerHTML='PROCESSAR PAGAMENTO';
-          return;
-        }
-        throw new Error(err.error||'Erro ao salvar');
-      }
-      const alunoData=await apiRes.json();
-      S.alunoId=alunoData.id;
-      fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:S.alunoId,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
+      await salvarAlunoSeNecessario('pix');
 
-      // 2. Gera PIX
       const pixRes=await fetch(API_URL+'/api/pagamentos/pix',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
@@ -941,7 +946,6 @@ async function processarPagamento(){
       const pixData=await pixRes.json();
       S.pixPaymentId=pixData.payment_id;
 
-      // 3. Mostra QR Code
       if(pixData.qr_code_base64){
         document.getElementById('pix-qr-box').innerHTML=
           '<img src="data:image/png;base64,'+pixData.qr_code_base64+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
@@ -957,7 +961,6 @@ async function processarPagamento(){
       btn.innerHTML='⏳ AGUARDANDO PAGAMENTO...';
       btn.style.background='#1a3a2a';
 
-      // 4. Polling a cada 5s
       S.pixInterval=setInterval(async()=>{
         try{
           const stRes=await fetch(API_URL+'/api/pagamentos/status/'+S.pixPaymentId);
@@ -977,63 +980,35 @@ async function processarPagamento(){
       const name=document.getElementById('f-card-name').value.trim();
       const exp=document.getElementById('f-card-exp').value;
       const cvv=document.getElementById('f-card-cvv').value;
-      if(!num||num.length<16){alert('Número do cartão inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
-      if(!name){alert('Informe o nome no cartão!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
-      if(!exp||exp.length<5){alert('Validade inválida!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
-      if(!cvv||cvv.length<3){alert('CVV inválido!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
+      if(!num||num.length<16){mostrarErro('Número do cartão inválido!');return;}
+      if(!name){mostrarErro('Informe o nome no cartão!');return;}
+      if(!exp||exp.length<5){mostrarErro('Validade inválida!');return;}
+      if(!cvv||cvv.length<3){mostrarErro('CVV inválido!');return;}
 
       const[mes,ano]=exp.split('/');
       const cpfTitular=(document.getElementById('f-card-cpf').value||S.dados.cpf||'').replace(/\D/g,'');
-      if(!cpfTitular||cpfTitular.length<11){alert('Informe o CPF do titular do cartão!');btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';return;}
+      if(!cpfTitular||cpfTitular.length<11){mostrarErro('Informe o CPF do titular do cartão!');return;}
+
       let cardToken;
-      try {
+      try{
         cardToken=await mp.createCardToken({
           cardNumber:num,cardholderName:name,
           cardExpirationMonth:mes,cardExpirationYear:'20'+ano,
           securityCode:cvv,
           identificationType:'CPF',identificationNumber:cpfTitular,
         });
-      } catch(mpErr) {
-        const mpMsg = mpErr?.message || mpErr?.cause?.[0]?.description || (Array.isArray(mpErr)?mpErr[0]?.description:null) || (mpErr?JSON.stringify(mpErr):null) || 'Verifique os dados do cartão e tente novamente';
-        throw new Error(mpMsg);
+      }catch(mpErr){
+        const mpMsg=mpErr?.message||mpErr?.cause?.[0]?.description||(Array.isArray(mpErr)?mpErr[0]?.description:null)||(mpErr?JSON.stringify(mpErr):null)||'Verifique os dados do cartão e tente novamente';
+        mostrarErro(mpMsg);return;
       }
-      if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão. Verifique os dados.');
+      if(!cardToken?.id){mostrarErro('Não foi possível tokenizar o cartão. Verifique os dados.');return;}
 
-      const apiRes=await fetch(API_URL+'/api/alunos/publico',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          nome:S.dados.nome,cpf:S.dados.cpf,nasc:S.dados.nasc,sexo:S.dados.sexo,
-          tel:S.dados.tel,email:S.dados.email,end:S.dados.end,cidade:S.dados.cidade,
-          cep:S.dados.cep,emergNome:S.dados.emergNome,emergTel:S.dados.emergTel,
-          parentesco:S.dados.parentesco,saude:S.dados.saude,alergia:S.dados.alergia,
-          nivel:S.dados.nivel,modalidade:S.modalidade,planoId:S.planoId,
-          plano:S.plano.nome+' — '+S.plano.desc,valor:S.plano.valor,meses:S.plano.meses,
-          inicio:todayStr,venc:calcVenc(todayStr,S.plano.meses),
-          payMethod:'cartao',obs:'',origem:'auto-cadastro'
-        })
-      });
-      if(!apiRes.ok){
-        const d=await apiRes.json();
-        if(apiRes.status===409){
-          document.getElementById('step3').innerHTML=`<div style="text-align:center;padding:24px">
-            <div style="font-size:48px;margin-bottom:12px">👤</div>
-            <h3 style="color:#d4111c;margin-bottom:8px">Cadastro já existe!</h3>
-            <p style="color:#555;margin-bottom:16px">${d.message||'Você já tem cadastro na Punch and Roll.'}</p>
-            <p style="color:#555;margin-bottom:20px">Acesse o portal do aluno para realizar seu pagamento.</p>
-            <a href="/punch-and-roll-portal.html" style="display:inline-block;padding:12px 32px;background:#d4111c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px">Acessar Portal do Aluno →</a>
-          </div>`;
-          btn.disabled=false;btn.innerHTML='CONFIRMAR PAGAMENTO';
-          return;
-        }
-        throw new Error(d.error||'Erro ao cadastrar aluno');
-      }
-      const alunoData=await apiRes.json();
-      fetch(API_URL+'/api/contratos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aluno_id:alunoData.id,plano:S.plano.nome+' — '+S.plano.desc,modalidade:S.modalidade,valor:S.plano.valor,meses:S.plano.meses,freq:S.freq,contrato_html:gerarContratoHTML(),nome:S.dados.nome,email:S.dados.email})}).catch(()=>{});
+      await salvarAlunoSeNecessario('cartao');
 
       const cardRes=await fetch(API_URL+'/api/pagamentos/cartao',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          aluno_id:alunoData.id,
+          aluno_id:S.alunoId,
           valor:valorFinal(),
           descricao:'Punch and Roll — '+S.plano.nome+' '+S.plano.desc+(S.cupom?' ['+S.cupom+']':''),
           token:cardToken.id,email:S.dados.email,nome:S.dados.nome,cpf:S.dados.cpf,
@@ -1067,17 +1042,13 @@ async function processarPagamento(){
           cc_rejected_max_attempts:'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
           cc_rejected_other_reason:'Cartão recusado pela operadora. Tente PIX.',
         };
-        const det = cardData.status_detail||cardData.status||'';
+        const det=cardData.status_detail||cardData.status||'';
         throw new Error(motivos[det]||`Cartão recusado: ${det}. Tente PIX.`);
       }
     }
   }catch(err){
     console.error(err);
-    const msg = (typeof err==='string'?err:null)||err?.message||'Erro ao processar pagamento. Tente novamente.';
-    alert('Erro: '+msg);
-    btn.disabled=false;
-    btn.style.background='';
-    btn.innerHTML=S.payMethod==='pix'?'GERAR PIX':'CONFIRMAR PAGAMENTO';
+    mostrarErro((typeof err==='string'?err:null)||err?.message||'Erro ao processar pagamento. Tente novamente.');
   }
 }
 
