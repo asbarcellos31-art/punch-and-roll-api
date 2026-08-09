@@ -803,8 +803,9 @@ async function fichaAluno(id) {
     const contratos = await GET('/api/contratos/aluno/'+a.id);
     const el = document.getElementById('contratos-'+a.id);
     if(!el) return;
+    const btnEnviar = `<button onclick="enviarContrato(${a.id},this)" style="width:100%;margin-top:8px;padding:8px;background:var(--dark);border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;color:var(--white)">📧 Enviar Contrato por E-mail</button>`;
     if(!contratos||contratos.length===0){
-      el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">Nenhum contrato enviado</div>';
+      el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">Nenhum contrato enviado</div>'+btnEnviar;
     } else {
       el.innerHTML = contratos.map(c=>{
         const assinado = c.assinado || !!c.assinado_em;
@@ -822,7 +823,7 @@ async function fichaAluno(id) {
             <a href="https://punchandroll.com.br/assinar-contrato.html?token=${c.token}" target="_blank" style="color:var(--muted);font-size:18px;text-decoration:none" title="Ver contrato">🔗</a>
           </div>
         </div>`;
-      }).join('');
+      }).join('') + btnEnviar;
     }
   } catch(e) {
     const el = document.getElementById('contratos-'+a.id);
@@ -831,6 +832,20 @@ async function fichaAluno(id) {
 
   // Fetch student documents async
   carregarDocumentosAluno(a.id);
+}
+
+async function enviarContrato(alunoId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const r = await POST('/api/contratos/enviar/' + alunoId, {});
+    btn.textContent = '✅ Enviado! Copiar link';
+    btn.onclick = () => { navigator.clipboard.writeText(r.link); btn.textContent = '✅ Link copiado!'; };
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '📧 Enviar Contrato por E-mail';
+    alert('Erro: ' + (e.message || 'Tente novamente'));
+  }
 }
 
 async function carregarDocumentosAluno(alunoId) {
