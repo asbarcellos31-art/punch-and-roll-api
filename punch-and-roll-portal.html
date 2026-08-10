@@ -64,23 +64,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 <body>
 
 <!-- LOGIN -->
-<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:500">
-  <a href="/" style="text-decoration:none;display:flex;flex-direction:column;align-items:center" title="Voltar ao início">
-      <img src="/logo.png" alt="Punch and Roll" style="width:160px;height:auto;margin-bottom:12px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))">
+<div id="login-screen" style="position:fixed;inset:0;background:#0c0c0c;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:500;overflow:hidden">
+  <div style="position:absolute;top:-100px;left:-100px;width:350px;height:350px;background:radial-gradient(circle,rgba(212,17,28,.22) 0%,transparent 70%);pointer-events:none"></div>
+  <div style="position:absolute;bottom:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(212,17,28,.12) 0%,transparent 70%);pointer-events:none"></div>
+  <a href="/" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1" title="Voltar ao início">
+    <img src="/logo.png" alt="Punch and Roll" style="width:180px;height:auto;margin-bottom:6px;filter:drop-shadow(0 0 24px rgba(212,17,28,.5))">
   </a>
-  <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px">Portal do Aluno</div>
-  <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:340px">
-    <div style="margin-bottom:12px">
-      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block">E-mail ou nome</label>
-      <input id="l-login" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="seu@email.com ou nome" onkeydown="if(event.key==='Enter')doLogin()">
+  <div style="font-size:10px;color:#d4111c;letter-spacing:3px;text-transform:uppercase;margin-bottom:32px;position:relative;z-index:1">Portal do Aluno</div>
+  <div style="background:#161616;border:1px solid #2a2a2a;border-radius:14px;padding:24px;width:100%;max-width:340px;position:relative;z-index:1">
+    <div style="margin-bottom:14px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#555;margin-bottom:6px;display:block">E-mail ou nome</label>
+      <input id="l-login" style="width:100%;background:#0f0f0f;border:1px solid #2d2d2d;border-radius:8px;padding:12px 14px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="seu@email.com ou nome" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-    <div style="margin-bottom:16px">
-      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block">Senha</label>
-      <input id="l-senha" type="password" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div style="margin-bottom:20px">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#555;margin-bottom:6px;display:block">Senha</label>
+      <input id="l-senha" type="password" style="width:100%;background:#0f0f0f;border:1px solid #2d2d2d;border-radius:8px;padding:12px 14px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;outline:none" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-    <button id="l-btn" onclick="doLogin()" style="width:100%;padding:12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;cursor:pointer">ENTRAR</button>
+    <button id="l-btn" onclick="doLogin()" style="width:100%;padding:14px;background:#d4111c;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;cursor:pointer;box-shadow:0 4px 20px rgba(212,17,28,.4)">ENTRAR</button>
     <div id="l-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">Login ou senha incorretos</div>
-    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px">Senha padrão: <strong style="color:var(--white)">123</strong></div>
+    <div style="font-size:11px;color:#333;text-align:center;margin-top:14px">Senha padrão: <strong style="color:#555">123</strong></div>
   </div>
 </div>
 
