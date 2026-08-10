@@ -384,73 +384,150 @@ async function renderFinanceiro() {
   `;
 }
 
+// CALENDÁRIO
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DOW_TO_DIA = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
+let calMes = new Date().getMonth();
+let calAno = new Date().getFullYear();
+let calDataSelecionada = hojeUTC; // YYYY-MM-DD
+
+function mudarMes(delta) { calMes+=delta; if(calMes>11){calMes=0;calAno++;}else if(calMes<0){calMes=11;calAno--;} renderAgenda(); }
+
+function selecionarData(dateStr) {
+  calDataSelecionada = dateStr;
+  renderAgenda();
+}
+
 // AGENDA
 async function renderAgenda() {
   const a = aluno;
   const bloqueado = a.status==='atrasado';
-  const tabs = DIAS.map(d=>`<button class="day-tab${d===diaSelecionado?' active':''}" onclick="selecionarDia('${d}')">${d}</button>`).join('');
-  const isHoje = diaHoje !== null && diaSelecionado === diaHoje;
-  const aulasD = cache.aulas.filter(au=>au.dia===diaSelecionado&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const el = document.getElementById('page-agenda');
 
-  let html = `<div class="day-tabs">${tabs}</div>`;
-  if(bloqueado) html+='<div class="alert-r">🔴 Mensalidade em atraso. Regularize para fazer check-in.</div>';
-  if(aulasD.length===0) { html+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:32px">Sem aulas neste dia</div>'; }
-  else {
-    // Carrega confirmados de cada turma do dia
-    const dataAgenda = getDataParaAula(diaSelecionado);
+  // Build calendar grid
+  const prim = new Date(calAno, calMes, 1);
+  const ult = new Date(calAno, calMes+1, 0);
+  const startDow = prim.getDay(); // 0=Dom
+
+  const BtnStyle = 'background:none;border:none;color:var(--white);font-size:22px;cursor:pointer;padding:4px 10px;border-radius:6px';
+  let grid = `<div class="card" style="padding:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <button onclick="mudarMes(-1)" style="${BtnStyle}">‹</button>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px">${MESES_PT[calMes]} ${calAno}</span>
+      <button onclick="mudarMes(1)" style="${BtnStyle}">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:4px">
+      ${['D','S','T','Q','Q','S','S'].map(d=>`<div style="text-align:center;font-size:10px;color:var(--muted);padding:4px 0;font-weight:600">${d}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
+
+  for(let i=0;i<startDow;i++) grid+='<div></div>';
+
+  for(let day=1;day<=ult.getDate();day++){
+    const dt = new Date(calAno,calMes,day);
+    const dow = dt.getDay();
+    const dateStr = _localDateStr(dt);
+    const diaNome = DOW_TO_DIA[dow];
+    const temAula = !!diaNome && cache.aulas.some(au=>au.dia===diaNome&&au.status==='ativo');
+    const isToday = dateStr===hojeUTC;
+    const isSel = dateStr===calDataSelecionada;
+    const isPast = dateStr<hojeUTC;
+    const isSun = dow===0;
+    const ckDia = cache.checkins.filter(c=>String(c.data_checkin).slice(0,10)===dateStr);
+    const temCk = ckDia.length>0;
+
+    let bg='transparent', cor=isSun||isPast?'var(--muted)':'var(--white)', bord='1px solid transparent', fw='400';
+    if(isToday){bg='var(--red)';cor='#fff';fw='700';}
+    else if(isSel){bg='rgba(212,17,28,.15)';bord='1px solid rgba(212,17,28,.5)';}
+
+    const click = (!isSun&&temAula) ? `onclick="selecionarData('${dateStr}')"` : '';
+    grid+=`<div ${click} style="text-align:center;padding:5px 2px;border-radius:7px;cursor:${(!isSun&&temAula)?'pointer':'default'};background:${bg};color:${cor};border:${bord};font-size:13px;font-weight:${fw};position:relative;min-height:34px;line-height:1.2">
+      ${day}
+      ${temCk?`<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#22c55e"></div>`
+        :(!isSun&&temAula&&!isPast?`<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--muted)"></div>`:'')
+      }
+    </div>`;
+  }
+  grid+='</div></div>';
+
+  // Legend
+  grid+=`<div style="display:flex;gap:16px;align-items:center;padding:0 4px 4px;font-size:11px;color:var(--muted)">
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Check-in</span>
+    <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px"></span>Aula disponível</span>
+  </div>`;
+
+  if(bloqueado) grid+='<div class="alert-r">🔴 Mensalidade em atraso. Regularize para fazer check-in.</div>';
+
+  // Classes for selected date
+  const selDow = new Date(calDataSelecionada+'T12:00:00').getDay();
+  const selDiaNome = DOW_TO_DIA[selDow];
+  const aulasD = selDiaNome ? cache.aulas.filter(au=>au.dia===selDiaNome&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora)) : [];
+  const selPast = calDataSelecionada < hojeUTC;
+  const selIsHoje = calDataSelecionada === hojeUTC;
+  const selFuture = calDataSelecionada > hojeUTC;
+
+  const dtLabel = calDataSelecionada===hojeUTC ? 'Hoje' : new Date(calDataSelecionada+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  grid+=`<div style="margin-top:4px;padding:10px 0 4px;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;color:var(--muted);text-transform:capitalize">${dtLabel}</div>`;
+
+  if(!selDiaNome||selDow===0) {
+    grid+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Sem aulas aos domingos</div>';
+  } else if(aulasD.length===0) {
+    grid+='<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Sem aulas neste dia</div>';
+  } else {
+    // Load confirmed for this date
     const confirmadosPorAula = {};
     await Promise.all(aulasD.map(async au=>{
       try {
-        const cks = await api('GET',`/api/checkins?aula_id=${au.id}&data=${dataAgenda}`);
-        confirmadosPorAula[au.id] = Array.isArray(cks) ? cks : [];
-      } catch(e) { confirmadosPorAula[au.id] = []; }
+        const cks = await api('GET','/api/checkins?aula_id='+au.id+'&data='+calDataSelecionada);
+        confirmadosPorAula[au.id] = Array.isArray(cks)?cks:[];
+      } catch(e) { confirmadosPorAula[au.id]=[]; }
     }));
 
-    const nowMinAgenda = getNowMin();
+    const nowMin = getNowMin();
     aulasD.forEach(au=>{
-      const dataAula = dataAgenda;
-      const confirmados = confirmadosPorAula[au.id] || [];
+      const confirmados = confirmadosPorAula[au.id]||[];
       const ck = confirmados.find(c=>c.aluno_id===aluno.id) ||
-                 cache.checkins.find(c=>c.aula_id===au.id && String(c.data_checkin).slice(0,10)===dataAula);
+                 cache.checkins.find(c=>c.aula_id===au.id && String(c.data_checkin).slice(0,10)===calDataSelecionada);
       const ckFeito = !!ck;
-      const vagasOcup = confirmados.length || (cache.ocupacao[au.id]||0);
-      const vagasLivre = Math.max(0, au.vagas - vagasOcup);
+      const vagasOcup = confirmados.length||(cache.ocupacao[au.id]||0);
+      const vagasLivre = Math.max(0,au.vagas-vagasOcup);
       const [h,mi]=au.hora.split(':').map(Number);
-      const diff=(h*60+mi)-nowMinAgenda;
-      let btn='';
-      if(ckFeito) {
-        const podeCanc = dataAula >= hojeUTC;
-        btn=`<div style="display:flex;gap:6px;align-items:center">
-          <span style="padding:7px 10px;background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.4);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600">✓ Confirmado</span>
-          ${podeCanc?`<button onclick="cancelarCheckin(${ck.id})" style="padding:7px 8px;background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer" title="Cancelar check-in">✕</button>`:''}
-        </div>`;
-      }
-      else if(bloqueado) btn=`<span style="font-size:10px;color:#f87171">⛔ Inadimplente</span>`;
-      else if(!isHoje) btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">Reservar</button>`;
-      else if(diff<0) btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
-      else if(diff<60) btn=`<span style="font-size:10px;color:#f59e0b">🔒 Encerrado</span>`;
-      else btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer">✓ Check-in</button>`;
+      const diff=(h*60+mi)-nowMin;
 
-      // Lista de confirmados
+      let btn='';
+      if(ckFeito){
+        btn=`<div style="display:flex;gap:6px;align-items:center">
+          <span style="padding:7px 10px;background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.4);border-radius:6px;font-size:11px;font-weight:600">✓ Confirmado</span>
+          ${calDataSelecionada>=hojeUTC?`<button onclick="cancelarCheckin(${ck.id})" style="padding:7px 8px;background:rgba(212,17,28,.12);color:#f87171;border:1px solid rgba(212,17,28,.25);border-radius:6px;font-size:11px;cursor:pointer">✕</button>`:''}
+        </div>`;
+      } else if(bloqueado){
+        btn=`<span style="font-size:10px;color:#f87171">⛔ Inadimplente</span>`;
+      } else if(selPast){
+        btn=`<span style="font-size:10px;color:var(--muted)">—</span>`;
+      } else if(selIsHoje&&diff<0){
+        btn=`<span style="font-size:10px;color:var(--muted)">Encerrado</span>`;
+      } else if(selIsHoje&&diff<60){
+        btn=`<span style="font-size:10px;color:#f59e0b">🔒 1h para fechar</span>`;
+      } else if(selFuture||selIsHoje){
+        btn=`<button onclick="fazerCheckin(${au.id})" style="padding:7px 12px;background:${selIsHoje?'rgba(34,197,94,.15)':'rgba(59,130,246,.15)'};color:${selIsHoje?'var(--green)':'var(--blue)'};border:1px solid ${selIsHoje?'rgba(34,197,94,.3)':'rgba(59,130,246,.3)'};border-radius:6px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif">${selIsHoje?'✓ Check-in':'Reservar'}</button>`;
+      }
+
       const nomes = confirmados.map(c=>(c.aluno_nome||'').split(' ')[0]).filter(Boolean);
       const listaHtml = nomes.length
-        ? `<div style="margin-top:8px;padding:8px;background:rgba(34,197,94,.07);border-radius:6px;border:1px solid rgba(34,197,94,.2)">
-            <div style="font-size:10px;color:var(--green);font-weight:600;margin-bottom:4px">👥 ${nomes.length} confirmado${nomes.length!==1?'s':''} · ${vagasLivre} vaga${vagasLivre!==1?'s':''} livre${vagasLivre!==1?'s':''}</div>
-            <div style="font-size:12px;color:var(--fg);line-height:1.6">${nomes.join(' · ')}</div>
-           </div>`
-        : `<div style="margin-top:6px;font-size:11px;color:var(--muted)">👥 Nenhum confirmado ainda · ${vagasLivre} vaga${vagasLivre!==1?'s':''} disponível${vagasLivre!==1?'is':''}</div>`;
+        ? `<div style="margin-top:8px;padding:8px;background:rgba(34,197,94,.07);border-radius:6px;border:1px solid rgba(34,197,94,.2)"><div style="font-size:10px;color:var(--green);font-weight:600;margin-bottom:4px">👥 ${nomes.length} confirmado${nomes.length!==1?'s':''} · ${vagasLivre} vaga${vagasLivre!==1?'s':''} livre${vagasLivre!==1?'s':''}</div><div style="font-size:12px;line-height:1.6">${nomes.join(' · ')}</div></div>`
+        : `<div style="margin-top:6px;font-size:11px;color:var(--muted)">👥 Nenhum confirmado · ${vagasLivre} vaga${vagasLivre!==1?'s':''} disponível${vagasLivre!==1?'is':''}</div>`;
 
-      html+=`<div class="aula-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      grid+=`<div class="aula-item" style="flex-direction:column;align-items:stretch;gap:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="aula-hora">${au.hora}</div>
           <div class="aula-info" style="flex:1"><div class="aula-nome">${au.nome}</div><div class="aula-meta">${au.modalidade==='boxe'?'🥊 Boxe':'🟦 Jiu-Jitsu'}</div></div>
           <div style="flex-shrink:0">${btn}</div>
-        </div>
-        ${listaHtml}
+        </div>${listaHtml}
       </div>`;
     });
   }
-  document.getElementById('page-agenda').innerHTML = html;
+
+  el.innerHTML = grid;
 }
 
 function selecionarDia(dia) { diaSelecionado=dia; renderAgenda(); }
