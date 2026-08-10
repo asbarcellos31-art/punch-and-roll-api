@@ -2912,6 +2912,41 @@ app.get('/api/estoque/:id/movimentacoes', auth, adminOnly, async (req, res) => {
 // CONTRATOS
 // ══════════════════════════════════════
 
+function gerarContratoHtml(a, { plano, modalidade, valor, meses, freq, modLabel, freqLabel, hoje, nascFmt, cancelClause }) {
+  return `<div style="font-family:Arial,sans-serif;color:#111827;font-size:13px;line-height:1.8">
+<div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
+  <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
+  <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
+  <div style="font-size:11px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
+</div>
+<div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.25);border-radius:6px;padding:14px;margin-bottom:16px">
+  <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:8px;font-weight:700">PARTES</div>
+  <p style="color:#111827"><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
+  <p style="margin-top:10px;color:#111827"><strong>CONTRATANTE:</strong> ${a.nome}<br>CPF: ${a.cpf || '—'} · Nascimento: ${nascFmt}<br>${a.endereco ? 'Endereço: ' + a.endereco + ', ' + (a.cidade || '') + ' · CEP ' + (a.cep || '') + '<br>' : ''}WhatsApp: ${a.tel || '—'} · E-mail: ${a.email || '—'}</p>
+</div>
+<p style="color:#111827">As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>.</p>
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
+<p style="color:#111827">Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
+<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:10px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+  <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong style="color:#111827">${modLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong style="color:#111827">${freqLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong style="color:#111827">${plano}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong style="color:#111827">${meses === 1 ? 'Mensal' : meses + ' meses'}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong style="color:#111827">R$ ${valor},00</strong></div>
+</div>
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
+<p style="color:#111827">O CONTRATANTE pagará <strong>R$ ${valor},00/mês</strong>. O atraso superior a 15 dias resultará na suspensão do acesso.</p>
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 3ª — Check-in e Frequência</p>
+<p style="background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;padding:12px;margin:10px 0;font-size:13px;color:#111827"><strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> pelo Portal do Aluno em <strong>punchandroll.com.br/punch-and-roll-portal.html</strong>.</p>
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 4ª — Rescisão</p>
+${cancelClause}
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 5ª — Responsabilidade</p>
+<p style="color:#111827">O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica por livre e espontânea vontade.</p>
+<p style="margin-top:16px;border-left:3px solid #d4111c;padding-left:10px;color:#d4111c;font-weight:700">Cláusula 6ª — Disposições Gerais</p>
+<p style="color:#111827">Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
+<div style="text-align:right;margin-top:14px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div></div>`;
+}
+
 // Admin: create + send contract for an existing aluno
 app.post('/api/contratos/enviar/:aluno_id', auth, adminOnly, async (req, res) => {
   try {
@@ -2934,38 +2969,7 @@ app.post('/api/contratos/enviar/:aluno_id', auth, adminOnly, async (req, res) =>
       ? '<p>O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
       : `<p>O cancelamento antecipado está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias</strong> por período mediante solicitação justificada.</p>`;
 
-    const contrato_html = `<div style="font-family:Arial,sans-serif;color:#f0f0f0;font-size:12px;line-height:1.8">
-<div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
-  <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
-  <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
-  <div style="font-size:10px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
-</div>
-<div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
-  <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
-  <p><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
-  <p style="margin-top:8px"><strong>CONTRATANTE:</strong> ${a.nome}<br>CPF: ${a.cpf || '—'} · Nascimento: ${nascFmt}<br>${a.endereco ? 'Endereço: ' + a.endereco + ', ' + (a.cidade || '') + ' · CEP ' + (a.cep || '') + '<br>' : ''}WhatsApp: ${a.tel || '—'} · E-mail: ${a.email}</p>
-</div>
-<p>As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>.</p>
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
-<p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
-<div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-  <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
-  <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
-  <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong>${plano}</strong></div>
-  <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong>${meses === 1 ? 'Mensal' : meses + ' meses'}</strong></div>
-  <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong>R$ ${valor},00</strong></div>
-</div>
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
-<p>O CONTRATANTE pagará <strong>R$ ${valor},00/mês</strong>. O atraso superior a 15 dias resultará na suspensão do acesso.</p>
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Check-in e Frequência</p>
-<p style="background:#fff5f5;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px"><strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> pelo Portal do Aluno em <strong>punchandroll.com.br/punch-and-roll-portal.html</strong>.</p>
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 4ª — Rescisão</p>
-${cancelClause}
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 5ª — Responsabilidade</p>
-<p>O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica por livre e espontânea vontade.</p>
-<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 6ª — Disposições Gerais</p>
-<p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
-<div style="text-align:right;margin-top:12px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div></div>`;
+    const contrato_html = gerarContratoHtml(a, { plano, modalidade, valor, meses, freq, modLabel, freqLabel, hoje, nascFmt, cancelClause });
 
     await db.query(
       'INSERT INTO contratos (aluno_id, token, plano, modalidade, valor, meses, freq, ip, contrato_html) VALUES (?,?,?,?,?,?,?,?,?)',
@@ -3168,45 +3172,15 @@ app.get('/api/contratos/preview/:aluno_id', auth, adminOnly, async (req, res) =>
     const cancelClause = meses === 1
       ? '<p>O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
       : `<p>O cancelamento antecipado está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias</strong> por período mediante solicitação justificada.</p>`;
+    const contratoHtml = gerarContratoHtml(a, { plano, modalidade, valor, meses, freq, modLabel, freqLabel, hoje, nascFmt, cancelClause });
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pré-visualização — ${a.nome}</title>
-    <style>body{background:#111;color:#f0f0f0;font-family:Arial,sans-serif;font-size:13px;line-height:1.8;margin:0;padding:0}
-    .wrap{max-width:680px;margin:0 auto;padding:24px 16px}
-    .preview-banner{background:#d4111c;color:#fff;text-align:center;padding:8px;font-size:12px;letter-spacing:1px;font-weight:700}
+    <style>body{background:#f3f4f6;font-family:Arial,sans-serif;margin:0;padding:0}
+    .wrap{max-width:680px;margin:0 auto;padding:0 0 40px}
+    .preview-banner{background:#d4111c;color:#fff;text-align:center;padding:10px;font-size:12px;letter-spacing:1px;font-weight:700;position:sticky;top:0;z-index:10}
+    .contrato-body{background:#fff;padding:24px;margin:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
     </style></head><body>
     <div class="preview-banner">⚠️ PRÉ-VISUALIZAÇÃO — Este contrato ainda não foi enviado ao aluno</div>
-    <div class="wrap">
-    <div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
-      <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
-      <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
-      <div style="font-size:10px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
-    </div>
-    <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
-      <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
-      <p><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
-      <p style="margin-top:8px"><strong>CONTRATANTE:</strong> ${a.nome}<br>CPF: ${a.cpf || '—'} · Nascimento: ${nascFmt}<br>${a.endereco ? 'Endereço: ' + a.endereco + ', ' + (a.cidade || '') + ' · CEP ' + (a.cep || '') + '<br>' : ''}WhatsApp: ${a.tel || '—'} · E-mail: ${a.email || '—'}</p>
-    </div>
-    <p>As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>.</p>
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
-    <p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
-    <div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
-      <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
-      <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong>${plano}</strong></div>
-      <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong>${meses === 1 ? 'Mensal' : meses + ' meses'}</strong></div>
-      <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong>R$ ${valor},00</strong></div>
-    </div>
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
-    <p>O CONTRATANTE pagará <strong>R$ ${valor},00/mês</strong>. O atraso superior a 15 dias resultará na suspensão do acesso.</p>
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Check-in e Frequência</p>
-    <p style="background:#fff5f5;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:#111"><strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> pelo Portal do Aluno em <strong>punchandroll.com.br/punch-and-roll-portal.html</strong>.</p>
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 4ª — Rescisão</p>
-    ${cancelClause}
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 5ª — Responsabilidade</p>
-    <p>O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica por livre e espontânea vontade.</p>
-    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 6ª — Disposições Gerais</p>
-    <p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
-    <div style="text-align:right;margin-top:12px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div>
-    </div></body></html>`;
+    <div class="wrap"><div class="contrato-body">${contratoHtml}</div></div></body></html>`;
     res.type('html').send(html);
   } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
 });
