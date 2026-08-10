@@ -4362,6 +4362,33 @@ setupDB().then(async () => {
     }
     if(fixed>0) console.log(`[FIX-DATES] ${fixed} check-ins corrigidos`);
   } catch(e) { console.error('[FIX-DATES] Erro:', e.message); }
+  // Fix: reescreve contratos com HTML antigo (texto branco #f0f0f0)
+  try {
+    const [cts] = await db.query('SELECT c.id, c.aluno_id, c.plano, c.modalidade, c.valor, c.meses, c.freq FROM contratos c WHERE c.contrato_html LIKE "%color:#f0f0f0%" OR c.contrato_html LIKE "%rgba(255,255,255,.05)%"');
+    if (cts.length > 0) {
+      const hoje = new Date().toLocaleDateString('pt-BR');
+      for (const ct of cts) {
+        try {
+          const [[a]] = await db.query('SELECT * FROM alunos WHERE id=?', [ct.aluno_id]);
+          if (!a) continue;
+          const plano = ct.plano || a.plano || a.modalidade || 'Plano Punch and Roll';
+          const modalidade = ct.modalidade || a.modalidade || 'boxe';
+          const valor = ct.valor || a.valor || 0;
+          const meses = ct.meses || a.meses || 1;
+          const freq = ct.freq || a.freq || 'livre';
+          const modLabel = modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : modalidade === 'ambos' ? 'Boxe e Jiu-Jitsu' : 'Boxe';
+          const freqLabel = freq === '3x' ? '3x por semana' : 'Livre (ilimitado)';
+          const nascFmt = a.nasc ? new Date(a.nasc + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+          const cancelClause = meses === 1
+            ? '<p style="color:#111827">O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
+            : `<p style="color:#111827">O cancelamento antecipado está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias</strong> por período mediante solicitação justificada.</p>`;
+          const novo_html = gerarContratoHtml(a, { plano, modalidade, valor, meses, freq, modLabel, freqLabel, hoje, nascFmt, cancelClause });
+          await db.query('UPDATE contratos SET contrato_html=? WHERE id=?', [novo_html, ct.id]);
+        } catch(e2) { console.error('[FIX-CONTRATOS] erro contrato', ct.id, e2.message); }
+      }
+      console.log(`[FIX-CONTRATOS] ${cts.length} contrato(s) reescrito(s)`);
+    }
+  } catch(e) { console.error('[FIX-CONTRATOS] Erro:', e.message); }
   // Fix pontual: corrige vencimento da Alinne (id=25) para dia fixo 22
   try {
     const [r] = await db.query("UPDATE alunos SET vencimento='2026-08-22' WHERE id=25");

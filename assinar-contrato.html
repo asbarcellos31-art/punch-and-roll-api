@@ -130,6 +130,12 @@ async function init() {
     if (!res.ok) { showErr('Contrato não encontrado. O link pode ter expirado.'); return; }
     const html = await res.text();
     document.getElementById('contrato-html').innerHTML = html;
+    // Fix contratos antigos com texto branco gerado antes do fix de cores
+    document.getElementById('contrato-html').querySelectorAll('[style]').forEach(el => {
+      el.style.color = el.style.color === 'rgb(240, 240, 240)' || el.style.color === '#f0f0f0' ? '#111827' : el.style.color;
+      if (el.style.background && el.style.background.includes('255,255,255,.05')) el.style.background = 'rgba(0,0,0,.04)';
+      if (el.style.backgroundColor && el.style.backgroundColor.includes('255,255,255,.05')) el.style.backgroundColor = 'rgba(0,0,0,.04)';
+    });
 
     // Check signing status
     const meta = await fetch(`${API_URL}/api/contratos/meta/${TOKEN}`).catch(() => null);
