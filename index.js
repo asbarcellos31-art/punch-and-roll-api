@@ -333,7 +333,8 @@ async function setupDB() {
       )
     `);
     try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado BOOLEAN DEFAULT FALSE"); } catch(e){}
-    try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado_em TIMESTAMP NULL"); } catch(e){}
+    try { await conn.query("ALTER TABLE contratos ADD COLUMN assinado_em TIMESTAMP NULL DEFAULT NULL"); } catch(e){}
+    try { await conn.query("ALTER TABLE contratos MODIFY COLUMN assinado_em TIMESTAMP NULL DEFAULT NULL"); } catch(e){}
     try { await conn.query("ALTER TABLE contratos ADD COLUMN criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); } catch(e){}
 
     // ── SHOP ──────────────────────────────────────────────
@@ -2910,6 +2911,113 @@ app.get('/api/estoque/:id/movimentacoes', auth, adminOnly, async (req, res) => {
 // ══════════════════════════════════════
 // CONTRATOS
 // ══════════════════════════════════════
+
+// Admin: create + send contract for an existing aluno
+app.post('/api/contratos/enviar/:aluno_id', auth, adminOnly, async (req, res) => {
+  try {
+    const [[a]] = await db.query('SELECT * FROM alunos WHERE id=?', [req.params.aluno_id]);
+    if (!a) return res.status(404).json({ error: 'Aluno não encontrado' });
+    if (!a.email) return res.status(400).json({ error: 'Aluno sem email cadastrado' });
+
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'desconhecido';
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const plano = a.plano || a.modalidade || 'Plano Punch and Roll';
+    const modalidade = a.modalidade || 'boxe';
+    const valor = a.valor || 0;
+    const meses = a.meses || 1;
+    const freq = a.freq || 'livre';
+    const modLabel = modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : modalidade === 'ambos' ? 'Boxe e Jiu-Jitsu' : 'Boxe';
+    const freqLabel = freq === '3x' ? '3x por semana' : 'Livre (ilimitado)';
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const nascFmt = a.nasc ? new Date(a.nasc + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+    const cancelClause = meses === 1
+      ? '<p>O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
+      : `<p>O cancelamento antecipado está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias</strong> por período mediante solicitação justificada.</p>`;
+
+    const contrato_html = `<div style="font-family:Arial,sans-serif;color:#f0f0f0;font-size:12px;line-height:1.8">
+<div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
+  <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
+  <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
+  <div style="font-size:10px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
+</div>
+<div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
+  <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
+  <p><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
+  <p style="margin-top:8px"><strong>CONTRATANTE:</strong> ${a.nome}<br>CPF: ${a.cpf || '—'} · Nascimento: ${nascFmt}<br>${a.endereco ? 'Endereço: ' + a.endereco + ', ' + (a.cidade || '') + ' · CEP ' + (a.cep || '') + '<br>' : ''}WhatsApp: ${a.tel || '—'} · E-mail: ${a.email}</p>
+</div>
+<p>As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
+<p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
+<div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+  <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong>${plano}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong>${meses === 1 ? 'Mensal' : meses + ' meses'}</strong></div>
+  <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong>R$ ${valor},00</strong></div>
+</div>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
+<p>O CONTRATANTE pagará <strong>R$ ${valor},00/mês</strong>. O atraso superior a 15 dias resultará na suspensão do acesso.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Check-in e Frequência</p>
+<p style="background:#fff5f5;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px"><strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> pelo Portal do Aluno em <strong>punchandroll.com.br/punch-and-roll-portal.html</strong>.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 4ª — Rescisão</p>
+${cancelClause}
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 5ª — Responsabilidade</p>
+<p>O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica por livre e espontânea vontade.</p>
+<p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 6ª — Disposições Gerais</p>
+<p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
+<div style="text-align:right;margin-top:12px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div></div>`;
+
+    await db.query(
+      'INSERT INTO contratos (aluno_id, token, plano, modalidade, valor, meses, freq, ip, contrato_html) VALUES (?,?,?,?,?,?,?,?,?)',
+      [a.id, token, plano, modalidade, valor, meses, freq, ip, contrato_html]
+    );
+
+    const link = `https://punchandroll.com.br/assinar-contrato.html?token=${token}`;
+    const nomeFirst = a.nome.split(' ')[0];
+    const modLabelEmail = modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : modalidade === 'ambos' ? 'Boxe + Jiu-Jitsu' : 'Boxe';
+    const freqLabelEmail = freq === 'livre' ? 'Frequência Livre' : '3x por semana';
+
+    await enviarEmailAluno(a.email, a.nome, `Punch and Roll — Assine seu contrato, ${nomeFirst}`,
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif">
+      <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;margin-top:24px;margin-bottom:24px">
+        <div style="background:#d4111c;padding:32px 24px;text-align:center">
+          <div style="font-size:40px;margin-bottom:8px">🥊</div>
+          <h1 style="color:#ffffff;font-size:28px;letter-spacing:3px;margin:0;font-family:Arial,sans-serif">PUNCH AND ROLL</h1>
+          <p style="color:rgba(255,255,255,.8);font-size:13px;margin:6px 0 0;letter-spacing:1px">FIGHT TEAM · SÃO JOSÉ, SC</p>
+        </div>
+        <div style="padding:32px 28px">
+          <h2 style="color:#111;font-size:22px;margin:0 0 12px">Olá, ${nomeFirst}!</h2>
+          <p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Seu contrato com a <strong>Punch and Roll Fight Team</strong> está pronto para assinatura. Clique no botão abaixo para assinar digitalmente — leva menos de 1 minuto.</p>
+          <div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin-bottom:28px">
+            <p style="color:#888;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin:0 0 12px">SEU PLANO</p>
+            <table style="width:100%;border-collapse:collapse">
+              <tr><td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Modalidade</td><td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${modLabelEmail}</td></tr>
+              <tr><td style="color:#555;font-size:13px;padding:6px 0;border-bottom:1px solid #eee">Frequência</td><td style="color:#111;font-size:13px;font-weight:bold;text-align:right;padding:6px 0;border-bottom:1px solid #eee">${freqLabelEmail}</td></tr>
+              <tr><td style="color:#555;font-size:13px;padding:8px 0 0">Mensalidade</td><td style="color:#d4111c;font-size:16px;font-weight:bold;text-align:right;padding:8px 0 0">R$ ${Number(valor||0).toFixed(0)}/mês</td></tr>
+            </table>
+          </div>
+          <div style="background:#fff8f8;border:1px solid #ffd0d0;border-radius:10px;padding:20px;margin-bottom:28px">
+            <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 8px">📋 Assine seu contrato</p>
+            <p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 20px">Clique no botão abaixo para ler e assinar seu contrato digitalmente.</p>
+            <div style="text-align:center">
+              <a href="${link}" style="background:#d4111c;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:bold;letter-spacing:1px;display:inline-block">ASSINAR CONTRATO</a>
+            </div>
+            <p style="color:#aaa;font-size:11px;text-align:center;margin:14px 0 0">Ou acesse: <a href="${link}" style="color:#d4111c">${link}</a></p>
+          </div>
+          <div style="border-top:1px solid #eee;padding-top:20px">
+            <p style="color:#444;font-size:13px;line-height:1.6;margin:0">📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC<br>💬 (48) 98463-9257<br>🌐 punchandroll.com.br</p>
+          </div>
+        </div>
+        <div style="background:#111;padding:20px 24px;text-align:center">
+          <p style="color:#888;font-size:11px;margin:0">© ${new Date().getFullYear()} Punch and Roll Fight Team · São José, SC</p>
+        </div>
+      </div></body></html>`
+    );
+
+    res.json({ ok: true, token, link });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/contratos', async (req, res) => {
   try {
     const { aluno_id, plano, modalidade, valor, meses, freq, contrato_html, nome, email } = req.body;
@@ -3026,7 +3134,13 @@ app.get('/api/contratos/aluno/:aluno_id', auth, async (req, res) => {
       'SELECT id, token, plano, modalidade, valor, meses, freq, ip, assinado, assinado_em, criado_em FROM contratos WHERE aluno_id=? ORDER BY criado_em DESC',
       [id]
     );
-    res.json(rows);
+    // Normalize: assinado_em only meaningful when assinado=TRUE
+    const normalized = rows.map(r => ({
+      ...r,
+      assinado: !!r.assinado,
+      assinado_em: r.assinado ? r.assinado_em : null,
+    }));
+    res.json(normalized);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3035,6 +3149,65 @@ app.get('/api/contratos/html/:token', async (req, res) => {
     const [rows] = await db.query('SELECT contrato_html FROM contratos WHERE token=?', [req.params.token]);
     if (!rows.length) return res.status(404).send('<h1>Contrato não encontrado</h1>');
     res.type('html').send(rows[0].contrato_html);
+  } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
+});
+
+app.get('/api/contratos/preview/:aluno_id', auth, adminOnly, async (req, res) => {
+  try {
+    const [[a]] = await db.query('SELECT * FROM alunos WHERE id=?', [req.params.aluno_id]);
+    if (!a) return res.status(404).send('<h1>Aluno não encontrado</h1>');
+    const plano = a.plano || a.modalidade || 'Plano Punch and Roll';
+    const modalidade = a.modalidade || 'boxe';
+    const valor = a.valor || 0;
+    const meses = a.meses || 1;
+    const freq = a.freq || 'livre';
+    const modLabel = modalidade === 'jiujitsu' ? 'Jiu-Jitsu' : modalidade === 'ambos' ? 'Boxe e Jiu-Jitsu' : 'Boxe';
+    const freqLabel = freq === '3x' ? '3x por semana' : 'Livre (ilimitado)';
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const nascFmt = a.nasc ? new Date(a.nasc + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+    const cancelClause = meses === 1
+      ? '<p>O plano mensal pode ser cancelado a qualquer momento, com comunicação prévia de <strong>30 dias</strong>.</p>'
+      : `<p>O cancelamento antecipado está sujeito a multa de <strong>20% sobre o valor restante</strong>. Permite <strong>congelamento de até 30 dias</strong> por período mediante solicitação justificada.</p>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pré-visualização — ${a.nome}</title>
+    <style>body{background:#111;color:#f0f0f0;font-family:Arial,sans-serif;font-size:13px;line-height:1.8;margin:0;padding:0}
+    .wrap{max-width:680px;margin:0 auto;padding:24px 16px}
+    .preview-banner{background:#d4111c;color:#fff;text-align:center;padding:8px;font-size:12px;letter-spacing:1px;font-weight:700}
+    </style></head><body>
+    <div class="preview-banner">⚠️ PRÉ-VISUALIZAÇÃO — Este contrato ainda não foi enviado ao aluno</div>
+    <div class="wrap">
+    <div style="text-align:center;border-bottom:2px solid #d4111c;padding-bottom:14px;margin-bottom:18px">
+      <div style="font-size:20px;font-weight:700;letter-spacing:2px">PUNCH AND ROLL FIGHT TEAM</div>
+      <div style="font-size:14px;color:#d4111c;font-weight:600;margin-top:4px">CONTRATO DE PRESTAÇÃO DE SERVIÇOS ESPORTIVOS</div>
+      <div style="font-size:10px;color:#6b7280;margin-top:3px">São José · Santa Catarina · ${new Date().getFullYear()}</div>
+    </div>
+    <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:6px;padding:12px;margin-bottom:14px">
+      <div style="font-size:10px;letter-spacing:2px;color:#d4111c;margin-bottom:6px;font-weight:700">PARTES</div>
+      <p><strong>CONTRATADA:</strong> PUNCH AND ROLL FIGHT TEAM<br>R. Cel. Américo, 1157, Sala 5, Barreiros, São José/SC — CEP 88117-311 · Tel: (48) 98463-9257</p>
+      <p style="margin-top:8px"><strong>CONTRATANTE:</strong> ${a.nome}<br>CPF: ${a.cpf || '—'} · Nascimento: ${nascFmt}<br>${a.endereco ? 'Endereço: ' + a.endereco + ', ' + (a.cidade || '') + ' · CEP ' + (a.cep || '') + '<br>' : ''}WhatsApp: ${a.tel || '—'} · E-mail: ${a.email || '—'}</p>
+    </div>
+    <p>As partes acima identificadas celebram o presente <strong>Contrato de Prestação de Serviços Esportivos</strong>.</p>
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 1ª — Do Objeto</p>
+    <p>Prestação de serviços de ensino e treinamento de <strong>${modLabel}</strong> nas dependências da academia.</p>
+    <div style="background:rgba(255,255,255,.05);border-radius:6px;padding:12px;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><span style="color:#6b7280;font-size:11px">Modalidade</span><br><strong>${modLabel}</strong></div>
+      <div><span style="color:#6b7280;font-size:11px">Frequência</span><br><strong>${freqLabel}</strong></div>
+      <div><span style="color:#6b7280;font-size:11px">Plano</span><br><strong>${plano}</strong></div>
+      <div><span style="color:#6b7280;font-size:11px">Duração</span><br><strong>${meses === 1 ? 'Mensal' : meses + ' meses'}</strong></div>
+      <div><span style="color:#6b7280;font-size:11px">Valor mensal</span><br><strong>R$ ${valor},00</strong></div>
+    </div>
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 2ª — Do Valor e Pagamento</p>
+    <p>O CONTRATANTE pagará <strong>R$ ${valor},00/mês</strong>. O atraso superior a 15 dias resultará na suspensão do acesso.</p>
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 3ª — Check-in e Frequência</p>
+    <p style="background:#fff5f5;border:1px solid #d4111c;border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:#111"><strong style="color:#d4111c">⚠️ ATENÇÃO:</strong> A participação nas aulas é confirmada <strong>exclusivamente por check-in digital</strong> pelo Portal do Aluno em <strong>punchandroll.com.br/punch-and-roll-portal.html</strong>.</p>
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 4ª — Rescisão</p>
+    ${cancelClause}
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 5ª — Responsabilidade</p>
+    <p>O CONTRATANTE declara estar ciente dos riscos físicos inerentes à prática de artes marciais e pratica por livre e espontânea vontade.</p>
+    <p style="margin-top:14px;border-left:3px solid #d4111c;padding-left:8px;color:#d4111c;font-weight:700">Cláusula 6ª — Disposições Gerais</p>
+    <p>Este contrato é regido pela legislação brasileira. Foro eleito: comarca de São José/SC. Firmado digitalmente nos termos da <strong>Lei nº 14.063/2020</strong>.</p>
+    <div style="text-align:right;margin-top:12px;color:#6b7280;font-size:11px">São José/SC, ${hoje}</div>
+    </div></body></html>`;
+    res.type('html').send(html);
   } catch (e) { res.status(500).send('<h1>Erro interno</h1>'); }
 });
 

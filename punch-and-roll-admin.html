@@ -811,7 +811,10 @@ async function fichaAluno(id) {
     const contratos = await GET('/api/contratos/aluno/'+a.id);
     const el = document.getElementById('contratos-'+a.id);
     if(!el) return;
-    const btnEnviar = `<button onclick="enviarContrato(${a.id},this)" style="width:100%;margin-top:8px;padding:8px;background:var(--dark);border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;color:var(--white)">📧 Enviar Contrato por E-mail</button>`;
+    const btnEnviar = `<div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="verContrato(${a.id})" style="flex:1;padding:8px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;color:var(--blue)">👁 Ver Contrato</button>
+      <button onclick="enviarContrato(${a.id},this)" style="flex:2;padding:8px;background:var(--dark);border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;color:var(--white)">📧 Enviar por E-mail</button>
+    </div>`;
     if(!contratos||contratos.length===0){
       el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">Nenhum contrato enviado</div>'+btnEnviar;
     } else {
@@ -840,6 +843,34 @@ async function fichaAluno(id) {
 
   // Fetch student documents async
   carregarDocumentosAluno(a.id);
+}
+
+function verContrato(alunoId) {
+  const token = localStorage.getItem('pr_token');
+  const url = `https://punch-and-roll-api-production.up.railway.app/api/contratos/preview/${alunoId}`;
+  const existing = document.getElementById('modal-preview-contrato');
+  if (existing) existing.remove();
+  const m = document.createElement('div');
+  m.id = 'modal-preview-contrato';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;flex-direction:column';
+  m.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#161616;border-bottom:1px solid #2a2a2a;flex-shrink:0">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:#fff">Pré-visualização do Contrato</div>
+      <button onclick="document.getElementById('modal-preview-contrato').remove()" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:0 4px">✕</button>
+    </div>
+    <iframe id="iframe-contrato" style="flex:1;border:none;width:100%" src="about:blank"></iframe>`;
+  document.body.appendChild(m);
+  // Load with auth token via fetch then write to iframe
+  fetch(url, { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.text())
+    .then(html => {
+      const iframe = document.getElementById('iframe-contrato');
+      if (iframe) { iframe.srcdoc = html; }
+    })
+    .catch(e => {
+      const iframe = document.getElementById('iframe-contrato');
+      if (iframe) iframe.srcdoc = '<body style="background:#111;color:#f87171;padding:20px;font-family:sans-serif">Erro ao carregar preview: ' + e.message + '</body>';
+    });
 }
 
 async function enviarContrato(alunoId, btn) {
