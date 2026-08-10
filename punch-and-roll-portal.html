@@ -116,7 +116,8 @@ const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'
 const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return `${dd}/${m}/${y}`; };
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const DIAS_IDX = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
-const diaHoje = DIAS_IDX[new Date().getDay()]||'Segunda';
+// getDay()=0 (domingo) não tem aula → null, sem fallback errado para 'Segunda'
+const diaHoje = DIAS_IDX[new Date().getDay()] || null;
 function _localDateStr(dt) { const d=dt||new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 const hojeUTC = _localDateStr();
 function getNowMin() { return new Date().getHours()*60+new Date().getMinutes(); }
@@ -132,7 +133,8 @@ function getDataParaAula(dia) {
 let _token = localStorage.getItem('pr_aluno_token')||'';
 let aluno = null;
 let cache = { aulas:[], recados:[], pagamentos:[], checkins:[], shopProdutos:[], shopPedidos:[], contratos:[] };
-let diaSelecionado = diaHoje;
+// No domingo (diaHoje=null), começa na segunda; nos outros dias, começa no dia atual
+let diaSelecionado = diaHoje || 'Segunda';
 let shopCart = JSON.parse(localStorage.getItem('pr_shop_cart')||'[]');
 
 async function api(method, path, body) {
@@ -387,7 +389,7 @@ async function renderAgenda() {
   const a = aluno;
   const bloqueado = a.status==='atrasado';
   const tabs = DIAS.map(d=>`<button class="day-tab${d===diaSelecionado?' active':''}" onclick="selecionarDia('${d}')">${d}</button>`).join('');
-  const isHoje = diaSelecionado===diaHoje;
+  const isHoje = diaHoje !== null && diaSelecionado === diaHoje;
   const aulasD = cache.aulas.filter(au=>au.dia===diaSelecionado&&au.status==='ativo').sort((a,b)=>a.hora.localeCompare(b.hora));
 
   let html = `<div class="day-tabs">${tabs}</div>`;
