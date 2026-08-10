@@ -1009,100 +1009,124 @@ async function excluirAula(id, nome) {
   catch(e) { alert('Erro: '+e.message); }
 }
 
-let checkinDataOffset = 0;
-function checkinDataAtual() {
-  const d = new Date(); d.setDate(d.getDate() + checkinDataOffset);
-  return _localDateStr(d);
-}
-function checkinDataLabel() {
-  if(checkinDataOffset===0) return 'Hoje';
-  if(checkinDataOffset===-1) return 'Ontem';
-  const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
-  return d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
-}
-function checkinNavData(delta) {
-  checkinDataOffset+=delta;
-  const d = new Date(); d.setDate(d.getDate()+checkinDataOffset);
-  const idx = d.getDay()-1;
-  if(idx>=0 && idx<DIAS.length) selectedDay = DIAS[idx];
-  renderCheckins();
-}
+const MESES_PT_ADM = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DOW_TO_DIA_ADM = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado'};
+let admCalMes = new Date().getMonth();
+let admCalAno = new Date().getFullYear();
+let admCalDataSel = _localDateStr();
 
-const _DIAS_OFFSET = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
-function checkinNavPara(dia) {
-  selectedDay = dia;
-  const alvo = _DIAS_OFFSET[dia];
-  if (alvo == null) { checkinDataOffset = 0; renderCheckins(); return; }
-  const hd = (new Date().getDay()) || 7;
-  let diff = alvo - hd;
-  if (diff < 0) diff += 7;
-  checkinDataOffset = diff;
-  renderCheckins();
-}
+function admMudarMes(delta) { admCalMes+=delta; if(admCalMes>11){admCalMes=0;admCalAno++;}else if(admCalMes<0){admCalMes=11;admCalAno--;} renderCheckins(); }
+function admSelecionarData(dateStr) { admCalDataSel=dateStr; renderCheckins(); }
 
 async function renderCheckins() {
   const pg = document.getElementById('page-checkins');
-  const tabs = DIAS.map(d=>`<button class="day-tab${d===selectedDay?' active':''}" onclick="checkinNavPara('${d}')">${d}</button>`).join('');
-  const dataLabel = checkinDataLabel();
-  const dataStr = checkinDataAtual();
-  const amanhaDt = new Date(dataStr+'T12:00:00Z'); amanhaDt.setUTCDate(amanhaDt.getUTCDate()+1);
-  const amanhaStr = amanhaDt.toISOString().slice(0,10);
-  pg.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <button onclick="checkinNavData(-1)" style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">‹ Anterior</button>
-      <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${dataLabel} — ${dataStr}</span>
-      <button onclick="checkinNavData(1)" ${checkinDataOffset>=14?'disabled style="opacity:.3;cursor:default"':''} style="padding:6px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Próximo ›</button>
+
+  // Build calendar grid
+  const prim = new Date(admCalAno, admCalMes, 1);
+  const ult = new Date(admCalAno, admCalMes+1, 0);
+  const startDow = prim.getDay();
+  const BtnS = 'background:none;border:none;color:var(--fg);font-size:22px;cursor:pointer;padding:4px 10px;border-radius:6px';
+
+  // Collect dates with check-ins from all cached checkins
+  const cksNoMes = cache.checkins ? cache.checkins.filter(c=>{
+    const d=String(c.data_checkin).slice(0,7);
+    return d===`${admCalAno}-${String(admCalMes+1).padStart(2,'0')}`;
+  }) : [];
+
+  let grid = `<div class="card" style="padding:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <button onclick="admMudarMes(-1)" style="${BtnS}">‹</button>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px">${MESES_PT_ADM[admCalMes]} ${admCalAno}</span>
+      <button onclick="admMudarMes(1)" style="${BtnS}">›</button>
     </div>
-    <div class="day-tabs">${tabs}</div>
-    <div id="checkins-lista"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
-    <div id="checkins-futuros"></div>`;
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:4px">
+      ${['D','S','T','Q','Q','S','S'].map(d=>`<div style="text-align:center;font-size:10px;color:var(--muted);padding:4px 0;font-weight:600">${d}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
+
+  for(let i=0;i<startDow;i++) grid+='<div></div>';
+
+  for(let day=1;day<=ult.getDate();day++){
+    const dt = new Date(admCalAno,admCalMes,day);
+    const dow = dt.getDay();
+    const dateStr = _localDateStr(dt);
+    const diaNome = DOW_TO_DIA_ADM[dow];
+    const temAula = !!diaNome && cache.aulas.some(au=>au.dia===diaNome&&au.status==='ativo');
+    const isToday = dateStr===todayStr;
+    const isSel = dateStr===admCalDataSel;
+    const isPast = dateStr<todayStr;
+    const isSun = dow===0;
+    const temCk = cksNoMes.some(c=>String(c.data_checkin).slice(0,10)===dateStr);
+
+    let bg='transparent', cor=isSun||isPast?'var(--muted)':'var(--fg)', bord='1px solid transparent', fw='400';
+    if(isToday){bg='var(--red)';cor='#fff';fw='700';}
+    else if(isSel){bg='rgba(212,17,28,.15)';bord='1px solid rgba(212,17,28,.5)';}
+
+    const click = (!isSun&&temAula) ? `onclick="admSelecionarData('${dateStr}')"` : '';
+    grid+=`<div ${click} style="text-align:center;padding:5px 2px;border-radius:7px;cursor:${(!isSun&&temAula)?'pointer':'default'};background:${bg};color:${cor};border:${bord};font-size:13px;font-weight:${fw};position:relative;min-height:34px;line-height:1.2">
+      ${day}
+      ${temCk?`<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#22c55e"></div>`
+        :(!isSun&&temAula&&!isPast?`<div style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--muted)"></div>`:'')
+      }
+    </div>`;
+  }
+  grid+='</div></div>';
+
+  grid+=`<div style="display:flex;gap:16px;align-items:center;padding:0 4px 8px;font-size:11px;color:var(--muted)">
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Check-in</span>
+    <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px"></span>Aula disponível</span>
+  </div>`;
+
+  const dtLabel = admCalDataSel===todayStr ? 'Hoje' : new Date(admCalDataSel+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  grid+=`<div style="padding:8px 0 6px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;color:var(--muted);text-transform:capitalize">${dtLabel}</div>`;
+  grid+=`<div id="checkins-lista"><div class="loading"><div class="spinner"></div>Carregando...</div></div>`;
+  grid+=`<div id="checkins-futuros"></div>`;
+
+  pg.innerHTML = grid;
+
   try {
+    const amanhaDt = new Date(admCalDataSel+'T12:00:00Z'); amanhaDt.setUTCDate(amanhaDt.getUTCDate()+1);
+    const amanhaStr = amanhaDt.toISOString().slice(0,10);
     const [cks, futuros] = await Promise.all([
-      GET('/api/checkins?data='+dataStr),
+      GET('/api/checkins?data='+admCalDataSel),
       GET('/api/checkins?data_min='+amanhaStr)
     ]);
     cache.checkins = Array.isArray(cks) ? cks : [];
     const el = document.getElementById('checkins-lista');
     const totalDia = cache.checkins.length;
-    if(totalDia===0){showEmpty(el,'Nenhum check-in neste dia');return;}
-    // Agrupa check-ins pelo aula_id real do próprio registro
-    const aulaMap = {};
-    cache.checkins.forEach(c=>{
-      if(!aulaMap[c.aula_id]) aulaMap[c.aula_id]={nome:c.aula_nome||'—',hora:c.hora||'—',checkins:[],vagas:null};
-      aulaMap[c.aula_id].checkins.push(c);
-    });
-    // Pega vagas da cache de aulas
-    cache.aulas.forEach(a=>{ if(aulaMap[a.id]) aulaMap[a.id].vagas=a.vagas; });
-    el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Total de check-ins em ${dataStr}: <strong style="color:var(--fg)">${totalDia}</strong></div>` +
-      Object.entries(aulaMap).sort((a,b)=>a[1].hora.localeCompare(b[1].hora)).map(([aulaId,info])=>{
-        const vagas=info.vagas||12;
-        const pct=Math.round(info.checkins.length/vagas*100);
-        return `<div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-            <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${info.hora} — ${info.nome}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">${info.checkins.length}/${vagas} confirmados</div></div>
-            <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${pct>=90?'#f87171':pct>=70?'var(--yellow)':'var(--green)'}">${pct}%</div></div>
-          </div>
-          <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:10px">
-            <div style="height:100%;width:${pct}%;background:${pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)'};border-radius:4px"></div>
-          </div>
-          ${info.checkins.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:6px;margin-bottom:4px">
-            <div style="font-size:13px;font-weight:500">${c.aluno_nome||'—'}</div>
-            <span style="font-size:11px;color:var(--muted)">⏰ ${c.hora||'—'}</span>
-          </div>`).join('')}
-        </div>`;
-      }).join('');
-    // Seção de reservas futuras
+    if(totalDia===0){showEmpty(el,'Nenhum check-in neste dia');
+    } else {
+      const aulaMap = {};
+      cache.checkins.forEach(c=>{
+        if(!aulaMap[c.aula_id]) aulaMap[c.aula_id]={nome:c.aula_nome||'—',hora:c.hora||'—',checkins:[],vagas:null};
+        aulaMap[c.aula_id].checkins.push(c);
+      });
+      cache.aulas.forEach(a=>{ if(aulaMap[a.id]) aulaMap[a.id].vagas=a.vagas; });
+      el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">Total em ${admCalDataSel}: <strong style="color:var(--fg)">${totalDia}</strong></div>` +
+        Object.entries(aulaMap).sort((a,b)=>a[1].hora.localeCompare(b[1].hora)).map(([aulaId,info])=>{
+          const vagas=info.vagas||12;
+          const pct=Math.round(info.checkins.length/vagas*100);
+          return `<div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+              <div><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${info.hora} — ${info.nome}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${info.checkins.length}/${vagas} confirmados</div></div>
+              <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${pct>=90?'#f87171':pct>=70?'var(--yellow)':'var(--green)'}">${pct}%</div></div>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:10px">
+              <div style="height:100%;width:${pct}%;background:${pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)'};border-radius:4px"></div>
+            </div>
+            ${info.checkins.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:6px;margin-bottom:4px">
+              <div style="font-size:13px;font-weight:500">${c.aluno_nome||'—'}</div>
+              <span style="font-size:11px;color:var(--muted)">⏰ ${c.hora||'—'}</span>
+            </div>`).join('')}
+          </div>`;
+        }).join('');
+    }
     const elF = document.getElementById('checkins-futuros');
     const futArr = Array.isArray(futuros) ? futuros : [];
     if(futArr.length===0){elF.innerHTML='';return;}
     const porData = {};
-    futArr.forEach(c=>{
-      const d = String(c.data_checkin).split('T')[0];
-      if(!porData[d]) porData[d]=[];
-      porData[d].push(c);
-    });
-    const diasPt = {Mon:'Seg',Tue:'Ter',Wed:'Qua',Thu:'Qui',Fri:'Sex',Sat:'Sáb',Sun:'Dom'};
+    futArr.forEach(c=>{ const d=String(c.data_checkin).split('T')[0]; if(!porData[d])porData[d]=[]; porData[d].push(c); });
     elF.innerHTML = `<div style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;margin:16px 0 8px;color:var(--yellow)">📋 Próximas Reservas (${futArr.length})</div>` +
       Object.entries(porData).map(([data,itens])=>{
         const dt = new Date(data+'T12:00:00Z');
@@ -1114,7 +1138,7 @@ async function renderCheckins() {
           </div>`).join('')}
         </div>`;
       }).join('');
-  } catch(e) { document.getElementById('checkins-lista').innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
+  } catch(e) { const el=document.getElementById('checkins-lista'); if(el) el.innerHTML='<div class="alert alert-r">Erro: '+e.message+'</div>'; }
 }
 
 let finTab='geral'; let finResumo=null; let _finChart=null; let _finChartDoughnut=null; let contasFilter='pendente'; let contasPorFilter='todos'; let _finShopPedidos=[];
