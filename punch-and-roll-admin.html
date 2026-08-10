@@ -846,7 +846,7 @@ async function fichaAluno(id) {
 }
 
 function verContrato(alunoId) {
-  const token = localStorage.getItem('pr_token');
+  const token = localStorage.getItem('pr_admin_token');
   const url = `https://punch-and-roll-api-production.up.railway.app/api/contratos/preview/${alunoId}`;
   const existing = document.getElementById('modal-preview-contrato');
   if (existing) existing.remove();
