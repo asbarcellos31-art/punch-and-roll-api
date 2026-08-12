@@ -858,9 +858,38 @@ async function fichaAluno(id) {
 
       let html = '';
 
-      // Status changes / cancellations
+      // Check-ins
+      if (h.checkins && h.checkins.length > 0) {
+        html += `<div style="font-size:11px;color:var(--muted);letter-spacing:.5px;margin-bottom:6px;margin-top:2px">CHECK-INS (${h.checkins.length})</div>`;
+        html += h.checkins.map(c => {
+          const dt = c.data_checkin instanceof Date ? c.data_checkin.toISOString().split('T')[0] : String(c.data_checkin).split('T')[0];
+          const [ano,mes,dia] = dt.split('-');
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1a1a1a">
+            <div style="font-size:12px;font-weight:500">✅ ${c.aula_nome||'Aula'} <span style="font-size:10px;color:var(--muted);font-weight:400">${c.hora||''}</span></div>
+            <div style="font-size:11px;color:var(--muted)">${dia}/${mes}/${ano}</div>
+          </div>`;
+        }).join('');
+      }
+
+      // Cancellations
+      if (h.cancelamentos && h.cancelamentos.length > 0) {
+        html += `<div style="font-size:11px;color:var(--muted);letter-spacing:.5px;margin-top:12px;margin-bottom:6px">CANCELAMENTOS DE CHECK-IN (${h.cancelamentos.length})</div>`;
+        html += h.cancelamentos.map(c => {
+          const dt = c.data_checkin instanceof Date ? c.data_checkin.toISOString().split('T')[0] : String(c.data_checkin).split('T')[0];
+          const [ano,mes,dia] = dt.split('-');
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1a1a1a">
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#f87171">❌ ${c.aula_nome||'Aula'} <span style="font-size:10px;font-weight:400">${c.hora||''}</span></div>
+              <div style="font-size:10px;color:var(--muted)">Cancelado por: ${c.cancelado_por==='aluno'?'próprio aluno':'admin'}</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted)">${dia}/${mes}/${ano}</div>
+          </div>`;
+        }).join('');
+      }
+
+      // Status changes
       if (h.statusLog && h.statusLog.length > 0) {
-        html += `<div style="font-size:11px;color:var(--muted);letter-spacing:.5px;margin-bottom:6px;margin-top:2px">ALTERAÇÕES DE STATUS</div>`;
+        html += `<div style="font-size:11px;color:var(--muted);letter-spacing:.5px;margin-top:12px;margin-bottom:6px">ALTERAÇÕES DE STATUS</div>`;
         html += h.statusLog.map(s => `
           <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1a1a1a">
             <div>

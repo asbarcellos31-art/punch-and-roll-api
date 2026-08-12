@@ -558,6 +558,21 @@ async function setupDB() {
       ('VENCENDO','Alerta Mensalidade Vencendo',0,'09:00')`);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS checkins_cancelados (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NOT NULL,
+        aula_id INT NOT NULL,
+        aula_nome VARCHAR(200),
+        data_checkin DATE NOT NULL,
+        hora VARCHAR(10),
+        cancelado_por VARCHAR(20),
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX (aluno_id),
+        INDEX (criado_em)
+      )
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS alunos_status_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         aluno_id INT NOT NULL,
@@ -1001,7 +1016,11 @@ app.get('/api/alunos/:id/historico', auth, adminOnly, async (req, res) => {
       `SELECT status_anterior, status_novo, motivo, admin_nome, criado_em FROM alunos_status_log WHERE aluno_id=? ORDER BY criado_em DESC LIMIT 50`, [id]);
     const [pagamentos] = await db.query(
       `SELECT descricao, valor, status, metodo, data_pagamento, criado_em FROM pagamentos WHERE aluno_id=? ORDER BY criado_em DESC LIMIT 20`, [id]);
-    res.json({ logins, statusLog, pagamentos });
+    const [checkins] = await db.query(
+      `SELECT c.data_checkin, c.hora, au.nome as aula_nome, au.modalidade FROM checkins c JOIN aulas au ON c.aula_id=au.id WHERE c.aluno_id=? ORDER BY c.data_checkin DESC, c.criado_em DESC LIMIT 50`, [id]);
+    const [cancelamentos] = await db.query(
+      `SELECT aula_nome, data_checkin, hora, cancelado_por, criado_em FROM checkins_cancelados WHERE aluno_id=? ORDER BY criado_em DESC LIMIT 30`, [id]);
+    res.json({ logins, statusLog, pagamentos, checkins, cancelamentos });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1257,6 +1276,9 @@ app.delete('/api/checkins/:id', auth, async (req, res) => {
       const dtCk = ck.data_checkin instanceof Date ? ck.data_checkin.toISOString().split('T')[0] : String(ck.data_checkin).split('T')[0];
       if (dtCk < hoje) return res.status(400).json({ error: 'Não é possível cancelar check-in de dias anteriores' });
     }
+    const [[aula]] = await db.query('SELECT nome, hora FROM aulas WHERE id=?', [ck.aula_id]);
+    db.query('INSERT INTO checkins_cancelados (aluno_id,aula_id,aula_nome,data_checkin,hora,cancelado_por) VALUES (?,?,?,?,?,?)',
+      [ck.aluno_id, ck.aula_id, aula?.nome||'—', ck.data_checkin, ck.hora||aula?.hora||'—', req.user.tipo]);
     await db.query('DELETE FROM checkins WHERE id=?', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
