@@ -1520,6 +1520,11 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
     if (type === 'payment') {
       const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
+      if (['cancelled','rejected','refunded','charged_back'].includes(payment.status)) {
+        const novoStatus = payment.status === 'cancelled' ? 'cancelado' : payment.status === 'rejected' ? 'rejeitado' : payment.status;
+        await db.query('UPDATE pagamentos SET status=? WHERE mp_payment_id=? AND status=?',
+          [novoStatus, String(data.id), 'pendente']);
+      }
       if (payment.status === 'approved') {
         // Tenta achar pelo mp_payment_id numérico primeiro
         let [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
