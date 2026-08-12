@@ -1226,11 +1226,20 @@ app.post('/api/checkins', auth, async (req, res) => {
     const { aula_id } = req.body;
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hora = new Date().toTimeString().slice(0,5);
-    const [aluno] = await db.query('SELECT nome, status FROM alunos WHERE id=?',[aluno_id]);
+    const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
+    if (!aluno[0]) return res.status(404).json({ error: 'Aluno não encontrado' });
     if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
       return res.status(403).json({ error: 'Acesso bloqueado. Regularize sua mensalidade para fazer check-in.' });
-    const [aula] = await db.query('SELECT vagas, nome, hora, dia FROM aulas WHERE id=?',[aula_id]);
+    const [aula] = await db.query('SELECT vagas, nome, hora, dia, modalidade FROM aulas WHERE id=?',[aula_id]);
     if (!aula[0]) return res.status(404).json({ error: 'Aula não encontrada' });
+    // Valida modalidade: boxe só entra em boxe, jiujitsu só entra em jiujitsu, ambos pode tudo
+    const modalidadeAluno = aluno[0].modalidade;
+    const modalidadeAula = aula[0].modalidade;
+    if (modalidadeAluno !== 'ambos' && modalidadeAula && modalidadeAluno !== modalidadeAula) {
+      const nomeAula = modalidadeAula === 'boxe' ? 'Boxe' : 'Jiu-Jitsu';
+      const nomePlano = modalidadeAluno === 'boxe' ? 'Boxe' : 'Jiu-Jitsu';
+      return res.status(403).json({ error: `Seu plano é de ${nomePlano}. Esta aula é de ${nomeAula}. Faça upgrade para o plano Combo para ter acesso às duas modalidades.` });
+    }
     // Calcula a data da aula usando horário de Brasília (BRT), não UTC
     const DIAS_SEMANA = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
     const diaAlvo = DIAS_SEMANA[aula[0].dia] ?? -1;
