@@ -2194,7 +2194,7 @@ setInterval(async () => {
         const [[tmplWA]]   = await db.query(`SELECT valor FROM wa_config WHERE chave=?`, [waChave]);
         const [[tmplEmail]]= await db.query(`SELECT valor FROM wa_config WHERE chave=?`, [emailChave]);
         const [alunos] = await db.query(
-          "SELECT id,nome,tel,email FROM alunos WHERE status='ativo' AND DATE(vencimento)=? AND (cortesia IS NULL OR cortesia=0)",
+          "SELECT id,nome,tel,email FROM alunos WHERE status IN ('ativo','vencendo') AND DATE(vencimento)=? AND (cortesia IS NULL OR cortesia=0)",
           [fmt(dataAlvo)]
         );
         for (const a of alunos) {
