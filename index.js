@@ -558,6 +558,20 @@ async function setupDB() {
       ('VENCENDO','Alerta Mensalidade Vencendo',0,'09:00')`);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS alunos_status_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT NOT NULL,
+        status_anterior VARCHAR(50),
+        status_novo VARCHAR(50) NOT NULL,
+        motivo VARCHAR(255),
+        admin_nome VARCHAR(150),
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX (aluno_id),
+        INDEX (criado_em)
+      )
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS login_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         tipo VARCHAR(20),
@@ -940,7 +954,8 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
     const cortesia = d.cortesia ? 1 : 0;
     const cortesiaMotivo = d.cortesia_motivo || null;
     const nd = (v) => v || null;
-    const dt = (v) => v ? String(v).slice(0,10) : null; // garante formato YYYY-MM-DD
+    const dt = (v) => v ? String(v).slice(0,10) : null;
+    const [[alunoAtual]] = await db.query('SELECT status FROM alunos WHERE id=?', [req.params.id]);
     await db.query(`
       UPDATE alunos SET nome=?,cpf=?,nasc=?,sexo=?,tel=?,email=?,endereco=?,cidade=?,cep=?,
       emerg_nome=?,emerg_tel=?,parentesco=?,saude=?,alergia=?,modalidade=?,nivel=?,
@@ -948,6 +963,13 @@ app.put('/api/alunos/:id', auth, adminOnly, async (req, res) => {
       cortesia=?,cortesia_motivo=?
       WHERE id=?
     `, [d.nome,nd(d.cpf),dt(d.nasc),nd(d.sexo),d.tel,nd(d.email),nd(d.end),d.cidade||'São José',nd(d.cep),nd(d.emergNome),nd(d.emergTel),nd(d.parentesco),nd(d.saude),nd(d.alergia),d.modalidade,d.nivel||'iniciante',nd(d.planoId),nd(d.plano),d.valor||0,dt(d.inicio),dt(d.venc),d.pagto||'pix',JSON.stringify(d.aulasLiberadas||[]),nd(d.obs),d.status||'ativo',cortesia,cortesiaMotivo,req.params.id]);
+    const statusNovo = d.status || 'ativo';
+    if (alunoAtual && alunoAtual.status !== statusNovo) {
+      const adminNome = req.user?.nome || req.user?.email || 'Admin';
+      const motivo = statusNovo === 'inativo' ? (d.obs ? d.obs.slice(0,200) : 'Cancelamento via admin') : null;
+      db.query('INSERT INTO alunos_status_log (aluno_id,status_anterior,status_novo,motivo,admin_nome) VALUES (?,?,?,?,?)',
+        [req.params.id, alunoAtual.status, statusNovo, motivo, adminNome]);
+    }
     res.json({ message: 'Aluno atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -968,6 +990,19 @@ app.delete('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   } finally {
     conn.release();
   }
+});
+
+app.get('/api/alunos/:id/historico', auth, adminOnly, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [logins] = await db.query(
+      `SELECT logado_em, ip FROM login_log WHERE tipo='aluno' AND user_id=? ORDER BY logado_em DESC LIMIT 30`, [id]);
+    const [statusLog] = await db.query(
+      `SELECT status_anterior, status_novo, motivo, admin_nome, criado_em FROM alunos_status_log WHERE aluno_id=? ORDER BY criado_em DESC LIMIT 50`, [id]);
+    const [pagamentos] = await db.query(
+      `SELECT descricao, valor, status, metodo, data_pagamento, criado_em FROM pagamentos WHERE aluno_id=? ORDER BY criado_em DESC LIMIT 20`, [id]);
+    res.json({ logins, statusLog, pagamentos });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/alunos/:id/senha', auth, adminOnly, async (req, res) => {
