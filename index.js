@@ -2156,9 +2156,9 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Atrasados]',e.message); }
 
-  // Vencimento de plano (disparo às 9h)
+  // Vencimento de plano (disparo a partir das 9h — resistente a restart)
   try {
-    if (hora === 9 && dia !== ultimoDiaVencimento) {
+    if (hora >= 9 && dia !== ultimoDiaVencimento) {
       ultimoDiaVencimento = dia;
       const hoje = new Date(); hoje.setHours(0,0,0,0);
       const em5 = new Date(hoje); em5.setDate(em5.getDate()+5);
@@ -2227,6 +2227,11 @@ setInterval(async () => {
           [fmt(dataAlvo)]
         );
         for (const a of alunos) {
+          // Evita duplicata mesmo após restart do servidor
+          const nomecamp = `Vencimento ${diasLabel} — ${a.nome}`;
+          const [[jaEnviou]] = await db.query(
+            "SELECT id FROM wa_campanhas WHERE nome=? AND DATE(criado_em)=CURDATE() LIMIT 1", [nomecamp]);
+          if (jaEnviou) continue;
           const nomeFirst = a.nome.split(' ')[0];
           // WhatsApp
           if (a.tel && tmplWA?.valor) {
@@ -2234,7 +2239,7 @@ setInterval(async () => {
             const r = await enviarWA(a.tel, msg);
             const [waCamp] = await db.query(
               `INSERT INTO wa_campanhas (nome,mensagem,segmento,status,total_enviados,total_erros) VALUES (?,?,?,?,?,?)`,
-              [`Vencimento ${diasLabel} — ${a.nome}`, msg, 'individual', 'CONCLUIDA', r.sucesso?1:0, r.sucesso?0:1]
+              [nomecamp, msg, 'individual', 'CONCLUIDA', r.sucesso?1:0, r.sucesso?0:1]
             );
             await db.query(
               'INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
