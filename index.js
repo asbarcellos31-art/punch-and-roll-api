@@ -885,7 +885,8 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
     if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
       const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-      const base = (vencAtual && vencAtual > hoje) ? vencAtual : hoje; // só estende do vencimento se ainda no futuro
+      let base = hoje;
+      if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
       const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
       const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
@@ -1423,7 +1424,8 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
       if (meses && plano_nome) {
         const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
         const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-        const base = (vencAtual && vencAtual > hoje) ? vencAtual : hoje; // só estende do vencimento se ainda no futuro
+        let base = hoje;
+        if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
         const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
         await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1457,7 +1459,8 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
         if (meses && plano_nome) {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-          const base = (vencAtual && vencAtual > hoje) ? vencAtual : hoje; // só estende do vencimento se ainda no futuro
+          let base = hoje;
+          if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
           const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
           await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1548,7 +1551,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
           const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
-          const base = (vencAtual && vencAtual > hoje) ? vencAtual : hoje; // só estende do vencimento se ainda no futuro
+          let base = hoje;
+          if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
           const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
           if (meses && plano_nome) {
             const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
