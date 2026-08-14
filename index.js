@@ -13,6 +13,17 @@ require('dotenv').config();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 // Retorna data local BRT (evita UTC deslocado após 21h)
 function hojeBRT() { const d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// Converte qualquer campo Date do MySQL para string YYYY-MM-DD
+function fmtDateFields(obj) {
+  if(!obj) return obj;
+  const DATE_FIELDS = ['vencimento','inicio','nasc','data_pagamento','data_checkin','criado_em','logado_em'];
+  const r = {...obj};
+  for(const f of DATE_FIELDS) {
+    if(r[f] instanceof Date) r[f] = r[f].toISOString().slice(0,10);
+  }
+  if(r.vencimento) r.venc = r.vencimento;
+  return r;
+}
 
 const ALLOWED_ORIGINS = [
   'https://punchandroll.com.br',
@@ -777,7 +788,7 @@ app.delete('/api/equipe/:id', auth, async (req, res) => {
 app.get('/api/alunos', auth, adminOnly, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos ORDER BY nome');
-    res.json(rows);
+    res.json(rows.map(fmtDateFields));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -787,7 +798,7 @@ app.get('/api/alunos/me', auth, async (req, res) => {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.user.id]);
     if(!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
     const a = rows[0];
-    res.json({...a, venc: a.vencimento, aulasLiberadas: (() => { try { return JSON.parse(a.aulas_liberadas||'[]'); } catch(e){ return []; } })()});
+    res.json({...fmtDateFields(a), aulasLiberadas: (() => { try { return JSON.parse(a.aulas_liberadas||'[]'); } catch(e){ return []; } })()});
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -800,7 +811,7 @@ app.put('/api/alunos/me', auth, async (req, res) => {
       [tel,email,endereco,cidade,cep,emerg_nome,emerg_tel,parentesco,saude,alergia,req.user.id]
     );
     const [rows] = await db.query('SELECT * FROM alunos WHERE id=?', [req.user.id]);
-    res.json({...rows[0], venc: rows[0].vencimento});
+    res.json(fmtDateFields(rows[0]));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -946,7 +957,7 @@ app.get('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Aluno não encontrado' });
-    res.json(rows[0]);
+    res.json(fmtDateFields(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
