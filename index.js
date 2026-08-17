@@ -895,7 +895,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
 
     if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
-      const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+      const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
       let base = hoje;
       if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
       const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
@@ -1434,7 +1434,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     if (pagStatusOk) {
       if (meses && plano_nome) {
         const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
-        const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+        const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
         let base = hoje;
         if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
@@ -1469,7 +1469,7 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
         const hoje = hojeBRT();
         if (meses && plano_nome) {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
-          const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+          const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
           let base = hoje;
           if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
@@ -1561,7 +1561,7 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
           const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
-          const vencAtual = alunoAtual?.vencimento ? String(alunoAtual.vencimento).slice(0,10) : null;
+          const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
           let base = hoje;
           if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
           const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
