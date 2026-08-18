@@ -1550,12 +1550,13 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       }
       if (payment.status === 'approved') {
         // Tenta achar pelo mp_payment_id numérico primeiro
-        let [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+        let [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome,status FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
         // Fallback: pagamento via checkout externo — busca pelo external_reference
         if (!pag.length && payment.external_reference) {
-          [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?',[payment.external_reference]);
+          [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome,status FROM pagamentos WHERE mp_payment_id=?',[payment.external_reference]);
         }
         if (pag.length) {
+          if (pag[0].status === 'pago') { res.sendStatus(200); return; } // já processado — evita duplicata
           await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? OR mp_payment_id=?",
             [String(data.id), payment.external_reference||String(data.id)]);
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
