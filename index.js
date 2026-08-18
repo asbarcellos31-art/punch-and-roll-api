@@ -2104,6 +2104,14 @@ setInterval(async () => {
         AND DATE(vencimento) >= CURDATE()
         AND DATE(vencimento) <= DATE_ADD(CURDATE(), INTERVAL 5 DAY)
     `);
+    // vencendo → atrasado: grace period esgotado (mesmo fluxo do ativo)
+    await db.query(`
+      UPDATE alunos SET status='atrasado'
+      WHERE status='vencendo'
+        AND (cortesia IS NULL OR cortesia=0)
+        AND vencimento IS NOT NULL
+        AND DATE(vencimento) < DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+    `);
     // vencendo → ativo: vencimento voltou a ser > 5 dias (pagou e renovou)
     await db.query(`
       UPDATE alunos SET status='ativo'
