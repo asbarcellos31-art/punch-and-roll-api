@@ -130,6 +130,15 @@ textarea.fi{resize:none}
     </div>
     <button id="l-btn" onclick="doLogin()" style="width:100%;padding:14px;background:#d4111c;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;cursor:pointer;box-shadow:0 4px 20px rgba(212,17,28,.4)">ENTRAR</button>
     <div id="l-erro" style="color:#f87171;font-size:12px;text-align:center;margin-top:10px;display:none">E-mail ou senha incorretos</div>
+    <div style="text-align:center;margin-top:12px">
+      <button onclick="toggleEsqueceuAdmin()" style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif;padding:0">Esqueceu a senha?</button>
+    </div>
+    <div id="esqueceu-admin-form" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #222">
+      <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#555;margin-bottom:6px;display:block">E-mail do administrador</label>
+      <input id="esqueceu-admin-email" type="email" style="width:100%;background:#0f0f0f;border:1px solid #2d2d2d;border-radius:8px;padding:10px 14px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:10px" placeholder="admin@punchandroll.com.br" onkeydown="if(event.key==='Enter')enviarRecuperacaoAdmin()">
+      <button onclick="enviarRecuperacaoAdmin()" id="rec-admin-btn" style="width:100%;padding:10px;background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;cursor:pointer">ENVIAR SENHA POR E-MAIL</button>
+      <div id="rec-admin-msg" style="font-size:12px;text-align:center;margin-top:8px;display:none"></div>
+    </div>
   </div>
 </div>
 
@@ -368,6 +377,33 @@ const GET = path => api('GET', path);
 const POST = (path,body) => api('POST', path, body);
 const PUT = (path,body) => api('PUT', path, body);
 const DEL = path => api('DELETE', path);
+
+function toggleEsqueceuAdmin() {
+  const f = document.getElementById('esqueceu-admin-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+async function enviarRecuperacaoAdmin() {
+  const email = document.getElementById('esqueceu-admin-email').value.trim();
+  const btn = document.getElementById('rec-admin-btn');
+  const msg = document.getElementById('rec-admin-msg');
+  if (!email) return;
+  btn.disabled = true; btn.textContent = 'ENVIANDO...';
+  msg.style.display = 'none';
+  try {
+    const r = await fetch('/api/auth/admin/esqueceu-senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const d = await r.json();
+    msg.style.display = 'block';
+    msg.style.color = r.ok ? '#4ade80' : '#f87171';
+    msg.textContent = d.message || d.error;
+  } catch(e) {
+    msg.style.display = 'block'; msg.style.color = '#f87171';
+    msg.textContent = 'Erro ao enviar. Tente novamente.';
+  }
+  btn.disabled = false; btn.textContent = 'ENVIAR SENHA POR E-MAIL';
+}
 
 async function doLogin() {
   const email = document.getElementById('l-email').value.trim();

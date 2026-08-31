@@ -721,6 +721,55 @@ app.post('/api/auth/aluno', authLimiter, async (req, res) => {
 });
 
 // ══════════════════════════════════════
+// RECUPERAÇÃO DE SENHA
+// ══════════════════════════════════════
+
+app.post('/api/auth/aluno/esqueceu-senha', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
+    const [rows] = await db.query(
+      'SELECT id, nome, email, tel FROM alunos WHERE LOWER(email) = ?',
+      [email.toLowerCase().trim()]
+    );
+    if (!rows.length) return res.json({ message: 'Se o e-mail estiver cadastrado, você receberá a senha pelo WhatsApp.' });
+    const aluno = rows[0];
+    const tempSenha = Math.floor(100000 + Math.random() * 900000).toString();
+    const hash = await bcrypt.hash(tempSenha, 10);
+    await db.query('UPDATE alunos SET senha=? WHERE id=?', [hash, aluno.id]);
+    if (aluno.tel) {
+      const nome = aluno.nome.split(' ')[0];
+      const msg = `🥋 *Punch and Roll Fight Team*\n\nOlá, ${nome}! Recebemos sua solicitação de recuperação de senha.\n\n🔑 Sua senha temporária é: *${tempSenha}*\n\nAcesse o portal e troque sua senha em Perfil › Alterar Senha.\n\n📱 punchandroll.com.br/punch-and-roll-portal.html`;
+      notificarWA(aluno.tel, msg).catch(() => {});
+    }
+    res.json({ message: 'Senha temporária enviada pelo WhatsApp! Verifique seu celular.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/auth/admin/esqueceu-senha', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
+    const [rows] = await db.query(
+      'SELECT id, nome, email FROM admin_users WHERE LOWER(email) = ? AND ativo = 1',
+      [email.toLowerCase().trim()]
+    );
+    if (!rows.length) return res.json({ message: 'Se o e-mail estiver cadastrado, você receberá a nova senha por e-mail.' });
+    const admin = rows[0];
+    const tempSenha = Math.floor(100000 + Math.random() * 900000).toString();
+    const hash = await bcrypt.hash(tempSenha, 10);
+    await db.query('UPDATE admin_users SET senha=? WHERE id=?', [hash, admin.id]);
+    const html = `<h2>Punch and Roll — Recuperação de Senha</h2><p>Olá, ${admin.nome}!</p><p>Sua senha temporária de administrador é: <strong style="font-size:20px">${tempSenha}</strong></p><p>Acesse o painel e troque sua senha imediatamente.</p>`;
+    await enviarEmailAluno(admin.email, admin.nome, '🔑 Punch and Roll — Senha Temporária de Administrador', html);
+    res.json({ message: 'Senha temporária enviada para o seu e-mail!' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════
 // EQUIPE — Gestão de admins/colaboradores
 // ══════════════════════════════════════
 
