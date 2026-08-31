@@ -390,7 +390,7 @@ async function enviarRecuperacaoAdmin() {
   btn.disabled = true; btn.textContent = 'ENVIANDO...';
   msg.style.display = 'none';
   try {
-    const r = await fetch('/api/auth/admin/esqueceu-senha', {
+    const r = await fetch(API + '/api/auth/admin/esqueceu-senha', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });

@@ -737,12 +737,20 @@ app.post('/api/auth/aluno/esqueceu-senha', authLimiter, async (req, res) => {
     const tempSenha = Math.floor(100000 + Math.random() * 900000).toString();
     const hash = await bcrypt.hash(tempSenha, 10);
     await db.query('UPDATE alunos SET senha=? WHERE id=?', [hash, aluno.id]);
-    if (aluno.tel) {
-      const nome = aluno.nome.split(' ')[0];
-      const msg = `🥋 *Punch and Roll Fight Team*\n\nOlá, ${nome}! Recebemos sua solicitação de recuperação de senha.\n\n🔑 Sua senha temporária é: *${tempSenha}*\n\nAcesse o portal e troque sua senha em Perfil › Alterar Senha.\n\n📱 punchandroll.com.br/punch-and-roll-portal.html`;
-      notificarWA(aluno.tel, msg).catch(() => {});
-    }
-    res.json({ message: 'Senha temporária enviada pelo WhatsApp! Verifique seu celular.' });
+    const nome = aluno.nome.split(' ')[0];
+    const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <img src="https://punchandroll.com.br/logo.png" alt="Punch and Roll" style="height:60px;margin-bottom:16px">
+      <h2 style="color:#111">Recuperação de Senha</h2>
+      <p>Olá, <strong>${nome}</strong>!</p>
+      <p>Recebemos uma solicitação de recuperação de senha para o Portal do Aluno.</p>
+      <p>Sua senha temporária é:</p>
+      <div style="font-size:32px;font-weight:700;letter-spacing:6px;background:#f5f5f5;padding:16px;border-radius:8px;text-align:center;margin:16px 0">${tempSenha}</div>
+      <p>Acesse o portal e troque sua senha em <strong>Perfil › Alterar Senha</strong>.</p>
+      <a href="https://punchandroll.com.br/punch-and-roll-portal.html" style="display:inline-block;background:#d4111c;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;margin-top:8px">Acessar Portal</a>
+      <p style="margin-top:24px;color:#888;font-size:12px">Se não foi você quem solicitou, ignore este e-mail.</p>
+    </div>`;
+    await enviarEmailAluno(aluno.email, aluno.nome, '🔑 Punch and Roll — Senha Temporária', html);
+    res.json({ message: 'Senha temporária enviada para o seu e-mail!' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

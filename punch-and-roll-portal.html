@@ -89,7 +89,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     <div id="esqueceu-form" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #222">
       <label style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#555;margin-bottom:6px;display:block">E-mail cadastrado</label>
       <input id="esqueceu-email" type="email" style="width:100%;background:#0f0f0f;border:1px solid #2d2d2d;border-radius:8px;padding:10px 14px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:10px" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')enviarRecuperacaoPortal()">
-      <button onclick="enviarRecuperacaoPortal()" id="rec-btn" style="width:100%;padding:10px;background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;cursor:pointer">ENVIAR SENHA POR WHATSAPP</button>
+      <button onclick="enviarRecuperacaoPortal()" id="rec-btn" style="width:100%;padding:10px;background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;cursor:pointer">ENVIAR SENHA POR E-MAIL</button>
       <div id="rec-msg" style="font-size:12px;text-align:center;margin-top:8px;display:none"></div>
     </div>
   </div>
@@ -170,7 +170,7 @@ async function enviarRecuperacaoPortal() {
   btn.disabled = true; btn.textContent = 'ENVIANDO...';
   msg.style.display = 'none';
   try {
-    const r = await fetch('/api/auth/aluno/esqueceu-senha', {
+    const r = await fetch(API + '/api/auth/aluno/esqueceu-senha', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
@@ -182,7 +182,7 @@ async function enviarRecuperacaoPortal() {
     msg.style.display = 'block'; msg.style.color = '#f87171';
     msg.textContent = 'Erro ao enviar. Tente novamente.';
   }
-  btn.disabled = false; btn.textContent = 'ENVIAR SENHA POR WHATSAPP';
+  btn.disabled = false; btn.textContent = 'ENVIAR SENHA POR E-MAIL';
 }
 
 // LOGIN
