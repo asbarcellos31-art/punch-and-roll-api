@@ -4402,6 +4402,13 @@ app.get('/api/_fix-checkin-dates', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/_reset-admin', async (req, res) => {
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
+  const hash = await bcrypt.hash('barc0831', 10);
+  await db.query("UPDATE admin_users SET senha=? WHERE email='admin@punchandroll.com.br'", [hash]);
+  res.json({ ok: true, message: 'Senha do admin resetada para barc0831' });
+});
+
 app.get('/api/_report-now', async (req, res) => {
   if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
