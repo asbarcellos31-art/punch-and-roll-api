@@ -1295,6 +1295,13 @@ app.post('/api/checkins', auth, async (req, res) => {
     const { aula_id } = req.body;
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hora = new Date().toTimeString().slice(0,5);
+    // Feriados: bloqueia check-in e exibe mensagem
+    const FERIADOS = {
+      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula hoje. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪'
+    };
+    const hoje = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+    const hojeStr = hoje.toISOString().slice(0,10);
+    if (FERIADOS[hojeStr]) return res.status(403).json({ error: FERIADOS[hojeStr] });
     const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
     if (!aluno[0]) return res.status(404).json({ error: 'Aluno não encontrado' });
     if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
