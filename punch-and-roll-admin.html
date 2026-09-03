@@ -1769,7 +1769,7 @@ function imprimirContas() {
     const linhas=socios.sort().map((nome,i)=>{
       const v=por[nome];
       const total=v.pago+v.pendente;
-      const faltaPagar=Math.max(0,partePrevista-v.pago); // ainda falta pagar da parte dele
+      const faltaPagar=v.pendente; // contas atribuídas ainda não pagas
       const excesso=v.pago-partePrevista; // positivo = pagou mais que a parte
       return `<tr style="background:${i%2===0?'#fff':'#f9f9f9'}">
         ${td(`<b>${nome}</b>`)}
