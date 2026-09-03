@@ -1573,6 +1573,32 @@ function renderFinContas(){
         `<button onclick="contasPorFilter='${v}';renderFinContas()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:${contasPorFilter===v?(_porCores[v]||'var(--muted)'):'var(--panel2)'};color:${contasPorFilter===v?'#fff':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap">${l}</button>`
       ).join('')}
     </div>
+    ${(()=>{
+      const naoRepete = doMes.filter(d => {
+        const parc = parseInt(d.parcelas) || 1;
+        const parcAtual = parseInt(d.parcela_atual) || 1;
+        return !d.recorrente && (parc <= 1 || parcAtual >= parc);
+      });
+      if (!naoRepete.length) return '';
+      const totalNaoRepete = naoRepete.reduce((s,d)=>s+parseFloat(d.valor||0),0);
+      return `<details style="margin-bottom:12px">
+        <summary style="cursor:pointer;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;list-style:none;user-select:none">
+          <span style="font-size:12px;font-weight:600;color:#a78bfa">⚠️ Não repetem no mês que vem <span style="font-weight:400;opacity:.8">(${naoRepete.length} conta${naoRepete.length>1?'s':''})</span></span>
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:#a78bfa">${fmtR(totalNaoRepete)}</span>
+        </summary>
+        <div style="border:1px solid rgba(139,92,246,.2);border-top:none;border-radius:0 0 8px 8px;padding:8px;background:rgba(139,92,246,.04)">
+          ${naoRepete.map(d=>{
+            const parc = parseInt(d.parcelas)||1;
+            const parcAtual = parseInt(d.parcela_atual)||1;
+            const tag = parc > 1 ? `<span style="font-size:10px;color:#a78bfa;background:rgba(139,92,246,.15);padding:1px 6px;border-radius:3px;margin-left:4px">última parcela (${parcAtual}/${parc})</span>` : `<span style="font-size:10px;color:#94a3b8;background:rgba(148,163,184,.1);padding:1px 6px;border-radius:3px;margin-left:4px">avulsa</span>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 6px;border-bottom:1px solid rgba(139,92,246,.1)">
+              <span style="font-size:12px">${d.descricao}${tag}</span>
+              <span style="font-size:13px;font-weight:700;color:#a78bfa;flex-shrink:0;margin-left:8px">${fmtR(d.valor)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </details>`;
+    })()}
     ${filtradas.length===0?'<div class="loading">Nenhuma conta nesta categoria</div>':
       filtradas.map(d=>{
         const vencida=d.status==='pendente'&&d.data_vencimento<todayStr;
