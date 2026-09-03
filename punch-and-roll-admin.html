@@ -1784,8 +1784,9 @@ function imprimirContas() {
       </tr>`;
     }).join('');
 
-    // Acerto: baseado no total atribuído (pago + pendente) vs parte justa
-    const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-partePrevista}));
+    // Acerto: baseado no total atribuído vs metade do total bruto (independente da receita)
+    const parteAtribuida=totalPrevisto/nSocios;
+    const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-parteAtribuida}));
     const acertos=[];
     const devem=saldos.filter(x=>x.saldo<0).map(x=>({nome:x.nome,v:-x.saldo})); // pagou menos → deve
     const recebem=saldos.filter(x=>x.saldo>0).map(x=>({nome:x.nome,v:x.saldo}));  // pagou mais → recebe
