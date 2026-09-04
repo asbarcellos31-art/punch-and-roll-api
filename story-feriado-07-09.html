@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    background: #ffffff;
+    font-family: 'Arial Black', Arial, sans-serif;
+  }
+
+  .container {
+    width: 1080px;
+    height: 1920px;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  /* Barra vermelha topo */
+  .barra-topo {
+    width: 100%;
+    height: 14px;
+    background: #d4111c;
+    flex-shrink: 0;
+  }
+
+  /* Cabeçalho igual ao email */
+  .logo-area {
+    width: 100%;
+    background: #ffffff;
+    padding: 60px 90px 50px;
+    text-align: center;
+    border-bottom: 8px solid #d4111c;
+    flex-shrink: 0;
+  }
+
+  .logo-nome {
+    font-size: 72px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    line-height: 1;
+    color: #111111;
+  }
+
+  .logo-nome .and {
+    color: #d4111c;
+  }
+
+  .logo-sub {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: #aaaaaa;
+    margin-top: 10px;
+  }
+
+  /* Linha divisória fina */
+  .linha {
+    width: calc(100% - 180px);
+    height: 2px;
+    background: #eeeeee;
+    margin-bottom: 80px;
+    flex-shrink: 0;
+  }
+
+  /* Conteúdo central */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 90px;
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .label-topo {
+    font-size: 28px;
+    font-weight: 700;
+    color: #d4111c;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+  }
+
+  .titulo {
+    font-size: 108px;
+    font-weight: 900;
+    color: #111111;
+    text-transform: uppercase;
+    line-height: 0.92;
+    letter-spacing: -3px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .titulo .vermelho {
+    color: #d4111c;
+  }
+
+  .data-linha {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 70px;
+  }
+
+  .data {
+    font-size: 52px;
+    font-weight: 900;
+    color: #111111;
+    letter-spacing: 3px;
+  }
+
+  .bandeira {
+    font-size: 64px;
+    line-height: 1;
+  }
+
+  /* Linha vermelha decorativa */
+  .linha-red {
+    width: 80px;
+    height: 5px;
+    background: #d4111c;
+    margin-bottom: 65px;
+  }
+
+  /* Box retorno */
+  .retorno {
+    border-left: 6px solid #d4111c;
+    padding: 28px 40px;
+    background: #f8f8f8;
+    margin-bottom: 80px;
+    width: 100%;
+    text-align: left;
+  }
+
+  .retorno-label {
+    font-size: 22px;
+    font-weight: 700;
+    color: #999;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .retorno-texto {
+    font-size: 52px;
+    font-weight: 900;
+    color: #111111;
+    letter-spacing: -1px;
+  }
+
+  .retorno-texto .verde {
+    color: #16a34a;
+  }
+
+  /* Badge sem aula */
+  .badge {
+    display: inline-block;
+    background: #d4111c;
+    color: #fff;
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    padding: 14px 44px;
+    margin-bottom: 60px;
+  }
+
+  /* Footer */
+  .footer {
+    width: 100%;
+    padding: 40px 90px 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 2px solid #eeeeee;
+    flex-shrink: 0;
+  }
+
+  .insta {
+    font-size: 30px;
+    font-weight: 900;
+    color: #111111;
+    letter-spacing: 1px;
+  }
+
+  .barra-bottom {
+    width: 100%;
+    height: 14px;
+    background: #d4111c;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="barra-topo"></div>
+
+  <div class="logo-area">
+    <div class="logo-nome">PUNCH <span class="and">AND</span> ROLL</div>
+    <div class="logo-sub">Fight Team</div>
+  </div>
+
+  <div class="linha"></div>
+
+  <div class="content">
+    <div class="label-topo">Aviso Importante</div>
+
+    <div class="badge">SEM AULA</div>
+
+    <div class="titulo">
+      FERIADO DA<br><span class="vermelho">INDEPENDÊNCIA</span>
+    </div>
+
+    <div class="data-linha">
+      <div class="data">07 / 09 / 2026</div>
+      <div class="bandeira">🇧🇷</div>
+    </div>
+
+    <div class="linha-red"></div>
+
+    <div class="retorno">
+      <div class="retorno-label">Retorno Normal</div>
+      <div class="retorno-texto"><span class="verde">Terça-feira</span> · 08/09</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="insta">@punchandrollfight</div>
+    <div style="font-size:26px;color:#cccccc;font-weight:700;letter-spacing:2px">punchandroll.com.br</div>
+  </div>
+
+  <div class="barra-bottom"></div>
+</div>
+</body>
+</html>

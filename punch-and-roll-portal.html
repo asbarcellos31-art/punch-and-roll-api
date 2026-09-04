@@ -760,14 +760,28 @@ function fecharRenovacao() {
 }
 
 function setRenovMetodo(m) {
-  document.getElementById('renov-tab-pix').style.background = m==='pix'?'var(--red)':'var(--panel2)';
-  document.getElementById('renov-tab-pix').style.color = m==='pix'?'#fff':'var(--muted)';
-  document.getElementById('renov-tab-cartao').style.background = m==='cartao'?'var(--red)':'var(--panel2)';
-  document.getElementById('renov-tab-cartao').style.color = m==='cartao'?'#fff':'var(--muted)';
+  ['pix','cartao','recorrente'].forEach(t => {
+    const tab = document.getElementById('renov-tab-'+t);
+    if(tab){ tab.style.background = m===t?'var(--red)':'var(--panel2)'; tab.style.color = m===t?'#fff':'var(--muted)'; }
+  });
   document.getElementById('renov-form-pix').style.display = m==='pix'?'block':'none';
   document.getElementById('renov-form-cartao').style.display = m==='cartao'?'block':'none';
-  document.getElementById('renov-btn').textContent = m==='pix'?'Gerar PIX':'Pagar com Cartão →';
+  document.getElementById('renov-form-recorrente').style.display = m==='recorrente'?'block':'none';
+  const labels = {pix:'Gerar PIX', cartao:'Pagar com Cartão →', recorrente:'Ativar Débito Automático 🔄'};
+  document.getElementById('renov-btn').textContent = labels[m]||'Continuar';
   window._renovMetodo = m;
+  // Mostra termos de cancelamento para semestral/anual
+  if(m==='recorrente') {
+    const p = _renovPlano;
+    const termos = document.getElementById('renov-rec-termos');
+    if(p && p.meses > 1) {
+      const multa = Math.round(p.valor * p.meses * 0.30);
+      termos.style.display='block';
+      termos.innerHTML = `⚠️ <strong>Plano com fidelidade de ${p.meses} meses.</strong> Cancelamento antecipado exige aviso com 30 dias de antecedência e pagamento de multa de 30% sobre o valor remanescente.`;
+    } else {
+      termos.style.display='none';
+    }
+  }
 }
 
 async function confirmarRenovacao() {
@@ -802,6 +816,13 @@ async function confirmarRenovacao() {
           }
         }catch(e){}
       },5000);
+    } else if(metodo==='recorrente') {
+      const res = await api('POST','/api/alunos/me/assinar',{
+        plano_id:p.id, plano_nome:p.nome, valor:valorFinal, meses:p.meses
+      });
+      if(!res.init_point) throw new Error('Não foi possível gerar o link de assinatura');
+      fecharRenovacao();
+      window.location.href = res.init_point;
     } else {
       // cartão — gera link de checkout MP (igual ao link direto que o admin envia)
       const res = await api('POST','/api/alunos/me/preferencia',{
@@ -1116,10 +1137,11 @@ async function alterarSenhaPerfil() {
 
     <div style="font-size:13px;color:var(--muted);margin-bottom:12px" id="renov-total"></div>
 
-    <!-- Tabs PIX / Cartão -->
+    <!-- Tabs PIX / Cartão / Recorrente -->
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button id="renov-tab-pix" onclick="setRenovMetodo('pix')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s">PIX</button>
       <button id="renov-tab-cartao" onclick="setRenovMetodo('cartao')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s">Cartão</button>
+      <button id="renov-tab-recorrente" onclick="setRenovMetodo('recorrente')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s">🔄 Recorrente</button>
     </div>
 
     <!-- Formulário PIX -->
@@ -1136,6 +1158,16 @@ async function alterarSenhaPerfil() {
         <div style="font-size:28px;margin-bottom:8px">🔒</div>
         <div style="font-size:14px;color:var(--fg);font-weight:600;margin-bottom:6px">Pagamento seguro via Mercado Pago</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.5">Você será direcionado para a página segura do Mercado Pago para inserir os dados do cartão. Após o pagamento, seu acesso é liberado automaticamente.</div>
+      </div>
+    </div>
+
+    <!-- Formulário Recorrente -->
+    <div id="renov-form-recorrente" style="display:none">
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px">
+        <div style="font-size:28px;margin-bottom:8px;text-align:center">🔄</div>
+        <div style="font-size:14px;color:var(--fg);font-weight:600;margin-bottom:8px;text-align:center">Débito automático mensal</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">Seu cartão é cobrado automaticamente todo mês. Você não precisa renovar — o acesso fica sempre ativo.</div>
+        <div id="renov-rec-termos" style="display:none;margin-top:10px;padding:10px;background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.6"></div>
       </div>
     </div>
 

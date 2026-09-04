@@ -192,6 +192,10 @@ async function setupDB() {
     `);
     try { await conn.query("ALTER TABLE alunos ADD COLUMN cortesia TINYINT DEFAULT 0"); } catch(e){}
     try { await conn.query("ALTER TABLE alunos ADD COLUMN cortesia_motivo VARCHAR(300)"); } catch(e){}
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN mp_subscription_id VARCHAR(100)"); } catch(e){}
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN subscription_tipo VARCHAR(20)"); } catch(e){}
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN subscription_meses INT DEFAULT NULL"); } catch(e){}
+    try { await conn.query("ALTER TABLE alunos ADD COLUMN subscription_inicio DATE DEFAULT NULL"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN categoria VARCHAR(50) DEFAULT 'outro'"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN arquivo LONGBLOB"); } catch(e){}
     try { await conn.query("ALTER TABLE documentos ADD COLUMN mimetype VARCHAR(100)"); } catch(e){}
@@ -1010,6 +1014,85 @@ app.post('/api/alunos/me/preferencia', auth, async (req, res) => {
   }
 });
 
+// Cria assinatura recorrente via MP Preapproval
+app.post('/api/alunos/me/assinar', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const aluno_id = req.user.id;
+    const { plano_id, plano_nome, valor, meses } = req.body;
+    if (!plano_nome || !valor || !meses) return res.status(400).json({ error: 'Dados do plano inválidos' });
+    const [[aluno]] = await db.query('SELECT nome, email, cpf FROM alunos WHERE id=?', [aluno_id]);
+    if (!aluno) return res.status(404).json({ error: 'Aluno não encontrado' });
+    const descricao = `Punch and Roll — ${plano_nome}`;
+    const mpRes = await axios.post('https://api.mercadopago.com/preapproval', {
+      reason: descricao,
+      payer_email: aluno.email,
+      back_url: 'https://punchandroll.com.br/punch-and-roll-portal.html?assinatura=ativada',
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: 'months',
+        transaction_amount: parseFloat(valor),
+        currency_id: 'BRL'
+      },
+      external_reference: `assinatura_${aluno_id}_${plano_id||'plano'}_${meses}m_${Date.now()}`,
+      notification_url: 'https://punch-and-roll-api-production.up.railway.app/api/webhook/mercadopago',
+      status: 'pending'
+    }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' } });
+    const sub = mpRes.data;
+    await db.query(
+      'UPDATE alunos SET mp_subscription_id=?, subscription_tipo=?, subscription_meses=?, subscription_inicio=CURDATE() WHERE id=?',
+      [String(sub.id), parseInt(meses)===1?'mensal':parseInt(meses)===6?'semestral':'anual', parseInt(meses), aluno_id]
+    );
+    res.json({ init_point: sub.init_point, subscription_id: sub.id });
+  } catch(e) {
+    const mpData = e.response?.data;
+    console.error('Assinar error:', JSON.stringify(mpData||e.message));
+    res.status(500).json({ error: mpData?.message || e.message });
+  }
+});
+
+// Cancela assinatura recorrente (calcula multa se semestral/anual)
+app.post('/api/alunos/me/cancelar-assinatura', auth, async (req, res) => {
+  try {
+    if (req.user.tipo !== 'aluno') return res.status(403).json({ error: 'Acesso negado' });
+    const aluno_id = req.user.id;
+    const [[aluno]] = await db.query(
+      'SELECT mp_subscription_id, subscription_tipo, subscription_meses, subscription_inicio, valor FROM alunos WHERE id=?',
+      [aluno_id]
+    );
+    if (!aluno?.mp_subscription_id) return res.status(400).json({ error: 'Nenhuma assinatura ativa encontrada' });
+
+    // Calcula multa se semestral ou anual
+    let multa = 0;
+    if (aluno.subscription_meses > 1 && aluno.subscription_inicio) {
+      const inicio = new Date(aluno.subscription_inicio);
+      const hoje = new Date();
+      const mesesPagos = Math.max(1, Math.ceil((hoje - inicio) / (1000*60*60*24*30)));
+      const mesesRestantes = Math.max(0, aluno.subscription_meses - mesesPagos);
+      multa = Math.round(parseFloat(aluno.valor||0) * mesesRestantes * 0.30 * 100) / 100;
+    }
+
+    // Se só consulta, retorna info sem cancelar
+    if (req.body.apenas_consulta) {
+      return res.json({ multa, subscription_tipo: aluno.subscription_tipo, subscription_meses: aluno.subscription_meses });
+    }
+
+    // Cancela no MP
+    await axios.put(`https://api.mercadopago.com/preapproval/${aluno.mp_subscription_id}`,
+      { status: 'cancelled' },
+      { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' } }
+    );
+    await db.query(
+      'UPDATE alunos SET mp_subscription_id=NULL, subscription_tipo=NULL, subscription_meses=NULL, subscription_inicio=NULL WHERE id=?',
+      [aluno_id]
+    );
+    res.json({ ok: true, multa });
+  } catch(e) {
+    const mpData = e.response?.data;
+    res.status(500).json({ error: mpData?.message || e.message });
+  }
+});
+
 app.get('/api/alunos/:id', auth, adminOnly, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM alunos WHERE id = ?', [req.params.id]);
@@ -1295,13 +1378,10 @@ app.post('/api/checkins', auth, async (req, res) => {
     const { aula_id } = req.body;
     const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hora = new Date().toTimeString().slice(0,5);
-    // Feriados: bloqueia check-in e exibe mensagem
+    // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
     const FERIADOS = {
-      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula hoje. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪'
+      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪'
     };
-    const hoje = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
-    const hojeStr = hoje.toISOString().slice(0,10);
-    if (FERIADOS[hojeStr]) return res.status(403).json({ error: FERIADOS[hojeStr] });
     const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
     if (!aluno[0]) return res.status(404).json({ error: 'Aluno não encontrado' });
     if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
@@ -1326,6 +1406,7 @@ app.post('/api/checkins', auth, async (req, res) => {
     if (diffDias < 0) diffDias += 7;
     const dataAulaUTC = new Date(Date.UTC(brtNow.getFullYear(), brtNow.getMonth(), brtNow.getDate() + diffDias));
     const dataCheckin = dataAulaUTC.toISOString().slice(0,10);
+    if (FERIADOS[dataCheckin]) return res.status(403).json({ error: FERIADOS[dataCheckin] });
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
@@ -1604,6 +1685,31 @@ app.post('/api/marketing/enviar', auth, adminOnly, async (req, res) => {
 app.post('/api/webhook/mercadopago', async (req, res) => {
   try {
     const { type, data } = req.body;
+    // Cobrança recorrente aprovada
+    if (type === 'preapproval') {
+      try {
+        const subRes = await axios.get(`https://api.mercadopago.com/preapproval/${data.id}`,
+          { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
+        const sub = subRes.data;
+        if (sub.status === 'authorized') {
+          const [[aluno]] = await db.query('SELECT id,nome,tel,plano,plano_id,vencimento,subscription_meses FROM alunos WHERE mp_subscription_id=?',[String(data.id)]);
+          if (aluno) {
+            const hoje = hojeBRT();
+            const vencAtual = aluno.vencimento ? String(aluno.vencimento).slice(0,10) : hoje;
+            const base = vencAtual >= hoje ? vencAtual : hoje;
+            const venc = new Date(base); venc.setMonth(venc.getMonth()+1);
+            const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,'0')}-${String(venc.getDate()).padStart(2,'0')}`;
+            await db.query("UPDATE alunos SET status='ativo',vencimento=?,pagto='recorrente' WHERE id=?",[vencStr,aluno.id]);
+            const valor = sub.auto_recurring?.transaction_amount || 0;
+            await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,CURDATE())',
+              [aluno.id, `Recorrente — ${aluno.plano||'Plano'}`, valor, 'pago', 'recorrente', String(data.id)+'_'+Date.now(), 1, aluno.plano||null]);
+            if (aluno.tel) await notificarWA(aluno.tel,`✅ Cobrança recorrente confirmada, ${aluno.nome.split(' ')[0]}! Plano renovado até ${vencStr.split('-').reverse().join('/')}. 🥊`);
+          }
+        } else if (sub.status === 'cancelled') {
+          await db.query('UPDATE alunos SET mp_subscription_id=NULL,subscription_tipo=NULL,subscription_meses=NULL,subscription_inicio=NULL WHERE mp_subscription_id=?',[String(data.id)]);
+        }
+      } catch(epa) { console.error('[Webhook preapproval]', epa.message); }
+    }
     if (type === 'payment') {
       const mpRes = await axios.get(`https://api.mercadopago.com/v1/payments/${data.id}`,{ headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` } });
       const payment = mpRes.data;
@@ -2457,7 +2563,7 @@ app.get('/api/teste-email/:destino', async (req, res) => {
       personalizations: [{ to: [{ email }] }],
       from: { email: from, name: 'Punch and Roll Fight Team' },
       subject: '🥊 Teste de email — Punch and Roll',
-      content: [{ type: 'text/html', value: '<h2>Funcionou!</h2><p>Email de teste enviado com sucesso.</p>' }],
+      content: [{ type: 'text/html', value: gerarHtmlEmail('Teste de email', 'Olá, Anderson! 👋', 'Este é um email de teste do sistema Punch and Roll.<br><br>Se você está vendo este email com o cabeçalho correto (logo + barra vermelha), o template está funcionando perfeitamente.', 'Punch and Roll Fight Team', 'teste-0') }],
     }, { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } });
     res.json({ ok: true, status: r.status, from, para: email });
   } catch(e) {
