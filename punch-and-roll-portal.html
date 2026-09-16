@@ -282,12 +282,24 @@ function renderInicio() {
   const bloqueado = a.status==='atrasado'||aguardando;
   const modLabel = {boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'}[a.modalidade]||a.modalidade||'—';
 
+  const grupoWaDismissKey = 'pr_grupo_wa_dismiss_' + a.id;
+  const grupoWaDismissed = localStorage.getItem(grupoWaDismissKey) === '1';
+
   let html = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:48px;height:48px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${a.nome[0]}</div>
       <div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Olá, ${a.nome.split(' ')[0]}!</div>
       <div style="font-size:11px;color:var(--muted)">${modLabel}</div></div>
     </div>
+    ${!grupoWaDismissed?`
+    <div style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">👥 Grupo da Punch and Roll no WhatsApp</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">Entre no nosso grupo para ficar por dentro dos avisos, horários e da turma.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a href="https://chat.whatsapp.com/IHipRAVglSbI6mO0u5vX52?mode=gi_t" target="_blank" style="background:#25D366;color:#fff;text-decoration:none;padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600">Entrar no grupo</a>
+        <button onclick="localStorage.setItem('${grupoWaDismissKey}','1');renderInicio()" style="background:none;border:none;color:var(--muted);font-size:11px;text-decoration:underline;cursor:pointer;padding:4px">Não mostrar mais</button>
+      </div>
+    </div>`:''}
     <div class="grid2">
       <div class="kpi ${sCls}"><div class="kpi-label">Mensalidade</div><div class="kpi-val" style="font-size:14px">${sTxt}</div><div class="kpi-sub">Venc: ${fmtD(a.venc)}</div></div>
       <div class="kpi kb"><div class="kpi-label">Plano</div><div class="kpi-val" style="font-size:13px;line-height:1.2">${(a.plano||'—').split('—')[0].trim()}</div><div class="kpi-sub">${fmtR(a.valor)}/mês</div></div>
