@@ -170,6 +170,7 @@ textarea.fi{resize:none}
     <div class="sb-sec">Marketing</div>
     <div class="sb-item" id="sb-avisos" onclick="navTo('avisos')"><span class="ico">🔔</span>Avisos Vencimento</div>
     <div class="sb-item" id="sb-lista-espera" onclick="navTo('lista-espera')"><span class="ico">📋</span>Lista de Espera</div>
+    <div class="sb-item" id="sb-aulas-experimentais" onclick="navTo('aulas-experimentais')"><span class="ico">🥊</span>Aulas Experimentais</div>
     <div class="sb-item" id="sb-mkt-wa" onclick="navTo('mkt-wa')"><span class="ico">💬</span>WhatsApp</div>
     <div class="sb-item" id="sb-mkt-email" onclick="navTo('mkt-email')"><span class="ico">📧</span>E-mail</div>
     <div class="sb-item" id="sb-mkt-campanhas" onclick="navTo('mkt-campanhas')"><span class="ico">📣</span>Campanhas</div>
@@ -203,6 +204,7 @@ textarea.fi{resize:none}
   <div class="page" id="page-marketing"></div>
   <div class="page" id="page-avisos"></div>
   <div class="page" id="page-lista-espera"></div>
+  <div class="page" id="page-aulas-experimentais"></div>
   <div class="page" id="page-portal-config"></div>
   <div class="page" id="page-mkt-wa"></div>
   <div class="page" id="page-mkt-email"></div>
@@ -317,6 +319,29 @@ textarea.fi{resize:none}
   <div class="modal-foot">
     <button class="btn btn-ghost" onclick="fecharModalRecado()">Cancelar</button>
     <button class="btn btn-r" id="btn-salvar-recado" onclick="salvarRecado()">📢 Publicar</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-aula-exp">
+<div class="modal-box">
+  <div class="modal-handle"></div>
+  <div class="modal-hdr"><div class="modal-title" id="modal-aula-exp-title">Nova Aula Experimental</div><button class="modal-x" onclick="fecharModalAulaExp()">✕</button></div>
+  <div class="fg"><label class="fl">Nome *</label><input class="fi" id="ae-nome" placeholder="Nome completo"></div>
+  <div class="fg"><label class="fl">Telefone</label><input class="fi" id="ae-tel" placeholder="(48) 99999-9999"></div>
+  <div class="frow">
+    <div class="fg"><label class="fl">Modalidade</label><select class="fi" id="ae-modalidade">
+      <option value="">Selecione</option>
+      <option value="boxe">🥊 Boxe</option>
+      <option value="jiujitsu">🟦 Jiu-Jitsu</option>
+      <option value="ambos">🥊🟦 Ambos</option>
+    </select></div>
+    <div class="fg"><label class="fl">Data da aula</label><input class="fi" type="date" id="ae-data"></div>
+  </div>
+  <div class="fg"><label class="fl">Observações</label><textarea class="fi" id="ae-obs" rows="2" placeholder="Como conheceu, indicação, etc."></textarea></div>
+  <div class="modal-foot">
+    <button class="btn btn-ghost" onclick="fecharModalAulaExp()">Cancelar</button>
+    <button class="btn btn-r" id="btn-salvar-ae" onclick="salvarAulaExp()">🥊 Cadastrar</button>
   </div>
 </div>
 </div>
@@ -505,7 +530,7 @@ function navTo(page) {
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const bn = document.getElementById('bn-'+page);
   if(bn) bn.classList.add('active');
-  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','lista-espera':'Lista de Espera','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe',shop:'🛒 Loja'};
+  const titles = {dashboard:'Dashboard',alunos:'Alunos',agenda:'Agenda',checkins:'Check-ins',financeiro:'Financeiro',estoque:'Estoque',pagamentos:'Mensalidades',recados:'Recados',documentos:'Documentos',marketing:'Marketing',avisos:'Avisos de Vencimento','lista-espera':'Lista de Espera','aulas-experimentais':'Aulas Experimentais','portal-config':'Config. Portal','mkt-wa':'WhatsApp Marketing','mkt-email':'E-mail Marketing','mkt-campanhas':'Campanhas',equipe:'Equipe',shop:'🛒 Loja'};
   document.getElementById('topbar-title').textContent = titles[page]||page;
   const actions = {
     'mkt-wa': '<button class="btn btn-r btn-sm" onclick="mktNovaMsg(\'wa\')">+ Mensagem</button>',
@@ -518,6 +543,7 @@ function navTo(page) {
     recados:'<button class="btn btn-r btn-sm" onclick="abrirModalRecado()">+ Recado</button>',
     equipe: _meuNivel==='master'?'<button class="btn btn-r btn-sm" onclick="abrirModalEquipe()">+ Membro</button>':'',
     shop: '<button class="btn btn-r btn-sm" onclick="shopAbrirProduto()">+ Produto</button>',
+    'aulas-experimentais': '<button class="btn btn-r btn-sm" onclick="abrirModalAulaExp()">+ Aula Experimental</button>',
   };
   document.getElementById('topbar-actions').innerHTML = actions[page]||'';
   currentPage = page; closeSB();
@@ -533,6 +559,7 @@ function navTo(page) {
   if(page==='marketing') renderMarketing();
   if(page==='avisos') renderAvisos();
   if(page==='lista-espera') renderListaEspera();
+  if(page==='aulas-experimentais') renderAulasExperimentais();
   if(page==='portal-config') renderPortalConfig();
   if(page==='mkt-wa') renderMktWA();
   if(page==='mkt-email') renderMktEmail();
@@ -3182,6 +3209,142 @@ async function marcarContatado(id, btn) {
     if (item) item.status = 'contatado';
     leRender();
   } catch(e) { alert('Erro: '+e.message); btn.disabled=false; }
+}
+
+// ── Aulas Experimentais ─────────────────────────────────────────────────────
+let aeData = [];
+let editingAeId = null;
+let aeFiltroStatus = '';
+
+async function renderAulasExperimentais() {
+  const pg = document.getElementById('page-aulas-experimentais');
+  pg.innerHTML = `<div style="font-size:13px;color:var(--muted);text-align:center;padding:30px">Carregando...</div>`;
+  try { aeData = await GET('/api/aulas-experimentais'); }
+  catch(e) { pg.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; return; }
+  aeRender();
+}
+
+function aeRender() {
+  const pg = document.getElementById('page-aulas-experimentais');
+  const modLabel = m => ({boxe:'🥊 Boxe',jiujitsu:'🟦 Jiu-Jitsu',ambos:'🥊🟦 Ambos'})[m]||m||'—';
+  const statusInfo = {
+    agendado:      { label:'📅 Agendado',       bg:'rgba(59,130,246,.1)',  cor:'var(--blue)',   borda:'rgba(59,130,246,.3)' },
+    compareceu:    { label:'✅ Compareceu',     bg:'rgba(34,197,94,.15)',  cor:'#22c55e',        borda:'rgba(34,197,94,.3)' },
+    nao_compareceu:{ label:'❌ Não compareceu', bg:'rgba(212,17,28,.1)',   cor:'#f87171',        borda:'rgba(212,17,28,.25)' },
+    convertido:    { label:'🎉 Convertido',     bg:'rgba(245,158,11,.12)', cor:'var(--yellow)',  borda:'rgba(245,158,11,.3)' },
+  };
+  const statusBadge = s => { const i = statusInfo[s]||statusInfo.agendado;
+    return `<span style="background:${i.bg};color:${i.cor};border:1px solid ${i.borda};border-radius:4px;padding:2px 8px;font-size:10px;white-space:nowrap">${i.label}</span>`; };
+
+  const lista = aeData.filter(r => !aeFiltroStatus || r.status === aeFiltroStatus);
+  const contagem = { agendado:0, compareceu:0, nao_compareceu:0, convertido:0 };
+  aeData.forEach(r => { contagem[r.status||'agendado'] = (contagem[r.status||'agendado']||0)+1; });
+
+  pg.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="font-size:13px;color:var(--muted)">${aeData.length} total</span>
+        ${Object.keys(statusInfo).map(s=>contagem[s]?`<span style="background:${statusInfo[s].bg};color:${statusInfo[s].cor};border:1px solid ${statusInfo[s].borda};border-radius:12px;padding:2px 10px;font-size:11px">${contagem[s]} ${statusInfo[s].label.replace(/^\S+\s/,'')}</span>`:'').join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <select class="fi" style="flex:1;min-width:140px;max-width:200px;padding:7px 10px;font-size:12px" onchange="aeFiltroStatus=this.value;aeRender()">
+        <option value="">Todos os status</option>
+        ${Object.keys(statusInfo).map(s=>`<option value="${s}" ${aeFiltroStatus===s?'selected':''}>${statusInfo[s].label}</option>`).join('')}
+      </select>
+      ${aeFiltroStatus?`<button class="btn btn-ghost btn-sm" onclick="aeFiltroStatus='';aeRender()">✕ Limpar</button>`:''}
+    </div>
+    ${!lista.length ? `<div class="card"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Nenhum registro</div></div>` :
+      lista.map(r=>`
+      <div class="card" style="margin-bottom:8px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;margin-bottom:3px">${r.nome}</div>
+            <div style="font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px">
+              ${r.tel?`<span>📱 ${r.tel}</span>`:''}
+              ${r.modalidade?`<span>${modLabel(r.modalidade)}</span>`:''}
+              ${r.data_aula?`<span>📅 ${fmtD(r.data_aula)}</span>`:''}
+              ${r.msg_enviada?`<span title="Mensagem pós-aula já enviada">✉️ Msg enviada</span>`:''}
+            </div>
+            ${r.obs?`<div style="font-size:11px;color:var(--muted);margin-top:3px;font-style:italic">"${r.obs}"</div>`:''}
+            <div style="font-size:10px;color:var(--muted);margin-top:3px">Cadastrado em ${new Date(r.criado_em).toLocaleDateString('pt-BR')}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+            ${statusBadge(r.status||'agendado')}
+            <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+              <select class="fi" style="padding:4px 6px;font-size:11px" onchange="aeMudarStatus(${r.id},this.value)">
+                ${Object.keys(statusInfo).map(s=>`<option value="${s}" ${(r.status||'agendado')===s?'selected':''}>${statusInfo[s].label}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display:flex;gap:4px">
+              ${r.tel?`<a href="https://wa.me/55${r.tel.replace(/\D/g,'')}" target="_blank" class="btn btn-ghost btn-sm" title="Abrir WhatsApp">💬</a>`:''}
+              ${r.tel?`<button class="btn btn-ghost btn-sm" title="${r.msg_enviada?'Reenviar mensagem pós-aula':'Enviar mensagem pós-aula'}" onclick="aeEnviarMsg(${r.id},this)">✉️${r.msg_enviada?' Reenviar':' Enviar msg'}</button>`:''}
+              <button class="btn btn-ghost btn-sm" onclick="abrirModalAulaExp(${r.id})" title="Editar">✏️</button>
+              <button class="btn btn-ghost btn-sm" onclick="excluirAulaExp(${r.id})" title="Excluir">🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>`).join('')}`;
+}
+
+function abrirModalAulaExp(id) {
+  editingAeId = id || null;
+  const r = id ? aeData.find(x=>x.id===id) : null;
+  document.getElementById('modal-aula-exp-title').textContent = r ? 'Editar Aula Experimental' : 'Nova Aula Experimental';
+  document.getElementById('ae-nome').value = r?.nome || '';
+  document.getElementById('ae-tel').value = r?.tel || '';
+  document.getElementById('ae-modalidade').value = r?.modalidade || '';
+  document.getElementById('ae-data').value = r?.data_aula ? String(r.data_aula).slice(0,10) : '';
+  document.getElementById('ae-obs').value = r?.obs || '';
+  document.getElementById('modal-aula-exp').classList.add('open');
+}
+function fecharModalAulaExp() { document.getElementById('modal-aula-exp').classList.remove('open'); editingAeId = null; }
+
+async function salvarAulaExp() {
+  const nome = document.getElementById('ae-nome').value.trim();
+  if (!nome) { alert('Preencha o nome!'); return; }
+  const dados = {
+    nome,
+    tel: document.getElementById('ae-tel').value.trim(),
+    modalidade: document.getElementById('ae-modalidade').value,
+    data_aula: document.getElementById('ae-data').value || null,
+    obs: document.getElementById('ae-obs').value.trim(),
+  };
+  const btn = document.getElementById('btn-salvar-ae');
+  btn.textContent = 'Salvando...'; btn.disabled = true;
+  try {
+    if (editingAeId) await PUT('/api/aulas-experimentais/'+editingAeId, dados);
+    else await POST('/api/aulas-experimentais', dados);
+    fecharModalAulaExp();
+    await renderAulasExperimentais();
+  } catch(e) { alert('Erro: '+e.message); }
+  finally { btn.textContent = '🥊 Cadastrar'; btn.disabled = false; }
+}
+
+async function aeMudarStatus(id, status) {
+  try {
+    await PUT('/api/aulas-experimentais/'+id+'/status', { status });
+    const item = aeData.find(r=>r.id===id);
+    if (item) item.status = status;
+    aeRender();
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+async function aeEnviarMsg(id, btn) {
+  if (!confirm('Enviar a mensagem pós-aula experimental para este contato?')) return;
+  btn.disabled = true; const txtOriginal = btn.textContent; btn.textContent = 'Enviando...';
+  try {
+    await POST('/api/aulas-experimentais/'+id+'/mensagem', {});
+    const item = aeData.find(r=>r.id===id);
+    if (item) item.msg_enviada = 1;
+    aeRender();
+  } catch(e) { alert('Erro: '+e.message); btn.disabled = false; btn.textContent = txtOriginal; }
+}
+
+async function excluirAulaExp(id) {
+  if (!confirm('Excluir este registro?')) return;
+  try { await DEL('/api/aulas-experimentais/'+id); await renderAulasExperimentais(); }
+  catch(e) { alert('Erro: '+e.message); }
 }
 
 async function renderAvisos() {

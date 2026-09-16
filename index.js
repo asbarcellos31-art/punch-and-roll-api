@@ -216,6 +216,20 @@ async function setupDB() {
     `);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS aulas_experimentais (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(120) NOT NULL,
+        tel VARCHAR(30),
+        modalidade VARCHAR(30),
+        data_aula DATE,
+        obs TEXT,
+        status VARCHAR(20) DEFAULT 'agendado',
+        msg_enviada TINYINT(1) DEFAULT 0,
+        criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS avisos_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         aluno_id INT NOT NULL,
@@ -1305,6 +1319,68 @@ app.get('/api/lista-espera', auth, async (req, res) => {
 app.put('/api/lista-espera/:id/status', auth, async (req, res) => {
   try {
     await db.query('UPDATE lista_espera SET status=? WHERE id=?', [req.body.status, req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Aulas experimentais — controle interno de leads que vieram fazer aula grátis
+app.get('/api/aulas-experimentais', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM aulas_experimentais ORDER BY criado_em DESC');
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/aulas-experimentais', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, tel, modalidade, data_aula, obs } = req.body;
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+    const [result] = await db.query(
+      'INSERT INTO aulas_experimentais (nome, tel, modalidade, data_aula, obs) VALUES (?,?,?,?,?)',
+      [nome, tel||null, modalidade||null, data_aula||null, obs||null]
+    );
+    res.json({ ok: true, id: result.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/aulas-experimentais/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, tel, modalidade, data_aula, obs } = req.body;
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+    await db.query(
+      'UPDATE aulas_experimentais SET nome=?, tel=?, modalidade=?, data_aula=?, obs=? WHERE id=?',
+      [nome, tel||null, modalidade||null, data_aula||null, obs||null, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/aulas-experimentais/:id/status', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('UPDATE aulas_experimentais SET status=? WHERE id=?', [req.body.status, req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/aulas-experimentais/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM aulas_experimentais WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/aulas-experimentais/:id/mensagem', auth, adminOnly, async (req, res) => {
+  try {
+    const [[reg]] = await db.query('SELECT * FROM aulas_experimentais WHERE id=?', [req.params.id]);
+    if (!reg) return res.status(404).json({ error: 'Registro não encontrado' });
+    if (!reg.tel) return res.status(400).json({ error: 'Sem telefone cadastrado' });
+    const primeiroNome = reg.nome.split(' ')[0];
+    const msg = req.body.mensagem || `Olá, *${primeiroNome}*! 🥊\n\nQue ótimo ter você no tatame na sua aula experimental na *Punch and Roll Fight Team*!\n\nEsperamos que tenha curtido a experiência e sentido na prática o que é treinar aqui. 💪\n\nSe quiser dar o próximo passo e fazer parte do nosso time, é só responder essa mensagem ou acessar o portal para garantir sua vaga:\n\n👉 *punchandroll.com.br*\n\nPlanos a partir de *R$ 139/mês* — com opções mensais, semestrais e anuais.\n\nTe esperamos no tatame! 🥋`;
+    const resultado = await enviarWA(reg.tel, msg, 'punchandroll');
+    await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
+      [reg.nome, formatarTelWA(reg.tel), msg, 'INDIVIDUAL', resultado.sucesso?'ENVIADO':'ERRO', resultado.erro||null]);
+    if (!resultado.sucesso) return res.status(500).json({ error: resultado.erro });
+    await db.query('UPDATE aulas_experimentais SET msg_enviada=1 WHERE id=?', [req.params.id]);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
