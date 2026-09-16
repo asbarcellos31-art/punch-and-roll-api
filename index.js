@@ -493,7 +493,7 @@ async function setupDB() {
       ('aniversario_template', '🥊 Feliz Aniversário, {{nome}}! 🎂\n\nA família Punch and Roll Fight Team deseja um dia muito especial para você!\n\nContinue na luta e nos vemos na academia! 💪\n\n— Punch and Roll Fight Team 🥊'),
       ('atrasados_ativo', '0'),
       ('atrasados_template', 'Olá, {{nome}}! 🥊\n\nIdentificamos que sua mensalidade da *Punch and Roll* está em atraso.\n\nPara manter seu acesso à academia, regularize sua situação:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team'),
-      ('boasvindas_wa', 'Olá, *{{nome}}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* {{plano}}\n💰 *Valor:* R$ {{valor}}/mês\n\n*📱 Portal do Aluno*\nAcesse: https://punchandroll.com.br/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*'),
+      ('boasvindas_wa', 'Olá, *{{nome}}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* {{plano}}\n💰 *Valor:* R$ {{valor}}/mês\n\n*📱 Portal do Aluno*\nAcesse: https://punchandroll.com.br/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\n*👥 Grupo da Punch and Roll*\nEntre no nosso grupo do WhatsApp pra ficar por dentro dos avisos e da turma:\nhttps://chat.whatsapp.com/IHipRAVglSbI6mO0u5vX52?mode=gi_t\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*'),
       ('boasvindas_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Seja bem-vindo(a), {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi confirmada com sucesso! Estamos muito felizes em ter você na nossa equipe.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 8px"><strong>📋 Plano:</strong> {{plano}}</p>'),
       ('espera_wa', 'Olá, *{{nome}}*! 👊\n\nRecebemos sua sugestão para a *Punch and Roll Fight Team* e estamos muito felizes com seu interesse!\n\nNossa equipe vai analisar sua preferência de horário e entraremos em contato em breve. 🥊\n\nQualquer dúvida, fale com a gente:\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 *@punchandrollfight*'),
       ('espera_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Olá, {{nome}}! 👊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Recebemos sua sugestão de horário e ficamos felizes com seu interesse em treinar na <strong>Punch and Roll Fight Team</strong>!</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 24px">Nossa equipe vai analisar sua preferência e entraremos em contato em breve.</p>'),
@@ -4069,6 +4069,15 @@ function gerarEmailBoasVindas(d) {
       <p style="color:#666;font-size:12px;margin:10px 0 0">⏰ O check-in fica disponível a partir de 30 minutos antes do início da aula.</p>
     </div>
 
+    <!-- GRUPO WHATSAPP -->
+    <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px;margin-bottom:24px">
+      <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 6px">👥 Grupo da Punch and Roll</p>
+      <p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 16px">Entre no nosso grupo do WhatsApp para ficar por dentro dos avisos, horários e da turma.</p>
+      <div style="text-align:center">
+        <a href="https://chat.whatsapp.com/IHipRAVglSbI6mO0u5vX52?mode=gi_t" style="background:#25D366;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:bold;letter-spacing:1px;display:inline-block">ENTRAR NO GRUPO</a>
+      </div>
+    </div>
+
     <!-- MANUAL -->
     <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin-bottom:24px">
       <p style="color:#111;font-size:15px;font-weight:bold;margin:0 0 6px">📋 Manual de Conduta</p>
@@ -4090,7 +4099,7 @@ function gerarEmailBoasVindas(d) {
 
 async function gerarMsgWABoasVindas(d) {
   const nomeFirst = (d.nome||'').split(' ')[0];
-  const fallback = `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*`;
+  const fallback = `Olá, *${nomeFirst}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* ${d.plano||''}\n💰 *Valor:* R$ ${Number(d.valor||0).toFixed(0)}/mês\n\n*📱 Portal do Aluno*\nAcesse: ${SITE_BASE}/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\n*👥 Grupo da Punch and Roll*\nEntre no nosso grupo do WhatsApp pra ficar por dentro dos avisos e da turma:\nhttps://chat.whatsapp.com/IHipRAVglSbI6mO0u5vX52?mode=gi_t\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*`;
   try {
     const [[row]] = await db.query("SELECT valor FROM wa_config WHERE chave='boasvindas_wa'");
     if (row?.valor) return row.valor
