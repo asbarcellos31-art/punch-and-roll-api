@@ -4136,6 +4136,27 @@ async function waRenderAutomacoes(c){
         <button onclick="waSalvarAutomacao('atrasados')" class="btn btn-r btn-sm" style="background:#f59e0b">Salvar configuração de cobrança</button>
       </div>
 
+      <!-- Ausentes -->
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div>
+            <div style="font-weight:700;font-size:15px">🥋 Mensagem de Ausência (Sumiu do treino)</div>
+            <div style="font-size:12px;color:var(--muted)">Disparada automaticamente todo dia às 10h para alunos ativos sem check-in há X dias. Não reenvia pro mesmo aluno antes de completar esse prazo de novo.</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <div style="position:relative;width:40px;height:22px">
+              <input type="checkbox" id="cfg-aus-ativo" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" ${cfg.ausentes_ativo==='1'?'checked':''} onchange="document.getElementById('cfg-aus-toggle').style.background=this.checked?'var(--red)':'var(--border)';document.getElementById('cfg-aus-knob').style.left=this.checked?'20px':'2px'">
+              <div id="cfg-aus-toggle" style="position:absolute;inset:0;border-radius:11px;transition:background .2s;background:${cfg.ausentes_ativo==='1'?'var(--red)':'var(--border)'}"></div>
+              <div id="cfg-aus-knob" style="position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;left:${cfg.ausentes_ativo==='1'?'20':'2'}px"></div>
+            </div>
+            <span style="font-size:13px;color:var(--muted)">${cfg.ausentes_ativo==='1'?'Ativo':'Inativo'}</span>
+          </label>
+        </div>
+        <div class="fg" style="max-width:220px"><label class="fl">Dias sem check-in pra considerar "sumido"</label><input class="fi" id="cfg-aus-dias" type="number" min="1" value="${cfg.ausentes_dias||'14'}"></div>
+        <div class="fg"><label class="fl">Template de mensagem (use {{nome}})</label><textarea class="fi" id="cfg-aus-tmpl" rows="8" style="resize:vertical;font-family:monospace">${cfg.ausentes_template||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('ausentes')" class="btn btn-r btn-sm">Salvar configuração de ausentes</button>
+      </div>
+
       <!-- Boas-vindas -->
       <div class="card" style="margin-bottom:12px">
         <div style="margin-bottom:14px">
@@ -4210,6 +4231,11 @@ async function waSalvarAutomacao(tipo){
       const ativo = document.getElementById('cfg-atr-ativo')?.checked?'1':'0';
       const tmpl = document.getElementById('cfg-atr-tmpl')?.value;
       await POST('/api/wa/config',{atrasados_ativo:ativo,atrasados_template:tmpl});
+    } else if(tipo==='ausentes'){
+      const ativo = document.getElementById('cfg-aus-ativo')?.checked?'1':'0';
+      const dias = document.getElementById('cfg-aus-dias')?.value;
+      const tmpl = document.getElementById('cfg-aus-tmpl')?.value;
+      await POST('/api/wa/config',{ausentes_ativo:ativo,ausentes_dias:dias,ausentes_template:tmpl});
     } else if(tipo==='boasvindas'){
       const tmpl = document.getElementById('cfg-bv-tmpl')?.value;
       await POST('/api/wa/config',{boasvindas_wa:tmpl});
@@ -4242,6 +4268,7 @@ async function waRenderHistorico(c){
           <option value="CAMPANHA">Campanha</option>
           <option value="INDIVIDUAL">Individual</option>
           <option value="COBRANCA">Cobrança</option>
+          <option value="AUSENTE">Ausente</option>
         </select></div>
         <div class="fg"><label class="fl">Status</label><select class="fi" id="hf-status" onchange="waHistFiltros.status=this.value">
           <option value="TODOS">Todos</option>
