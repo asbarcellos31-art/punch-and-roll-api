@@ -4141,7 +4141,7 @@ async function waRenderAutomacoes(c){
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <div>
             <div style="font-weight:700;font-size:15px">🥋 Mensagem de Ausência (Sumiu do treino)</div>
-            <div style="font-size:12px;color:var(--muted)">Disparada automaticamente todo dia às 10h para alunos ativos sem check-in há X dias. Não reenvia pro mesmo aluno antes de completar esse prazo de novo.</div>
+            <div style="font-size:12px;color:var(--muted)">Disparada automaticamente todo dia às 10h para alunos com status <b>ativo</b> sem check-in há X dias úteis (seg-sex). Não reenvia pro mesmo aluno antes de completar esse prazo de novo.</div>
           </div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <div style="position:relative;width:40px;height:22px">
@@ -4152,7 +4152,7 @@ async function waRenderAutomacoes(c){
             <span style="font-size:13px;color:var(--muted)">${cfg.ausentes_ativo==='1'?'Ativo':'Inativo'}</span>
           </label>
         </div>
-        <div class="fg" style="max-width:220px"><label class="fl">Dias sem check-in pra considerar "sumido"</label><input class="fi" id="cfg-aus-dias" type="number" min="1" value="${cfg.ausentes_dias||'14'}"></div>
+        <div class="fg" style="max-width:220px"><label class="fl">Dias úteis sem check-in pra considerar "sumido"</label><input class="fi" id="cfg-aus-dias" type="number" min="1" value="${cfg.ausentes_dias||'5'}"></div>
         <div class="fg"><label class="fl">Template de mensagem (use {{nome}})</label><textarea class="fi" id="cfg-aus-tmpl" rows="8" style="resize:vertical;font-family:monospace">${cfg.ausentes_template||''}</textarea></div>
         <button onclick="waSalvarAutomacao('ausentes')" class="btn btn-r btn-sm">Salvar configuração de ausentes</button>
       </div>

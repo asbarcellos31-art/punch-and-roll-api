@@ -494,7 +494,7 @@ async function setupDB() {
       ('atrasados_ativo', '0'),
       ('atrasados_template', 'Olá, {{nome}}! 🥊\n\nIdentificamos que sua mensalidade da *Punch and Roll* está em atraso.\n\nPara manter seu acesso à academia, regularize sua situação:\n📱 (48) 98463-9257\n\nPunch and Roll Fight Team'),
       ('ausentes_ativo', '0'),
-      ('ausentes_dias', '14'),
+      ('ausentes_dias', '5'),
       ('ausentes_template', 'Ô, {{nome}}! 🥊\n\nSentimos sua falta na *Punch and Roll*! Faz um tempinho que você não aparece pra treinar.\n\nSabemos que a rotina aperta, mas seu lugar no tatame continua te esperando 💪\n\nTá com alguma dificuldade ou só sumiu mesmo? Me chama aqui que a gente resolve junto!\n\n📱 (48) 99225-9899\n\nBora voltar? Te esperamos! 🥋\n\n— Punch and Roll Fight Team'),
       ('boasvindas_wa', 'Olá, *{{nome}}*! 🥊\n\nSeja muito bem-vindo(a) à *Punch and Roll Fight Team*! 🎉\n\nSua matrícula foi confirmada:\n📋 *Plano:* {{plano}}\n💰 *Valor:* R$ {{valor}}/mês\n\n*📱 Portal do Aluno*\nAcesse: https://punchandroll.com.br/punch-and-roll-portal.html\n🔐 Login: seu e-mail ou primeiro nome\n🔑 Senha inicial: *123*\n\n*✅ Como fazer Check-in*\n1. Abra o portal\n2. Vá em "Minhas Aulas"\n3. Selecione a aula\n4. Clique em "Fazer Check-in"\n\n*👥 Grupo da Punch and Roll*\nEntre no nosso grupo do WhatsApp pra ficar por dentro dos avisos e da turma:\nhttps://chat.whatsapp.com/IHipRAVglSbI6mO0u5vX52?mode=gi_t\n\nBora treinar! 💪\n\n📍 R. Cel. Américo, 1157 · Sala 5 · Barreiros · São José, SC\n👊 Admin: *(48) 99225-9899*\n🥋 Instrutor: *(48) 98463-9257*\n📸 Instagram: *@punchandrollfight*'),
       ('boasvindas_email_corpo', '<h2 style="color:#111;font-size:20px;margin:0 0 16px">Seja bem-vindo(a), {{nome}}! 🥊</h2><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 16px">Sua matrícula na <strong>Punch and Roll Fight Team</strong> foi confirmada com sucesso! Estamos muito felizes em ter você na nossa equipe.</p><p style="color:#444;font-size:15px;line-height:1.7;margin:0 0 8px"><strong>📋 Plano:</strong> {{plano}}</p>'),
@@ -1886,6 +1886,22 @@ async function enviarEmailAluno(email, nome, assunto, html) {
 // ══════════════════════════════════════
 // WHATSAPP MKT — Helper
 // ══════════════════════════════════════
+function diasUteisDesde(data) {
+  // conta quantos dias úteis (seg-sex) se passaram entre `data` e hoje
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const d = new Date(data); d.setHours(0,0,0,0);
+  if (isNaN(d.getTime()) || d >= hoje) return 0;
+  let count = 0;
+  const cur = new Date(d);
+  cur.setDate(cur.getDate() + 1);
+  while (cur <= hoje) {
+    const dow = cur.getDay(); // 0=domingo, 6=sábado
+    if (dow !== 0 && dow !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
 function formatarTelWA(tel) {
   let d = String(tel||'').replace(/\D/g,'');
   if (d.startsWith('55') && d.length > 11) d = d.slice(2);
@@ -2419,34 +2435,42 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Atrasados]',e.message); }
 
-  // Ausentes — alunos sem check-in há X dias (disparo automático às 10h)
+  // Ausentes — alunos ATIVOS sem check-in há X dias ÚTEIS (disparo automático às 10h)
   try {
     const [[cfgAus]] = await db.query("SELECT valor FROM wa_config WHERE chave='ausentes_ativo'");
     if (cfgAus && cfgAus.valor === '1' && hora === 10 && dia !== ultimoDiaAusentes) {
       ultimoDiaAusentes = dia;
       const [[cfgDias]] = await db.query("SELECT valor FROM wa_config WHERE chave='ausentes_dias'");
-      const diasAusente = parseInt(cfgDias?.valor || '14') || 14;
+      const diasUteisAlvo = parseInt(cfgDias?.valor || '5') || 5;
       const [[tmplAus]] = await db.query("SELECT valor FROM wa_config WHERE chave='ausentes_template'");
       const template = tmplAus?.valor || 'Ô, {{nome}}! Sentimos sua falta na *Punch and Roll*! Bora voltar? 🥊';
+
       const [candidatos] = await db.query(
-        `SELECT a.id, a.nome, a.tel FROM alunos a
-         WHERE a.status IN ('ativo','vencendo')
+        `SELECT a.id, a.nome, a.tel, a.inicio,
+           (SELECT MAX(c.data_checkin) FROM checkins c WHERE c.aluno_id = a.id) as ultimo_checkin
+         FROM alunos a
+         WHERE a.status = 'ativo'
            AND a.tel IS NOT NULL AND a.tel != ''
-           AND a.inicio IS NOT NULL AND a.inicio <= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-           AND NOT EXISTS (
-             SELECT 1 FROM checkins c WHERE c.aluno_id = a.id AND c.data_checkin >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-           )`,
-        [diasAusente, diasAusente]
+           AND a.inicio IS NOT NULL`
       );
-      const [enviosRecentes] = await db.query(
-        `SELECT telefone FROM wa_envios WHERE tipo='AUSENTE' AND criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
-        [diasAusente]
+      const [enviosAusente] = await db.query(
+        `SELECT telefone, MAX(criado_em) as ultimo_aviso FROM wa_envios WHERE tipo='AUSENTE' GROUP BY telefone`
       );
-      const telsRecentes = new Set(enviosRecentes.map(e => e.telefone));
+      const ultimoAvisoPorTel = {};
+      enviosAusente.forEach(e => { ultimoAvisoPorTel[e.telefone] = e.ultimo_aviso; });
+
       let enviados = 0;
       for (const a of candidatos) {
+        const baseData = a.ultimo_checkin || a.inicio; // sem check-in ainda → conta a partir da matrícula
+        if (!baseData) continue;
+        const diasUteisSemCheckin = diasUteisDesde(baseData);
+        if (diasUteisSemCheckin < diasUteisAlvo) continue;
+
         const telFmt = formatarTelWA(a.tel);
-        if (telsRecentes.has(telFmt)) continue; // já avisado recentemente, evita spam diário
+        // evita reenviar antes de passar o mesmo prazo em dias úteis desde o último aviso
+        const ultimoAviso = ultimoAvisoPorTel[telFmt];
+        if (ultimoAviso && diasUteisDesde(ultimoAviso) < diasUteisAlvo) continue;
+
         const msg = template.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
         const r = await enviarWA(a.tel, msg);
         await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
