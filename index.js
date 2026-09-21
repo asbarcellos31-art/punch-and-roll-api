@@ -2467,9 +2467,13 @@ setInterval(async () => {
         if (diasUteisSemCheckin < diasUteisAlvo) continue;
 
         const telFmt = formatarTelWA(a.tel);
-        // evita reenviar antes de passar o mesmo prazo em dias úteis desde o último aviso
+        // só reenvia se o aluno tiver voltado a fazer check-in depois do último aviso
+        // (senão é a mesma sequência de ausência já avisada — não repete)
         const ultimoAviso = ultimoAvisoPorTel[telFmt];
-        if (ultimoAviso && diasUteisDesde(ultimoAviso) < diasUteisAlvo) continue;
+        if (ultimoAviso) {
+          const jaAvisadoNestaAusencia = !a.ultimo_checkin || new Date(a.ultimo_checkin) <= new Date(ultimoAviso);
+          if (jaAvisadoNestaAusencia) continue;
+        }
 
         const msg = template.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
         const r = await enviarWA(a.tel, msg);
