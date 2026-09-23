@@ -311,6 +311,7 @@ async function setupDB() {
       "ALTER TABLE despesas ADD COLUMN recorrente TINYINT DEFAULT 0",
       "ALTER TABLE despesas ADD COLUMN grupo_parcelas VARCHAR(36)",
       "ALTER TABLE despesas ADD COLUMN pago_por VARCHAR(20) DEFAULT NULL",
+      "ALTER TABLE despesas ADD COLUMN tipo VARCHAR(10) DEFAULT 'saida'",
       "ALTER TABLE pagamentos ADD COLUMN meses INT DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN plano_id VARCHAR(50) DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN plano_nome VARCHAR(200) DEFAULT NULL",
@@ -3151,17 +3152,22 @@ app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
     `).catch(() => [[]]);
     const [historicoDes] = await db.query(`
       SELECT DATE_FORMAT(data_vencimento, '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
-      FROM despesas WHERE data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      FROM despesas WHERE (tipo IS NULL OR tipo != 'entrada') AND data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
       GROUP BY mes ORDER BY mes
     `);
+    const [historicoEntradasManual] = await db.query(`
+      SELECT DATE_FORMAT(COALESCE(data_pagamento, data_vencimento), '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
+      FROM despesas WHERE tipo = 'entrada' AND status = 'pago' AND COALESCE(data_pagamento, data_vencimento) >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+      GROUP BY mes ORDER BY mes
+    `).catch(() => [[]]);
     const [despesas] = await db.query(
       `SELECT * FROM despesas ORDER BY FIELD(status,'pendente','pago'), data_vencimento ASC LIMIT 300`
     );
     const [cats] = await db.query(
       `SELECT DISTINCT categoria FROM despesas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria`
     );
-    res.json({ historicoRec, historicoShop, historicoDes, despesas, categorias: cats.map(c => c.categoria) });
-  } catch (e) { res.json({ historicoRec: [], historicoShop: [], historicoDes: [], despesas: [], categorias: [] }); }
+    res.json({ historicoRec, historicoShop, historicoDes, historicoEntradasManual, despesas, categorias: cats.map(c => c.categoria) });
+  } catch (e) { res.json({ historicoRec: [], historicoShop: [], historicoDes: [], historicoEntradasManual: [], despesas: [], categorias: [] }); }
 });
 
 // ── DESPESAS CRUD ──
@@ -3176,7 +3182,8 @@ const normDate = v => v ? String(v).split('T')[0] : null;
 
 app.post('/api/despesas', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, categoria, metodo, obs, parcelas = 1, recorrente = false, pago_por = null } = req.body;
+    const { descricao, valor, categoria, metodo, obs, parcelas = 1, recorrente = false, pago_por = null, tipo = 'saida' } = req.body;
+    const tipoSafe = tipo === 'entrada' ? 'entrada' : 'saida';
     const data_vencimento = normDate(req.body.data_vencimento);
     if (!descricao || !valor || !data_vencimento) return res.status(400).json({ error: 'Preencha descrição, valor e vencimento' });
     const n = Math.min(Math.max(parseInt(parcelas) || 1, 1), 60);
@@ -3188,8 +3195,8 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
       const venc = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
       const desc = n > 1 ? `${descricao} (${i+1}/${n})` : descricao;
       const [r] = await db.query(
-        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas,pago_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo, pago_por||null]
+        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas,pago_por,tipo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo, pago_por||null, tipoSafe]
       );
       ids.push(r.insertId);
     }
@@ -3205,8 +3212,8 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
         );
         if (!existente.length) {
           await db.query(
-            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,grupo_parcelas,pago_por) VALUES (?,?,?,?,?,?,?,?,?)',
-            [descricao, valor, proxVenc, 'pendente', categoria||null, metodo||'pix', 1, grupo, pago_por||null]
+            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,grupo_parcelas,pago_por,tipo) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            [descricao, valor, proxVenc, 'pendente', categoria||null, metodo||'pix', 1, grupo, pago_por||null, tipoSafe]
           );
         }
       }
@@ -3217,12 +3224,13 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
 
 app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { descricao, valor, status, categoria, metodo, obs, recorrente, pago_por } = req.body;
+    const { descricao, valor, status, categoria, metodo, obs, recorrente, pago_por, tipo } = req.body;
     const data_vencimento = normDate(req.body.data_vencimento);
     const data_pagamento = normDate(req.body.data_pagamento);
+    const tipoSafe = tipo === 'entrada' ? 'entrada' : 'saida';
     await db.query(
-      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=?,pago_por=? WHERE id=?',
-      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, pago_por||null, req.params.id]
+      'UPDATE despesas SET descricao=?,valor=?,data_vencimento=?,data_pagamento=?,status=?,categoria=?,metodo=?,obs=?,recorrente=?,pago_por=?,tipo=? WHERE id=?',
+      [descricao, valor, data_vencimento, data_pagamento||null, status||'pendente', categoria||null, metodo||'pix', obs||null, recorrente?1:0, pago_por||null, tipoSafe, req.params.id]
     );
     // Recorrente: ao pagar, cria automaticamente a próxima mensal
     let recorrente_criado = false;
@@ -3241,8 +3249,8 @@ app.put('/api/despesas/:id', auth, adminOnly, async (req, res) => {
         );
         if (!existente.length) {
           await db.query(
-            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente) VALUES (?,?,?,?,?,?,?)',
-            [atual.descricao, atual.valor, proxVenc, 'pendente', atual.categoria, atual.metodo, 1]
+            'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,recorrente,pago_por,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
+            [atual.descricao, atual.valor, proxVenc, 'pendente', atual.categoria, atual.metodo, 1, atual.pago_por||null, atual.tipo||'saida']
           );
           recorrente_criado = true;
         }
