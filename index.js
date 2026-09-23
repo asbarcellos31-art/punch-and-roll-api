@@ -2417,22 +2417,39 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Aniversário]',e.message); }
 
-  // Atrasados (disparo automático às 9h)
+  // Atrasados (disparo automático às 9h) — no máximo 2 cobranças por atraso:
+  // 1ª assim que entra em atraso, 2ª depois de 15 dias ainda atrasado, e para por aí.
   try {
     const [[cfgAtr]] = await db.query("SELECT valor FROM wa_config WHERE chave='atrasados_ativo'");
     if (cfgAtr && cfgAtr.valor === '1' && hora === 9 && dia !== ultimoDiaAtrasados) {
       ultimoDiaAtrasados = dia;
       const [[tmplAtr]] = await db.query("SELECT valor FROM wa_config WHERE chave='atrasados_template'");
       const template = tmplAtr?.valor || 'Olá, {{nome}}! Sua mensalidade da *Punch and Roll* está em atraso. Regularize: 📱 (48) 98463-9257';
-      const [alunos] = await db.query("SELECT nome,tel FROM alunos WHERE status='atrasado' AND (cortesia IS NULL OR cortesia=0) AND tel IS NOT NULL AND tel != ''");
+      const [alunos] = await db.query("SELECT nome,tel,vencimento FROM alunos WHERE status='atrasado' AND (cortesia IS NULL OR cortesia=0) AND tel IS NOT NULL AND tel != '' AND vencimento IS NOT NULL");
+      let enviados = 0;
       for (const a of alunos) {
+        const telFmt = formatarTelWA(a.tel);
+        // Só conta cobranças enviadas DESDE este vencimento (ciclo de atraso atual — reseta ao pagar, pois vencimento avança)
+        const [cobrancas] = await db.query(
+          `SELECT criado_em FROM wa_envios WHERE tipo='COBRANCA' AND telefone=? AND criado_em >= ? ORDER BY criado_em ASC`,
+          [telFmt, a.vencimento]
+        );
+        if (cobrancas.length === 0) {
+          // 1ª cobrança deste atraso
+        } else if (cobrancas.length === 1) {
+          const diasCorridos = Math.floor((Date.now() - new Date(cobrancas[0].criado_em).getTime()) / 86400000);
+          if (diasCorridos < 15) continue; // ainda não completou 15 dias desde a 1ª cobrança
+        } else {
+          continue; // já mandou as 2 cobranças permitidas neste atraso
+        }
         const msg = template.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
         const r = await enviarWA(a.tel, msg);
         await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
-          [a.nome,formatarTelWA(a.tel),msg,'COBRANCA',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+          [a.nome,telFmt,msg,'COBRANCA',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+        enviados++;
         await new Promise(x=>setTimeout(x,3000));
       }
-      if (alunos.length) console.log(`[Atrasados] ${alunos.length} mensagens enviadas`);
+      if (enviados) console.log(`[Atrasados] ${enviados} mensagens enviadas`);
     }
   } catch(e) { console.error('[Cron Atrasados]',e.message); }
 
