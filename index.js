@@ -3194,9 +3194,12 @@ app.post('/api/despesas', auth, adminOnly, async (req, res) => {
       const dt = new Date(y, m - 1 + i, d);
       const venc = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
       const desc = n > 1 ? `${descricao} (${i+1}/${n})` : descricao;
+      // Entrada: já nasce recebida (o dinheiro já é seu ao lançar) — sem passo extra de confirmar
+      const statusInicial = tipoSafe === 'entrada' ? 'pago' : 'pendente';
+      const dataPagInicial = tipoSafe === 'entrada' ? venc : null;
       const [r] = await db.query(
-        'INSERT INTO despesas (descricao,valor,data_vencimento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas,pago_por,tipo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [desc, valor, venc, 'pendente', categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo, pago_por||null, tipoSafe]
+        'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,categoria,metodo,obs,parcelas,parcela_atual,recorrente,grupo_parcelas,pago_por,tipo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [desc, valor, venc, dataPagInicial, statusInicial, categoria||null, metodo||'pix', obs||null, n, i+1, recorrente?1:0, grupo, pago_por||null, tipoSafe]
       );
       ids.push(r.insertId);
     }

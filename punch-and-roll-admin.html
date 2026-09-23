@@ -2354,6 +2354,12 @@ async function salvarDespesa(id){
     const parcelas=parseInt(document.getElementById('dp-parcelas')?.value||1);
     const recorrente=document.getElementById('dp-recorrente')?.checked||false;
     dados.parcelas=parcelas; dados.recorrente=recorrente;
+  } else {
+    // Preserva status/pagamento/recorrência atuais — editar descrição não deve "despagar" a conta
+    const atual=(finResumo?.despesas||[]).find(x=>x.id===id);
+    dados.status=atual?.status||'pendente';
+    dados.data_pagamento=atual?.data_pagamento?String(atual.data_pagamento).slice(0,10):null;
+    dados.recorrente=!!atual?.recorrente;
   }
   try{
     if(id&&id!=='null')await PUT('/api/despesas/'+id,dados);
