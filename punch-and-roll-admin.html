@@ -1826,10 +1826,12 @@ function imprimirContas() {
   </div>
   ${(()=>{
     // Agrupa todas as despesas do mês por responsável (entradas não entram na divisão)
+    // PR (caixa da empresa) entra como mais um participante do rateio — o que ele já cobriu
+    // vira crédito dele no acerto contra quem adiantou mais do bolso próprio.
     const por={};
     _todasDoMes.filter(d=>d.tipo!=='entrada').forEach(d=>{
       const p=(d.pago_por||'').trim().toUpperCase();
-      if(!p||p==='PR') return;
+      if(!p) return;
       if(!por[p]) por[p]={pago:0,pendente:0};
       if(d.status==='pago') por[p].pago+=parseFloat(d.valor||0);
       else por[p].pendente+=parseFloat(d.valor||0);
