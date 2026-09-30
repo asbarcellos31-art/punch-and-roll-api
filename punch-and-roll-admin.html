@@ -2676,10 +2676,11 @@ function renderMensOverview(){
   const pagantes=cache.alunos.filter(a=>!a.cortesia);
   const recMes=ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const inadim=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-  const taxaAdim=pagantes.length>0?Math.round(ativos.length/pagantes.length*100):0;
+  const adimplentes=pagantes.length-atrasados.length; // ativo + vencendo = em dia, só atrasado é inadimplente
+  const taxaAdim=pagantes.length>0?Math.round(adimplentes/pagantes.length*100):0;
   document.getElementById('mens-content').innerHTML=`
     <div class="grid4">
-      <div class="kpi kg"><div class="kpi-label">Adimplentes</div><div class="kpi-val">${ativos.length}</div><div class="kpi-sub">${taxaAdim}% do total</div></div>
+      <div class="kpi kg"><div class="kpi-label">Adimplentes</div><div class="kpi-val">${adimplentes}</div><div class="kpi-sub">${taxaAdim}% do total</div></div>
       <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados.length}</div><div class="kpi-sub">${fmtR(inadim)} em aberto</div></div>
       <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo.length}</div></div>
       <div class="kpi kb"><div class="kpi-label">Receita/mês</div><div class="kpi-val">${fmtR(recMes)}</div></div>

@@ -301,8 +301,9 @@ function calcMetricas() {
   const aulasBoxe = dadosCache.aulas.filter(a=>a.modalidade==='boxe').length;
   const aulasJJ = dadosCache.aulas.filter(a=>a.modalidade==='jiujitsu').length;
 
-  // Taxa de adimplência (apenas pagantes)
-  const taxaAdim = pagantes.length>0?Math.round(ativos.length/pagantes.length*100):0;
+  // Taxa de adimplência: todo pagante que NÃO está atrasado conta como adimplente
+  // (vencendo = ainda dentro do prazo, não é inadimplência)
+  const taxaAdim = pagantes.length>0?Math.round((pagantes.length-atrasados.length)/pagantes.length*100):0;
 
   // Próximo mês
   const proxMes = mes===12?1:mes+1;
