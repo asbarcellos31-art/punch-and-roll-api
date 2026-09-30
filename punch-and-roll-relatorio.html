@@ -269,9 +269,14 @@ function calcMetricas() {
   const recEsperada = ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
 
   // Metas (baseadas nos dados reais — academia pequena)
-  const metaAlunos = 30; // meta de alunos em 6 meses
-  const metaReceita = metaAlunos * 159; // R$ 159 médio por aluno
-  const metaNovosMes = metaAlunos / 6; // ritmo mensal pra bater 30 alunos em 6 meses
+  const metaAlunos = 30; // meta final: 30 alunos em 6 meses
+  const metaReceita = metaAlunos * 159; // R$ 159 médio por aluno (receita mensal quando bater a meta)
+  const metaNovosMes = metaAlunos / 6; // ritmo mensal pra bater 30 alunos em 6 meses (30÷6=5)
+  // Janela da meta: começou em 07/2026. Ritmo esperado ATÉ O MÊS do relatório (não o total final),
+  // pra não marcar como "crítico" um mês que ainda está dentro do prazo dos 6 meses.
+  const META_INICIO_MES=7, META_INICIO_ANO=2026;
+  const mesesDecorridosMeta = Math.max(1, Math.min(6, (ano-META_INICIO_ANO)*12 + (mes-META_INICIO_MES) + 1));
+  const metaAlunosRitmo = Math.round(metaNovosMes * mesesDecorridosMeta); // quanto já deveríamos ter, no ritmo, até este mês
 
   // Novos alunos no mês (excluindo cortesia)
   const novosNoMes = pagantes.filter(a=>{
@@ -312,10 +317,13 @@ function calcMetricas() {
   return {
     mes, ano, alunos, pagantes, ativos, atrasados, vencendo,
     recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
+    mesesDecorridosMeta, metaAlunosRitmo,
     novosNoMes, inadimTotal, historico, cancelados,
     aulasBoxe, aulasJJ, taxaAdim, proxMes, proxAno,
     pctReceita: metaReceita>0?Math.round(recMes/metaReceita*100):0,
-    pctAlunos: metaAlunos>0?Math.round(ativos.length/metaAlunos*100):0,
+    // % em relação ao ritmo esperado até este mês (não a meta final de 30) — evita marcar
+    // como crítico um mês que ainda está dentro do prazo da janela de 6 meses (início 07/2026)
+    pctAlunos: metaAlunosRitmo>0?Math.round(pagantes.length/metaAlunosRitmo*100):0,
     pctNovos: metaNovosMes>0?Math.round(novosNoMes/metaNovosMes*100):0,
     pctAdim: taxaAdim,
   };
@@ -355,9 +363,9 @@ function renderRelatorio(m) {
         <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctReceita,100)}%;background:${barColor(m.pctReceita)}"></div></div>
       </div>
       <div class="kpi-card" style="border-left-color:${barColor(m.pctAlunos)}">
-        <div class="kpi-label">Alunos Ativos</div>
-        <div class="kpi-val">${m.ativos.length}</div>
-        <div class="kpi-sub">Meta: ${m.metaAlunos} alunos</div>
+        <div class="kpi-label">Alunos</div>
+        <div class="kpi-val">${m.pagantes.length}</div>
+        <div class="kpi-sub">Ritmo (mês ${m.mesesDecorridosMeta}/6): ${m.metaAlunosRitmo} · Meta final: ${m.metaAlunos}</div>
         <div class="kpi-pct">${pill(m.pctAlunos)}</div>
         <div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(m.pctAlunos,100)}%;background:${barColor(m.pctAlunos)}"></div></div>
       </div>
@@ -584,9 +592,9 @@ function renderRelatorio(m) {
           <span style="font-size:11px;font-weight:700;color:#6d28d9;background:#ede9fe;padding:2px 8px;border-radius:20px">Expansão</span>
           <span style="font-size:22px">👥</span>
         </div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Total de Alunos</div>
-        <div style="font-size:26px;font-weight:900;color:#1e293b">${m.alunos.length}/${m.metaAlunos}</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Novos este mês: ${m.novosNoMes}</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">Total de Alunos (meta final: ${m.metaAlunos})</div>
+        <div style="font-size:26px;font-weight:900;color:#1e293b">${m.pagantes.length}/${m.metaAlunosRitmo}</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Ritmo esperado até mês ${m.mesesDecorridosMeta}/6 · Novos este mês: ${m.novosNoMes}</div>
         ${pill(m.pctAlunos)}<br>
         <div style="font-size:11px;color:#64748b;margin-top:10px">${MESES[m.mes]}: ${m.novosNoMes} novo(s) aluno(s). Meta: ${m.metaNovosMes}/mês.</div>
       </div>
@@ -641,8 +649,8 @@ function renderRelatorio(m) {
             <div style="font-size:11px;color:#78350f">Vencendo em breve</div>
           </div>
           <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:28px;font-weight:900;color:#15803d">${m.ativos.length}</div>
-            <div style="font-size:11px;color:#166534">Em Dia</div>
+            <div style="font-size:28px;font-weight:900;color:#15803d">${m.pagantes.length-m.atrasados.length}</div>
+            <div style="font-size:11px;color:#166534">Adimplentes (Ativo+Vencendo)</div>
           </div>
           <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
             <div style="font-size:28px;font-weight:900;color:#1e40af">${m.alunos.length}</div>
