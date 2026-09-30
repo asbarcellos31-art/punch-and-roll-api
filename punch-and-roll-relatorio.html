@@ -265,9 +265,6 @@ function calcMetricas() {
     return parseInt(d.slice(5,7))===mes && parseInt(d.slice(0,4))===ano && p.status==='pago';
   }).reduce((s,p)=>s+parseFloat(p.valor||0),0);
 
-  // Receita esperada (alunos ativos)
-  const recEsperada = ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-
   // Metas (baseadas nos dados reais — academia pequena)
   const metaAlunos = 30; // meta final: 30 alunos em 6 meses
   const metaReceita = metaAlunos * 159; // R$ 159 médio por aluno (receita mensal quando bater a meta)
@@ -278,6 +275,10 @@ function calcMetricas() {
   const mesesDecorridosMeta = Math.max(1, Math.min(6, (ano-META_INICIO_ANO)*12 + (mes-META_INICIO_MES) + 1));
   const metaAlunosRitmo = Math.round(metaNovosMes * mesesDecorridosMeta); // quanto já deveríamos ter, no ritmo, até este mês
   const metaReceitaRitmo = Math.round(metaAlunosRitmo * 159); // receita esperada no ritmo até este mês (mesma lógica dos alunos)
+
+  // Receita esperada = o que já foi conquistado este mês + o incremento esperado se a
+  // meta de novos alunos do próximo mês for batida (não pode ser menor que o já feito)
+  const recEsperada = recMes + Math.round(metaNovosMes*159);
 
   // Ponto de equilíbrio — fixo, fora da lógica de ritmo/meta
   const pontoEquilibrio = 5000;
@@ -455,10 +456,9 @@ function renderRelatorio(m) {
 
         <!-- Metas -->
         <div class="card" style="margin-bottom:14px">
-          <div class="card-title">🎯 Metas do Mês</div>
-          <div class="fluxo-row"><span class="fluxo-label">Meta de Receita</span><span class="fluxo-val" style="color:#1e3a8a">${fmtR(m.metaReceita)}</span></div>
-          <div class="fluxo-row"><span class="fluxo-label">Meta de Alunos</span><span class="fluxo-val">${m.metaAlunos} alunos</span></div>
-          <div class="fluxo-row"><span class="fluxo-label">Receita Esperada</span><span class="fluxo-val">${fmtR(m.recEsperada)}</span></div>
+          <div class="card-title">🎯 Metas do Mês (ritmo ${m.mesesDecorridosMeta}/6)</div>
+          <div class="fluxo-row"><span class="fluxo-label">Meta de Receita</span><span class="fluxo-val" style="color:#1e3a8a">${fmtR(m.metaReceitaRitmo)}</span></div>
+          <div class="fluxo-row"><span class="fluxo-label">Meta de Alunos</span><span class="fluxo-val">${m.metaAlunosRitmo} alunos</span></div>
           <div class="fluxo-row" style="border:none"><span class="fluxo-label">Novos Alunos/mês</span><span class="fluxo-val">${m.metaNovosMes} alunos</span></div>
         </div>
 
@@ -466,9 +466,9 @@ function renderRelatorio(m) {
         <div class="kpi-card" style="border-left-color:#22c55e">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
-              <div class="kpi-label">Receita Esperada (alunos ativos)</div>
+              <div class="kpi-label">Receita Esperada</div>
               <div class="kpi-val" style="color:#22c55e">${fmtR(m.recEsperada)}</div>
-              <span class="kpi-pill pill-green">Potencial mensal</span>
+              <span class="kpi-pill pill-green">Já feito + meta de novos alunos</span>
             </div>
             <span style="font-size:28px">📊</span>
           </div>
@@ -613,7 +613,7 @@ function renderRelatorio(m) {
         ${[
           {label:'Receita Atual',val:m.recMes*12,cor:'#ef4444'},
           {label:'Meta Anual',val:m.metaReceita*12,cor:'#3b82f6'},
-          {label:'Esperada (ativos)',val:m.recEsperada*12,cor:'#22c55e'},
+          {label:'Esperada',val:m.recEsperada*12,cor:'#22c55e'},
         ].map(item=>{
           const maxV = m.metaReceita*12*1.1;
           const pct = Math.round((item.val/maxV)*100);
