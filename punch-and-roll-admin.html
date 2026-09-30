@@ -1840,12 +1840,11 @@ function imprimirContas() {
     const socios=Object.keys(por).filter(p=>p!=='PR');
     if(!socios.length) return '';
     const nSocios=socios.length;
-    // Total geral (todos, incl. PR) e o que sobra pros sócios dividirem depois de abater o PR
     const totalGeral=Object.keys(por).reduce((s,p)=>s+por[p].pago+por[p].pendente,0);
-    const totalPrevisto=Math.max(0,totalGeral-totalPR);
-    // Abate a receita do mês do total GERAL (não do "totalPrevisto" já sem PR) — o PR paga
+    // Abate a receita do mês do total GERAL (não só do que sobra sem o PR) — o PR paga
     // a parte dele COM essa mesma receita, então não pode subtrair os dois separadamente
-    // (senão conta a mesma grana duas vezes).
+    // (senão conta a mesma grana duas vezes). O que sobrar da receita depois do PR já
+    // reduz a parte justa de cada sócio automaticamente, por estar no mesmo cálculo.
     const receitaDoMes=_recTotal||0;
     const deficitLiquido=Math.max(0,totalGeral-receitaDoMes);
     const partePrevista=deficitLiquido/nSocios; // responsabilidade líquida de cada sócio
@@ -1866,9 +1865,10 @@ function imprimirContas() {
       </tr>`;
     }).join('');
 
-    // Acerto: baseado no total atribuído (já sem o PR) vs parte igual de cada sócio — independente da receita
-    const parteAtribuida=totalPrevisto/nSocios;
-    const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-parteAtribuida}));
+    // Acerto: mesma "parte justa" da tabela acima (já líquida de receita, que inclui o que o PR
+    // usa pra cobrir a parte dele) — quem tem total atribuído acima da parte justa repassa a
+    // diferença pra quem tem abaixo. Um único cálculo, sem duplicar a receita.
+    const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-partePrevista}));
     const acertos=[];
     const devem=saldos.filter(x=>x.saldo<0).map(x=>({nome:x.nome,v:-x.saldo})); // pagou menos → deve
     const recebem=saldos.filter(x=>x.saldo>0).map(x=>({nome:x.nome,v:x.saldo}));  // pagou mais → recebe
