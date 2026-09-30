@@ -1865,10 +1865,14 @@ function imprimirContas() {
       </tr>`;
     }).join('');
 
-    // Acerto: mesma "parte justa" da tabela acima (já líquida de receita, que inclui o que o PR
-    // usa pra cobrir a parte dele) — quem tem total atribuído acima da parte justa repassa a
-    // diferença pra quem tem abaixo. Um único cálculo, sem duplicar a receita.
+    // Acerto: sócios comparados à parte justa (mesma da tabela acima) — quem tem total
+    // atribuído acima da parte justa deve receber, quem tem abaixo deve repassar.
+    // O PR entra também: o que sobrou de receita depois de cobrir a parte dele (totalPR)
+    // é dinheiro que ele está segurando e precisa repassar pro sócio que ficou no prejuízo
+    // — sem isso, o repasse ficava "escondido" e só aparecia a diferença entre os sócios.
+    const saldoPR=totalPR-receitaDoMes; // negativo = PR está segurando mais receita do que precisa pra si
     const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-partePrevista}));
+    if(Math.abs(saldoPR)>0.01) saldos.push({nome:'PR',saldo:saldoPR});
     const acertos=[];
     const devem=saldos.filter(x=>x.saldo<0).map(x=>({nome:x.nome,v:-x.saldo})); // pagou menos → deve
     const recebem=saldos.filter(x=>x.saldo>0).map(x=>({nome:x.nome,v:x.saldo}));  // pagou mais → recebe
