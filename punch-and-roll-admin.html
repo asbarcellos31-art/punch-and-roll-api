@@ -1843,9 +1843,11 @@ function imprimirContas() {
     // Total geral (todos, incl. PR) e o que sobra pros sócios dividirem depois de abater o PR
     const totalGeral=Object.keys(por).reduce((s,p)=>s+por[p].pago+por[p].pendente,0);
     const totalPrevisto=Math.max(0,totalGeral-totalPR);
-    // Abate a receita do mês — o que já entrou não precisa ser coberto pelos sócios
+    // Abate a receita do mês do total GERAL (não do "totalPrevisto" já sem PR) — o PR paga
+    // a parte dele COM essa mesma receita, então não pode subtrair os dois separadamente
+    // (senão conta a mesma grana duas vezes).
     const receitaDoMes=_recTotal||0;
-    const deficitLiquido=Math.max(0,totalPrevisto-receitaDoMes);
+    const deficitLiquido=Math.max(0,totalGeral-receitaDoMes);
     const partePrevista=deficitLiquido/nSocios; // responsabilidade líquida de cada sócio
 
     const td=(txt,opt='')=>`<td style="padding:7px 12px;border-bottom:1px solid #eee;${opt}">${txt}</td>`;
@@ -1880,7 +1882,7 @@ function imprimirContas() {
 
     return `<div style="margin-top:24px;border-top:2px solid #e5e7eb;padding-top:16px">
       <h3 style="font-size:13px;margin-bottom:4px;color:#111">Previsão por Sócio — ${contasMesLabel()}</h3>
-      <div style="font-size:11px;color:#555;margin-bottom:10px">Despesas totais: <b>R$ ${totalGeral.toFixed(2).replace('.',',')}</b>${totalPR>0?` − Já coberto pelo PR: <b style="color:#0369a1">R$ ${totalPR.toFixed(2).replace('.',',')}</b>`:''} = Entre sócios: <b>R$ ${totalPrevisto.toFixed(2).replace('.',',')}</b>${receitaDoMes>0?` − Receita: <b style="color:#16a34a">R$ ${receitaDoMes.toFixed(2).replace('.',',')}</b> = Déficit: <b>R$ ${deficitLiquido.toFixed(2).replace('.',',')}</b>`:''} ÷ ${nSocios} sócio${nSocios>1?'s':''} = <b>R$ ${partePrevista.toFixed(2).replace('.',',')} cada</b></div>
+      <div style="font-size:11px;color:#555;margin-bottom:10px">Despesas totais: <b>R$ ${totalGeral.toFixed(2).replace('.',',')}</b>${receitaDoMes>0?` − Receita: <b style="color:#16a34a">R$ ${receitaDoMes.toFixed(2).replace('.',',')}</b>`:''} = Déficit: <b>R$ ${deficitLiquido.toFixed(2).replace('.',',')}</b> ÷ ${nSocios} sócio${nSocios>1?'s':''} = <b>R$ ${partePrevista.toFixed(2).replace('.',',')} cada</b>${totalPR>0?`<br><span style="color:#0369a1">ℹ️ Dessa receita, R$ ${totalPR.toFixed(2).replace('.',',')} já está sendo usada pelo PR pra cobrir as contas atribuídas a ele.</span>`:''}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr>
           <th style="text-align:left;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Sócio</th>
