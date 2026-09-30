@@ -279,6 +279,10 @@ function calcMetricas() {
   const metaAlunosRitmo = Math.round(metaNovosMes * mesesDecorridosMeta); // quanto já deveríamos ter, no ritmo, até este mês
   const metaReceitaRitmo = Math.round(metaAlunosRitmo * 159); // receita esperada no ritmo até este mês (mesma lógica dos alunos)
 
+  // Ponto de equilíbrio — fixo, fora da lógica de ritmo/meta
+  const pontoEquilibrio = 5000;
+  const faltaEquilibrio = Math.max(0, pontoEquilibrio - recMes);
+
   // Novos alunos no mês (excluindo cortesia)
   const novosNoMes = pagantes.filter(a=>{
     const mat = a.mat||a.criado_em||'';
@@ -318,7 +322,7 @@ function calcMetricas() {
   return {
     mes, ano, alunos, pagantes, ativos, atrasados, vencendo,
     recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
-    mesesDecorridosMeta, metaAlunosRitmo, metaReceitaRitmo,
+    mesesDecorridosMeta, metaAlunosRitmo, metaReceitaRitmo, pontoEquilibrio, faltaEquilibrio,
     novosNoMes, inadimTotal, historico, cancelados,
     aulasBoxe, aulasJJ, taxaAdim, proxMes, proxAno,
     // % em relação ao ritmo esperado até este mês (não a meta final) — evita marcar como
@@ -413,6 +417,7 @@ function renderRelatorio(m) {
         <!-- Status -->
         <div style="background:#1e3a8a;border-radius:14px;padding:20px;color:#fff;flex:1">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px">Status ${MESES[m.mes]}</div>
+          ${m.faltaEquilibrio>0?`<div class="status-item"><span>⚖️</span><span>Faltam <strong>${fmtR(m.faltaEquilibrio)}</strong> pra bater o ponto de equilíbrio (${fmtR(m.pontoEquilibrio)}).</span></div>`:`<div class="status-item"><span>✅</span><span>Ponto de equilíbrio (${fmtR(m.pontoEquilibrio)}) batido este mês!</span></div>`}
           ${m.pctReceita<100?`<div class="status-item"><span>⚠️</span><span>Gap de <strong>${fmtR(m.metaReceitaRitmo-m.recMes)}</strong> na receita vs ritmo esperado do mês ${m.mesesDecorridosMeta}/6.</span></div>`:''}
           ${m.atrasados.length>0?`<div class="status-item"><span>🔴</span><span><strong>${m.atrasados.length}</strong> aluno(s) com mensalidade em atraso — ${fmtR(m.inadimTotal)} em aberto.</span></div>`:''}
           ${m.vencendo.length>0?`<div class="status-item"><span>⚠️</span><span><strong>${m.vencendo.length}</strong> aluno(s) com mensalidade vencendo em breve.</span></div>`:''}
