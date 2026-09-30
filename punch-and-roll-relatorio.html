@@ -269,9 +269,9 @@ function calcMetricas() {
   const recEsperada = ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
 
   // Metas (baseadas nos dados reais — academia pequena)
-  const metaAlunos = 30; // meta de alunos
-  const metaReceita = metaAlunos * 220; // R$ 220 médio por aluno
-  const metaNovosMes = 3; // novos alunos por mês
+  const metaAlunos = 30; // meta de alunos em 6 meses
+  const metaReceita = metaAlunos * 159; // R$ 159 médio por aluno
+  const metaNovosMes = metaAlunos / 6; // ritmo mensal pra bater 30 alunos em 6 meses
 
   // Novos alunos no mês (excluindo cortesia)
   const novosNoMes = pagantes.filter(a=>{
