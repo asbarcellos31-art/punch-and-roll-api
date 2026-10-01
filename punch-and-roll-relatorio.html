@@ -320,11 +320,16 @@ function calcMetricas() {
   // Próximo mês
   const proxMes = mes===12?1:mes+1;
   const proxAno = mes===12?ano+1:ano;
+  // Ritmo esperado para o PRÓXIMO mês especificamente (um passo à frente do ritmo deste mês)
+  const mesesDecorridosMetaProx = Math.max(1, Math.min(6, (proxAno-META_INICIO_ANO)*12 + (proxMes-META_INICIO_MES) + 1));
+  const metaAlunosRitmoProx = Math.round(metaNovosMes * mesesDecorridosMetaProx);
+  const metaReceitaRitmoProx = Math.round(metaAlunosRitmoProx * 159);
 
   return {
     mes, ano, alunos, pagantes, ativos, atrasados, vencendo, pagsMes,
     recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
     mesesDecorridosMeta, metaAlunosRitmo, metaReceitaRitmo, pontoEquilibrio, faltaEquilibrio,
+    mesesDecorridosMetaProx, metaAlunosRitmoProx, metaReceitaRitmoProx,
     novosNoMes, inadimTotal, historico, cancelados,
     aulasBoxe, aulasJJ, taxaAdim, proxMes, proxAno,
     // % em relação ao ritmo esperado até este mês (não a meta final) — evita marcar como
@@ -738,21 +743,22 @@ function renderRelatorio(m) {
   <!-- SLIDE 6: META PRÓXIMO MÊS -->
   <div class="section print-break">
     <div class="card">
-      <div class="card-title">🎯 Meta para ${MESES[m.proxMes]} ${m.proxAno}</div>
+      <div class="card-title">🎯 Meta para ${MESES[m.proxMes]} ${m.proxAno} (ritmo ${m.mesesDecorridosMetaProx}/6)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div style="background:#dbeafe;border-radius:10px;padding:14px;text-align:center">
           <div style="font-size:11px;color:#2563eb;font-weight:600;margin-bottom:4px">Meta de Receita</div>
-          <div style="font-size:22px;font-weight:900;color:#1e40af">${fmtR(m.metaReceita)}</div>
+          <div style="font-size:22px;font-weight:900;color:#1e40af">${fmtR(m.metaReceitaRitmoProx)}</div>
         </div>
         <div style="background:#dcfce7;border-radius:10px;padding:14px;text-align:center">
           <div style="font-size:11px;color:#15803d;font-weight:600;margin-bottom:4px">Meta de Alunos</div>
-          <div style="font-size:22px;font-weight:900;color:#15803d">${m.metaAlunos}</div>
+          <div style="font-size:22px;font-weight:900;color:#15803d">${m.metaAlunosRitmoProx}</div>
         </div>
         <div style="background:#ede9fe;border-radius:10px;padding:14px;text-align:center">
           <div style="font-size:11px;color:#6d28d9;font-weight:600;margin-bottom:4px">Novos Alunos</div>
           <div style="font-size:22px;font-weight:900;color:#6d28d9">${m.metaNovosMes}</div>
         </div>
       </div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:10px">Meta final (mês 6/6): ${fmtR(m.metaReceita)} · ${m.metaAlunos} alunos</div>
       <textarea class="insight-area-light" id="ins-prox" placeholder="Defina estratégias e ações para ${MESES[m.proxMes]}..." style="min-height:100px">${insights.proxMes}</textarea>
     </div>
   </div>
