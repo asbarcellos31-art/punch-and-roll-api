@@ -259,11 +259,12 @@ function calcMetricas() {
   const atrasados = pagantes.filter(a=>a.status==='atrasado');
   const vencendo = pagantes.filter(a=>a.status==='vencendo');
 
-  // Receita do mês
-  const recMes = pags.filter(p=>{
+  // Receita do mês — pagamentos realmente recebidos no mês selecionado
+  const pagsMes = pags.filter(p=>{
     const d = p.data_pagamento||p.criado_em||'';
     return parseInt(d.slice(5,7))===mes && parseInt(d.slice(0,4))===ano && p.status==='pago';
-  }).reduce((s,p)=>s+parseFloat(p.valor||0),0);
+  });
+  const recMes = pagsMes.reduce((s,p)=>s+parseFloat(p.valor||0),0);
 
   // Metas (baseadas nos dados reais — academia pequena)
   const metaAlunos = 30; // meta final: 30 alunos em 6 meses
@@ -321,7 +322,7 @@ function calcMetricas() {
   const proxAno = mes===12?ano+1:ano;
 
   return {
-    mes, ano, alunos, pagantes, ativos, atrasados, vencendo,
+    mes, ano, alunos, pagantes, ativos, atrasados, vencendo, pagsMes,
     recMes, recEsperada, metaReceita, metaAlunos, metaNovosMes,
     mesesDecorridosMeta, metaAlunosRitmo, metaReceitaRitmo, pontoEquilibrio, faltaEquilibrio,
     novosNoMes, inadimTotal, historico, cancelados,
@@ -520,28 +521,50 @@ function renderRelatorio(m) {
     <div class="section-sub" style="margin-bottom:20px">Aulas e alunos por modalidade — ${MESES[m.mes]} ${m.ano}</div>
 
     <div class="grid2" style="margin-bottom:20px">
-      ${['boxe','jiujitsu'].map((mod,i)=>{
-        const alunosMod = m.alunos.filter(a=>!a.cortesia&&(a.modalidade===mod||a.modalidade==='ambos'));
-        const ativosMod = alunosMod.filter(a=>a.status==='ativo');
-        const aulasMod = m.aulasBoxe;
-        const recMod = ativosMod.reduce((s,a)=>s+parseFloat(a.valor||0),0);
-        const label = mod==='boxe'?'🥊 Boxe':'🟦 Jiu-Jitsu';
-        const cor = CORES[i];
-        const aulas = mod==='boxe'?m.aulasBoxe:m.aulasJJ;
-        return `<div class="colab-card">
-          <div class="colab-bar" style="background:${cor}"></div>
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:4px">
-            <div class="colab-avatar" style="background:${cor}">${mod==='boxe'?'🥊':'🟦'}</div>
-            <div><div class="colab-name">${label}</div><div class="colab-role">${aulas} aulas/semana · ${ativosMod.length} alunos</div></div>
-          </div>
-          <div class="colab-val" style="color:${cor}">${fmtR(recMod)}</div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:10px">Receita estimada/mês</div>
-          <div class="colab-row"><span>Alunos Ativos</span><span style="font-weight:700">${ativosMod.length}</span></div>
-          <div class="colab-row"><span>Inadimplentes</span><span style="font-weight:700;color:#ef4444">${alunosMod.filter(a=>a.status==='atrasado').length}</span></div>
-          <div class="colab-row" style="border:none"><span>Aulas/semana</span><span style="font-weight:700">${aulas}</span></div>
-          <div class="colab-pct-bar"><div style="height:100%;border-radius:4px;background:${cor};width:${m.pagantes.length>0?Math.round(alunosMod.length/m.pagantes.length*100):0}%"></div></div>
+      ${(()=>{
+        // Modalidade de cada aluno, por id — pra atribuir o faturamento real do mês
+        const modPorAluno = {};
+        m.alunos.forEach(a=>{ modPorAluno[a.id] = (a.modalidade||'').toLowerCase(); });
+        // Faturamento real do mês, rateado por modalidade (sem duplicar "ambos")
+        const recPorMod = {boxe:0, jiujitsu:0, ambos:0, outros:0};
+        m.pagsMes.forEach(p=>{
+          const mod = modPorAluno[p.aluno_id];
+          const v = parseFloat(p.valor||0);
+          if(mod==='boxe'||mod==='jiujitsu'||mod==='ambos') recPorMod[mod]+=v; else recPorMod.outros+=v;
+        });
+        const defs = [
+          {key:'boxe', label:'🥊 Boxe', icone:'🥊', aulas:m.aulasBoxe},
+          {key:'jiujitsu', label:'🟦 Jiu-Jitsu', icone:'🟦', aulas:m.aulasJJ},
+          {key:'ambos', label:'🥊🟦 Ambos', icone:'🥊', aulas:m.aulasBoxe+m.aulasJJ},
+        ];
+        const cards = defs.map((d,i)=>{
+          // Cada aluno entra em UMA categoria só (a dele), sem contar "ambos" duas vezes
+          const alunosMod = m.alunos.filter(a=>!a.cortesia&&(a.modalidade||'').toLowerCase()===d.key);
+          if(!alunosMod.length && !recPorMod[d.key]) return '';
+          const ativosMod = alunosMod.filter(a=>a.status==='ativo');
+          const cor = CORES[i];
+          return `<div class="colab-card">
+            <div class="colab-bar" style="background:${cor}"></div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;margin-top:4px">
+              <div class="colab-avatar" style="background:${cor}">${d.icone}</div>
+              <div><div class="colab-name">${d.label}</div><div class="colab-role">${d.aulas} aulas/semana · ${alunosMod.length} alunos</div></div>
+            </div>
+            <div class="colab-val" style="color:${cor}">${fmtR(recPorMod[d.key])}</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:10px">Faturado em ${MESES[m.mes]}</div>
+            <div class="colab-row"><span>Alunos (total)</span><span style="font-weight:700">${alunosMod.length}</span></div>
+            <div class="colab-row"><span>Ativos / Vencendo</span><span style="font-weight:700">${ativosMod.length} / ${alunosMod.filter(a=>a.status==='vencendo').length}</span></div>
+            <div class="colab-row"><span>Inadimplentes</span><span style="font-weight:700;color:#ef4444">${alunosMod.filter(a=>a.status==='atrasado').length}</span></div>
+            <div class="colab-row" style="border:none"><span>Aulas/semana</span><span style="font-weight:700">${d.aulas}</span></div>
+            <div class="colab-pct-bar"><div style="height:100%;border-radius:4px;background:${cor};width:${m.pagantes.length>0?Math.round(alunosMod.length/m.pagantes.length*100):0}%"></div></div>
+          </div>`;
+        }).filter(Boolean).join('');
+        const somaCards = recPorMod.boxe+recPorMod.jiujitsu+recPorMod.ambos+recPorMod.outros;
+        const conferencia = `<div style="grid-column:1/-1;background:#f1f5f9;border-radius:10px;padding:12px 16px;font-size:12px;color:#334155;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Soma das modalidades${recPorMod.outros>0?` (inclui ${fmtR(recPorMod.outros)} sem modalidade identificada)`:''}</span>
+          <strong style="font-size:14px;color:#0f172a">${fmtR(somaCards)} = faturamento de ${MESES[m.mes]}</strong>
         </div>`;
-      }).join('')}
+        return cards + conferencia;
+      })()}
     </div>
 
     <!-- Insight colaboradores -->
