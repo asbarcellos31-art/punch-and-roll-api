@@ -683,7 +683,15 @@ async function renderDashboard() {
 
 function renderAlunos() {
   const pg = document.getElementById('page-alunos');
+  // Ativos aqui conta TODOS com status='ativo', inclusive cortesia — diferente da aba
+  // Mensalidades, que só considera pagantes (exclui cortesia por ser sobre faturamento).
+  const totalAtivos = cache.alunos.filter(a=>a.status==='ativo').length;
+  const totalCortesiaAtivos = cache.alunos.filter(a=>a.status==='ativo'&&a.cortesia).length;
   pg.innerHTML = `
+    <div class="grid2" style="margin-bottom:10px">
+      <div class="kpi kg"><div class="kpi-label">Alunos Ativos</div><div class="kpi-val">${totalAtivos}</div><div class="kpi-sub">${totalCortesiaAtivos>0?`inclui ${totalCortesiaAtivos} em cortesia`:'pagantes + cortesia'}</div></div>
+      <div class="kpi kb"><div class="kpi-label">Total Cadastrado</div><div class="kpi-val">${cache.alunos.length}</div><div class="kpi-sub">todos os status</div></div>
+    </div>
     <div class="search-row"><input class="fi" id="s-aluno" placeholder="🔍 Buscar aluno..." oninput="filtrarAlunos()"></div>
     <div class="filter-row">
       <select class="fsel" id="f-status" onchange="filtrarAlunos()"><option value="">Todos os status</option><option value="ativo">✅ Ativo</option><option value="atrasado">🔴 Atrasado</option><option value="vencendo">⚠️ Vencendo</option></select>
