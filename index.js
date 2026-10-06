@@ -1806,9 +1806,13 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           [pag] = await db.query('SELECT aluno_id,meses,plano_id,plano_nome,status FROM pagamentos WHERE mp_payment_id=?',[payment.external_reference]);
         }
         if (pag.length) {
-          if (pag[0].status === 'pago') { res.sendStatus(200); return; } // já processado — evita duplicata
-          await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? OR mp_payment_id=?",
+          // Claim atômico: só prossegue se ESTA chamada conseguiu mudar de 'pendente' pra 'pago'.
+          // Evita que notificações duplicadas do Mercado Pago (reenvio por garantia, comum) cheguem
+          // quase simultâneas, as duas leiam status='pendente' antes de qualquer uma gravar, e as
+          // duas estendam o vencimento — dobrando o mês do aluno.
+          const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE (mp_payment_id=? OR mp_payment_id=?) AND status != 'pago'",
             [String(data.id), payment.external_reference||String(data.id)]);
+          if (claim.affectedRows === 0) { res.sendStatus(200); return; } // outra chamada já processou este pagamento
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
           const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
