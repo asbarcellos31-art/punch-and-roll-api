@@ -1689,7 +1689,11 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
     if (payment.status === 'approved') {
       const [pag] = await db.query("SELECT aluno_id,meses,plano_id,plano_nome FROM pagamentos WHERE mp_payment_id=?",[String(req.params.payment_id)]);
       if (pag.length) {
-        await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=?",[String(req.params.payment_id)]);
+        // Claim atômico — o front faz polling nesta rota enquanto espera a aprovação, então ela
+        // pode ser chamada várias vezes seguidas com status='approved'. Sem isso, toda chamada
+        // repetida estendia o vencimento de novo (mesmo bug do webhook, só que pior aqui).
+        const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? AND status != 'pago'",[String(req.params.payment_id)]);
+        if (claim.affectedRows === 0) { res.json({ status: payment.status, status_detail: payment.status_detail }); return; }
         const { aluno_id, meses, plano_id, plano_nome } = pag[0];
         const hoje = hojeBRT();
         if (meses && plano_nome) {
