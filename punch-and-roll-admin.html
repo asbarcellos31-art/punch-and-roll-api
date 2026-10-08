@@ -1541,7 +1541,14 @@ function renderFinContas(){
   const porStatus=contasFilter==='todas'?doMes:contasFilter==='pago'?doMes.filter(d=>d.status==='pago'):contasFilter==='vencida'?doMes.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr):doMes.filter(d=>d.status==='pendente'&&d.data_vencimento>=todayStr);
   const filtradas=contasPorFilter==='todos'?porStatus:porStatus.filter(d=>(d.pago_por||'').toUpperCase()===contasPorFilter);
   const totalPend=doMesSaidas.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-  const totalPago=doMesSaidas.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  // Só o que sai do CAIXA DA EMPRESA deve abater o saldo. Conta paga do bolso do sócio
+  // (Anderson/Leonardo/Melque) não movimenta a grana da empresa — isso é acertado à parte
+  // no "Acerto entre Sócios", não pode baixar o saldo da empresa de novo aqui.
+  const _socioNomes=['ANDERSON','LEONARDO','MELQUE'];
+  const _ehSocio=d=>_socioNomes.includes((d.pago_por||'').toUpperCase());
+  const totalPagoPR=doMesSaidas.filter(d=>d.status==='pago'&&!_ehSocio(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const totalPagoSocios=doMesSaidas.filter(d=>d.status==='pago'&&_ehSocio(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const totalPendPR=doMesSaidas.filter(d=>d.status==='pendente'&&!_ehSocio(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const totalEntradasPago=doMesEntradas.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const totalEntradasPend=doMesEntradas.filter(d=>d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const qtdVenc=doMesSaidas.filter(d=>d.status==='pendente'&&d.data_vencimento<todayStr).length;
@@ -1556,8 +1563,8 @@ function renderFinContas(){
   const _recTotal=_recMens+_recShop+totalEntradasPago;
   const _recPot=(cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _qtdPgtos=(Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===_mesAnterior).length;
-  const _resultado=_recTotal-totalPago;
-  const _saldo = _recTotal - totalPago;
+  const _resultado=_recTotal-totalPagoPR;
+  const _saldo = _recTotal - totalPagoPR;
   const _porCores={'ANDERSON':'#818cf8','LEONARDO':'#34d399','MELQUE':'#fb923c','PR':'#f87171','todos':'var(--muted)'};
   document.getElementById('fin-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
@@ -1580,7 +1587,7 @@ function renderFinContas(){
     </div>
 
     <!-- Resumo: Entradas × Saídas × Saldo Real × Saldo Previsto -->
-    ${(()=>{const _totalDesp=totalPago+totalPend;const _saldoPrev=_recTotal+totalEntradasPend-_totalDesp;return`
+    ${(()=>{const _totalDespPR=totalPagoPR+totalPendPR;const _saldoPrev=_recTotal+totalEntradasPend-_totalDespPR;return`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
       <div onclick="verPagantesDoMes('${_mesAnterior}')" style="cursor:pointer;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Entradas</div>
@@ -1588,19 +1595,19 @@ function renderFinContas(){
         <div style="font-size:9px;color:var(--green);margin-top:2px">${_qtdPgtos} pagantes (${_mesAnteriorLbl})${totalEntradasPago>0?` + ${fmtR(totalEntradasPago)} avulsas 👆`:' 👆'}</div>
       </div>
       <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saídas pagas</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f87171">${fmtR(totalPago)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">${doMesSaidas.filter(d=>d.status==='pago').length} conta(s)</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saídas pagas (caixa)</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f87171">${fmtR(totalPagoPR)}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">${doMesSaidas.filter(d=>d.status==='pago'&&!_ehSocio(d)).length} conta(s)${totalPagoSocios>0?` · +${fmtR(totalPagoSocios)} pago por sócios (não conta aqui)`:''}</div>
       </div>
       <div style="background:${_saldo>=0?'rgba(34,197,94,.08)':'rgba(212,17,28,.08)'};border:1px solid ${_saldo>=0?'rgba(34,197,94,.25)':'rgba(212,17,28,.25)'};border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saldo real</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldo>=0?'var(--green)':'#f87171'}">${_saldo>=0?'+':''}${fmtR(_saldo)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − pagas</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − pago pelo caixa</div>
       </div>
       <div style="background:${_saldoPrev>=0?'rgba(59,130,246,.08)':'rgba(245,158,11,.08)'};border:1px solid ${_saldoPrev>=0?'rgba(59,130,246,.25)':'rgba(245,158,11,.25)'};border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saldo previsto</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldoPrev>=0?'#60a5fa':'#f59e0b'}">${_saldoPrev>=0?'+':''}${fmtR(_saldoPrev)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − todas as despesas</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − despesas do caixa (não conta sócio)</div>
       </div>
     </div>`})()}
     ${totalPend>0?`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>`:''}
