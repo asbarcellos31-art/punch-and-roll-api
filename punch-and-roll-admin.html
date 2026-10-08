@@ -1730,8 +1730,13 @@ function imprimirContas() {
   const _totalEntradasManualMes=_todasDoMes.filter(d=>d.tipo==='entrada'&&d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const _totalEntradasManualPendMes=_todasDoMes.filter(d=>d.tipo==='entrada'&&d.status==='pendente').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const _recTotal=parseFloat((finResumo?.historicoRec||[]).find(h=>h.mes===_mesAnterior)?.total||0)+parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mesAnterior)?.total||0)+_totalEntradasManualMes;
-  const _totalPagoMes=_todasDoMes.filter(d=>d.status==='pago'&&d.tipo!=='entrada').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-  const _totalPendMes=_todasDoMes.filter(d=>d.status==='pendente'&&d.tipo!=='entrada').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  // Mesma regra do app: só o que sai do CAIXA (PR/sem responsável) abate o saldo — o que
+  // sócio paga do próprio bolso é acertado à parte em "Acerto entre Sócios", não aqui.
+  const _socioNomesPdf=['ANDERSON','LEONARDO','MELQUE'];
+  const _ehSocioPdf=d=>_socioNomesPdf.includes((d.pago_por||'').toUpperCase());
+  const _totalPagoMes=_todasDoMes.filter(d=>d.status==='pago'&&d.tipo!=='entrada'&&!_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _totalPendMes=_todasDoMes.filter(d=>d.status==='pendente'&&d.tipo!=='entrada'&&!_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _totalPagoSociosPdf=_todasDoMes.filter(d=>d.status==='pago'&&d.tipo!=='entrada'&&_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const _saldoReal=_recTotal-_totalPagoMes;
   const _saldoPrev=_recTotal+_totalEntradasManualPendMes-_totalPagoMes-_totalPendMes;
   const fR=v=>'R$ '+Math.abs(v).toFixed(2).replace('.',',');
