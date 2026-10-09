@@ -13,6 +13,19 @@ require('dotenv').config();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 // Retorna data local BRT (evita UTC deslocado após 21h)
 function hojeBRT() { const d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+// Data-base pra somar os meses do plano quando um pagamento é confirmado.
+// - Nunca teve vencimento (1º pagamento): conta a partir de hoje.
+// - Em dia ou até 7 dias de atraso: mantém a data de corte original (não "desliza" o dia do mês
+//   por um atraso curto).
+// - Mais de 7 dias de atraso: reinicia o ciclo a partir do pagamento novo — o aluno ficou um
+//   tempo sem vir, não faz sentido ele "herdar" uma data de corte de semanas atrás.
+function baseVencimento(vencAtual, hoje) {
+  if (!vencAtual) return hoje;
+  const diasAtraso = Math.floor((new Date(hoje) - new Date(vencAtual)) / 86400000);
+  if (diasAtraso > 7) return hoje;
+  return vencAtual;
+}
 // Converte qualquer campo Date do MySQL para string YYYY-MM-DD
 function fmtDateFields(obj) {
   if(!obj) return obj;
@@ -974,9 +987,9 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
 
     if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
-      const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
-      let base = hoje;
-      if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
+      const vencAtualRaw = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
+      const vencAtual = vencAtualRaw ? (([vy,vm,vd])=>`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`)(vencAtualRaw.split('-').map(Number)) : null;
+      const base = baseVencimento(vencAtual, hoje);
       const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
       const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
@@ -1659,9 +1672,9 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     if (pagStatusOk) {
       if (meses && plano_nome) {
         const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
-        const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
-        let base = hoje;
-        if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
+        const vencAtualRaw = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
+        const vencAtual = vencAtualRaw ? (([vy,vm,vd])=>`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`)(vencAtualRaw.split('-').map(Number)) : null;
+        const base = baseVencimento(vencAtual, hoje);
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
         const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
         await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1698,9 +1711,9 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
         const hoje = hojeBRT();
         if (meses && plano_nome) {
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
-          const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
-          let base = hoje;
-          if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
+          const vencAtualRaw = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
+          const vencAtual = vencAtualRaw ? (([vy,vm,vd])=>`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`)(vencAtualRaw.split('-').map(Number)) : null;
+          const base = baseVencimento(vencAtual, hoje);
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
           const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
           await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
@@ -1779,8 +1792,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const [[aluno]] = await db.query('SELECT id,nome,tel,plano,plano_id,vencimento,subscription_meses FROM alunos WHERE mp_subscription_id=?',[String(data.id)]);
           if (aluno) {
             const hoje = hojeBRT();
-            const vencAtual = aluno.vencimento ? String(aluno.vencimento).slice(0,10) : hoje;
-            const base = vencAtual >= hoje ? vencAtual : hoje;
+            const vencAtual = aluno.vencimento ? String(aluno.vencimento).slice(0,10) : null;
+            const base = baseVencimento(vencAtual, hoje);
             const venc = new Date(base); venc.setMonth(venc.getMonth()+1);
             const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,'0')}-${String(venc.getDate()).padStart(2,'0')}`;
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,pagto='recorrente' WHERE id=?",[vencStr,aluno.id]);
@@ -1820,9 +1833,9 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
           const hoje = hojeBRT();
           const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
-          const vencAtual = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
-          let base = hoje;
-          if (vencAtual) { const [vy,vm,vd]=vencAtual.split('-').map(Number); base=`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`; }
+          const vencAtualRaw = alunoAtual?.vencimento ? (alunoAtual.vencimento instanceof Date ? alunoAtual.vencimento.toISOString().slice(0,10) : String(alunoAtual.vencimento).slice(0,10)) : null;
+          const vencAtual = vencAtualRaw ? (([vy,vm,vd])=>`${vy>=2020?vy:new Date().getFullYear()}-${String(vm).padStart(2,'0')}-${String(vd).padStart(2,'0')}`)(vencAtualRaw.split('-').map(Number)) : null;
+          const base = baseVencimento(vencAtual, hoje);
           const pagto = payment.payment_type_id === 'credit_card' ? 'cartao' : 'pix';
           if (meses && plano_nome) {
             const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
@@ -1830,9 +1843,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto=? WHERE id=?",
               [vencStr, plano_nome, plano_id||null, pagto, aluno_id]);
           } else {
-            // meses não informado — estende 1 mês a partir do vencimento atual ou hoje
-            const baseExt = (vencAtual && vencAtual >= hoje) ? vencAtual : hoje;
-            const vencExt = new Date(baseExt); vencExt.setMonth(vencExt.getMonth() + 1);
+            // meses não informado — estende 1 mês a partir da base (mesma regra dos 7 dias)
+            const vencExt = new Date(base); vencExt.setMonth(vencExt.getMonth() + 1);
             const vencExtStr = `${vencExt.getFullYear()}-${String(vencExt.getMonth()+1).padStart(2,'0')}-${String(vencExt.getDate()).padStart(2,'0')}`;
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,pagto=? WHERE id=?",[vencExtStr, pagto, aluno_id]);
           }
