@@ -1473,7 +1473,8 @@ app.post('/api/checkins', auth, async (req, res) => {
     const hora = new Date().toTimeString().slice(0,5);
     // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
     const FERIADOS = {
-      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪'
+      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪',
+      '2026-10-12': '🙏 Feriado Nacional (Nossa Senhora Aparecida) — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 13/10. Bom feriado! 💪'
     };
     const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
     if (!aluno[0]) return res.status(404).json({ error: 'Aluno não encontrado' });
