@@ -1054,8 +1054,18 @@ app.post('/api/alunos/me/assinar', auth, async (req, res) => {
     const aluno_id = req.user.id;
     const { plano_id, plano_nome, valor, meses } = req.body;
     if (!plano_nome || !valor || !meses) return res.status(400).json({ error: 'Dados do plano inválidos' });
-    const [[aluno]] = await db.query('SELECT nome, email, cpf FROM alunos WHERE id=?', [aluno_id]);
+    const [[aluno]] = await db.query('SELECT nome, email, cpf, mp_subscription_id FROM alunos WHERE id=?', [aluno_id]);
     if (!aluno) return res.status(404).json({ error: 'Aluno não encontrado' });
+    // Evita órfão: se já existe uma assinatura vinculada (ativa ou pendente), cancela ela no MP
+    // antes de criar outra — sem isso, clicar 2x deixava a antiga cobrando sem ninguém rastrear.
+    if (aluno.mp_subscription_id) {
+      try {
+        await axios.put(`https://api.mercadopago.com/preapproval/${aluno.mp_subscription_id}`,
+          { status: 'cancelled' },
+          { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' } }
+        );
+      } catch(eCancel) { console.error('[Assinar] falha ao cancelar assinatura anterior (pode já estar cancelada):', eCancel.message); }
+    }
     const descricao = `Punch and Roll — ${plano_nome}`;
     const mpRes = await axios.post('https://api.mercadopago.com/preapproval', {
       reason: descricao,
