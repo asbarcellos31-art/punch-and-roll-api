@@ -844,11 +844,21 @@ function atualizarParcelamento(){
   if(!S.plano)return;
   const total=valorFinal();
   const sel=document.getElementById('f-parcelas');sel.innerHTML='';
-  const max=Math.min(12,S.plano.meses>1?12:3);
-  for(let i=1;i<=max;i++){
-    const op=document.createElement('option');op.value=i;
-    op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
+  if(S.plano.meses>1){
+    // Semestral/Anual: parcelamento FIXO em N vezes (sem opção de escolher menos) — o servidor
+    // também força isso independente do que for enviado aqui, essa trava é só pra não confundir.
+    const n=Math.min(12,S.plano.meses);
+    const op=document.createElement('option');op.value=n;
+    op.textContent=n+'x de '+fmtR(total/n)+' sem juros';
     sel.appendChild(op);
+    sel.disabled=true;
+  }else{
+    sel.disabled=false;
+    for(let i=1;i<=3;i++){
+      const op=document.createElement('option');op.value=i;
+      op.textContent=i+'x de '+fmtR(total/i)+(i>3?' (com juros)':' sem juros');
+      sel.appendChild(op);
+    }
   }
 }
 

@@ -963,11 +963,12 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
         qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64,
       });
     } else {
-      // cartão
+      // cartão — plano de 6/12 meses sempre parcela fixo em N vezes, igual à preferência de checkout
+      const mesesIntRenovar = parseInt(meses) || 0;
       const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
         transaction_amount: totalValor,
         token, description: descricao,
-        installments: parseInt(parcelas) || 1,
+        installments: mesesIntRenovar > 1 ? Math.min(mesesIntRenovar, 12) : (parseInt(parcelas) || 1),
         payment_method_id,
         payer: {
           email, first_name: (nome||'').split(' ')[0],
@@ -1662,11 +1663,15 @@ app.post('/api/pagamentos/pix', async (req, res) => {
 // ── MERCADO PAGO — CARTÃO ──
 app.post('/api/pagamentos/cartao', async (req, res) => {
   try {
-    const { aluno_id, valor, descricao, token, email, nome, cpf, parcelas, payment_method_id } = req.body;
+    const { aluno_id, valor, descricao, token, email, nome, cpf, parcelas, payment_method_id, meses } = req.body;
+    // Plano de 6/12 meses: parcela FIXA em N vezes, independe do que o front mandar em "parcelas".
+    // Sem meses definido (cobrança avulsa) ou mensal (1 mês): respeita o que foi pedido.
+    const mesesInt = parseInt(meses) || 0;
+    const installmentsFinal = mesesInt > 1 ? Math.min(mesesInt, 12) : (parseInt(parcelas) || 1);
     const mpRes = await axios.post('https://api.mercadopago.com/v1/payments', {
       transaction_amount: parseFloat(valor), token,
       description: descricao || 'Mensalidade Punch and Roll',
-      installments: parseInt(parcelas) || 1,
+      installments: installmentsFinal,
       payment_method_id,
       payer: {
         email, first_name: nome.split(' ')[0],
@@ -1680,7 +1685,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     const payment = mpRes.data;
     console.log(`[CARTAO-ADMIN] aluno=${aluno_id} valor=${valor} status=${payment.status} detail=${payment.status_detail}`);
     const pagStatusOk = ['approved','authorized'].includes(payment.status);
-    const { meses, plano_id, plano_nome } = req.body;
+    const { plano_id, plano_nome } = req.body;
     const hoje = hojeBRT();
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id),meses||null,plano_id||null,plano_nome||null,pagStatusOk?hoje:null]);
