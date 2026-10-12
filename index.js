@@ -1034,7 +1034,9 @@ app.post('/api/alunos/me/preferencia', auth, async (req, res) => {
       external_reference: extRef,
       // Planos de 1 mês: só à vista (não faz sentido parcelar R$159). Planos de 6/12 meses:
       // permite parcelar em até o número de meses do plano, em vez de cobrar tudo de uma vez.
-      payment_methods: { excluded_payment_types: [{ id: 'ticket' }], installments: Math.min(Math.max(parseInt(meses)||1,1), 12) }
+      // Semestral/Anual: parcela FIXA (não "até Nx") — installments e default_installments
+      // iguais travam a única opção de parcelamento em N vezes, igual sempre foi combinado.
+      payment_methods: { excluded_payment_types: [{ id: 'ticket' }], installments: Math.min(Math.max(parseInt(meses)||1,1), 12), default_installments: Math.min(Math.max(parseInt(meses)||1,1), 12) }
     }, { headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' } });
     // Salva registro pendente com external_reference para o webhook encontrar depois
     await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome) VALUES (?,?,?,?,?,?,?,?,?)',
