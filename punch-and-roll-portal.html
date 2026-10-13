@@ -123,6 +123,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 
 <script>
 const API = 'https://punch-and-roll-api-production.up.railway.app';
+const MP_PUBLIC_KEY = 'APP_USR-a858d1ce-c91a-4c60-9a22-85860e915aa6';
+const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
 const fmtR = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(parseFloat(v)||0);
 const fmtD = d => { if(!d||d==='—') return '—'; const[y,m,dd]=String(d).slice(0,10).split('-'); return `${dd}/${m}/${y}`; };
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
@@ -782,6 +784,16 @@ function setRenovMetodo(m) {
   const labels = {pix:'Gerar PIX', cartao:'Pagar com Cartão →', recorrente:'Ativar Débito Automático 🔄'};
   document.getElementById('renov-btn').textContent = labels[m]||'Continuar';
   window._renovMetodo = m;
+  if(m==='cartao') {
+    const p = _renovPlano;
+    const info = document.getElementById('renov-cartao-parcela-info');
+    if(p && info) {
+      const valorFinal = (p.valor||0) - (_renovDesconto||0);
+      info.textContent = p.meses > 1
+        ? `Parcelamento fixo em ${p.meses}x de ${fmtR(valorFinal/p.meses)} sem juros.`
+        : 'Cobrança única no cartão.';
+    }
+  }
   // Mostra termos de cancelamento para semestral/anual
   if(m==='recorrente') {
     const p = _renovPlano;
@@ -836,14 +848,71 @@ async function confirmarRenovacao() {
       fecharRenovacao();
       window.location.href = res.init_point;
     } else {
-      // cartão — gera link de checkout MP (igual ao link direto que o admin envia)
-      const res = await api('POST','/api/alunos/me/preferencia',{
-        plano_id:p.id, plano_nome:p.nome, valor:valorFinal, meses:p.meses,
-        email:aluno.email, nome:aluno.nome, cpf:aluno.cpf
+      // cartão — tokeniza e cobra direto via API (parcela fixa sem juros), sem redirecionar pro Mercado Pago
+      const num = document.getElementById('renov-card-num').value.replace(/\s/g,'');
+      const name = document.getElementById('renov-card-name').value.trim();
+      const exp = document.getElementById('renov-card-exp').value;
+      const cvv = document.getElementById('renov-card-cvv').value;
+      const cpfTitular = document.getElementById('renov-card-cpf').value.replace(/\D/g,'');
+      if(!num||num.length<16) throw new Error('Número do cartão inválido!');
+      if(!name) throw new Error('Informe o nome no cartão!');
+      if(!exp||exp.length<5) throw new Error('Validade inválida!');
+      if(!cvv||cvv.length<3) throw new Error('CVV inválido!');
+      if(!cpfTitular||cpfTitular.length<11) throw new Error('Informe o CPF do titular do cartão!');
+      const [mes,ano] = exp.split('/');
+      let cardToken;
+      try {
+        cardToken = await mp.createCardToken({
+          cardNumber:num, cardholderName:name,
+          cardExpirationMonth:mes, cardExpirationYear:'20'+ano,
+          securityCode:cvv,
+          identificationType:'CPF', identificationNumber:cpfTitular,
+        });
+      } catch(mpErr) {
+        const mpMsg = mpErr?.message||mpErr?.cause?.[0]?.description||(Array.isArray(mpErr)?mpErr[0]?.description:null)||'Verifique os dados do cartão e tente novamente';
+        throw new Error(mpMsg);
+      }
+      if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão. Verifique os dados.');
+
+      const cardRes = await fetch(API+'/api/pagamentos/cartao', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          aluno_id: aluno.id, valor: valorFinal,
+          descricao: 'Punch and Roll — '+p.nome,
+          token: cardToken.id, email: aluno.email, nome: aluno.nome, cpf: cpfTitular,
+          parcelas: p.meses, payment_method_id: cardToken.payment_method_id,
+          meses: p.meses, plano_id: p.id, plano_nome: p.nome
+        })
       });
-      if(!res.checkout_url) throw new Error('Não foi possível gerar o link de pagamento');
-      fecharRenovacao();
-      window.location.href = res.checkout_url;
+      const cardData = await cardRes.json();
+      if(!cardRes.ok) throw new Error(cardData.error||'Erro no pagamento');
+
+      if(cardData.status==='approved'||cardData.status==='authorized') {
+        fecharRenovacao();
+        alert('✅ Pagamento aprovado! Plano renovado com sucesso. 🥊');
+        const novo = await api('GET','/api/alunos/me');
+        if(novo&&novo.id){aluno={...novo,venc:novo.vencimento||novo.venc||''};renderInicio();}
+      } else if(cardData.status==='in_process'||cardData.status==='pending') {
+        fecharRenovacao();
+        alert('⏳ Pagamento em processamento. Você receberá a confirmação em breve.');
+      } else {
+        const motivos = {
+          cc_rejected_insufficient_amount:'Saldo insuficiente no cartão.',
+          cc_rejected_bad_filled_card_number:'Número do cartão inválido.',
+          cc_rejected_bad_filled_security_code:'CVV incorreto.',
+          cc_rejected_bad_filled_date:'Data de validade incorreta.',
+          cc_rejected_bad_filled_other:'Dados do cartão incorretos (número, nome, validade ou CVV).',
+          cc_rejected_blacklist:'Cartão bloqueado pela operadora. Contate seu banco.',
+          cc_rejected_call_for_authorize:'Ligue para sua operadora para autorizar esta transação.',
+          cc_rejected_card_disabled:'Cartão desativado. Contate sua operadora.',
+          cc_rejected_card_error:'Erro no cartão. Tente outro cartão.',
+          cc_rejected_high_risk:'Transação recusada por segurança. Tente PIX.',
+          cc_rejected_max_attempts:'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+          cc_rejected_other_reason:'Cartão recusado pela operadora. Tente PIX.',
+        };
+        const det = cardData.status_detail||cardData.status||'';
+        throw new Error(motivos[det]||`Cartão recusado: ${det}. Tente PIX.`);
+      }
     }
   } catch(e) {
     alert('Erro: '+e.message);
@@ -1164,13 +1233,17 @@ async function alterarSenhaPerfil() {
       <div id="renov-pix-chave" style="display:none;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10px;word-break:break-all;margin-top:8px;cursor:pointer;color:var(--blue);text-align:center"></div>
     </div>
 
-    <!-- Formulário Cartão — abre checkout seguro do Mercado Pago -->
+    <!-- Formulário Cartão — tokeniza e cobra direto (sem juros, parcela fixa) -->
     <div id="renov-form-cartao" style="display:none">
-      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;margin-bottom:10px">
-        <div style="font-size:28px;margin-bottom:8px">🔒</div>
-        <div style="font-size:14px;color:var(--fg);font-weight:600;margin-bottom:6px">Pagamento seguro via Mercado Pago</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.5">Você será direcionado para a página segura do Mercado Pago para inserir os dados do cartão. Após o pagamento, seu acesso é liberado automaticamente.</div>
+      <div id="renov-cartao-info" style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">🔒 Pagamento seguro. Dados do cartão não ficam salvos em nosso servidor.</div>
+      <div style="margin-bottom:8px"><input id="renov-card-num" type="text" placeholder="Número do cartão" maxlength="19" oninput="maskRenovCard(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box"></div>
+      <div style="margin-bottom:8px"><input id="renov-card-name" type="text" placeholder="Nome impresso no cartão" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;text-transform:uppercase;box-sizing:border-box"></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="renov-card-exp" type="text" placeholder="MM/AA" maxlength="5" oninput="maskRenovExp(this)" style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box">
+        <input id="renov-card-cvv" type="password" placeholder="CVV" maxlength="4" style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box">
       </div>
+      <div style="margin-bottom:10px"><input id="renov-card-cpf" type="text" placeholder="CPF do titular do cartão" maxlength="14" oninput="maskRenovCpf(this)" style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box"></div>
+      <div id="renov-cartao-parcela-info" style="font-size:12px;color:var(--muted);margin-bottom:4px"></div>
     </div>
 
     <!-- Formulário Recorrente -->
