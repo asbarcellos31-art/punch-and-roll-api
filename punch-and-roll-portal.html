@@ -790,8 +790,8 @@ function setRenovMetodo(m) {
     if(p && info) {
       const valorFinal = (p.valor||0) - (_renovDesconto||0);
       info.textContent = p.meses > 1
-        ? `Parcelamento fixo em ${p.meses}x de ${fmtR(valorFinal/p.meses)} sem juros.`
-        : 'Cobrança única no cartão.';
+        ? `Parcelamento fixo em ${p.meses}x de ${fmtR(valorFinal)} sem juros (total ${fmtR(valorFinal*p.meses)}).`
+        : `Cobrança única de ${fmtR(valorFinal)} no cartão.`;
     }
   }
   // Mostra termos de cancelamento para semestral/anual
@@ -874,10 +874,11 @@ async function confirmarRenovacao() {
       }
       if(!cardToken?.id) throw new Error('Não foi possível tokenizar o cartão. Verifique os dados.');
 
+      const valorTotalCartao = valorFinal * p.meses;
       const cardRes = await fetch(API+'/api/pagamentos/cartao', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          aluno_id: aluno.id, valor: valorFinal,
+          aluno_id: aluno.id, valor: valorTotalCartao,
           descricao: 'Punch and Roll — '+p.nome,
           token: cardToken.id, email: aluno.email, nome: aluno.nome, cpf: cpfTitular,
           parcelas: p.meses, payment_method_id: cardToken.payment_method_id,
