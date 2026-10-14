@@ -503,7 +503,7 @@ async function carregarTudo() {
   } catch(e) { console.error('Erro ao carregar dados:', e.message); }
   try {
     const pagamentos = await GET('/api/pagamentos');
-    mensHistorico = Array.isArray(pagamentos) ? pagamentos.map(p=>({id:p.id, alunoId:p.aluno_id, alunoNome:p.aluno_nome, valor:p.valor, data:p.data_pagamento||p.criado_em, metodo:p.metodo, status:p.status})) : [];
+    mensHistorico = Array.isArray(pagamentos) ? pagamentos.map(p=>({id:p.id, alunoId:p.aluno_id, alunoNome:p.aluno_nome, valor:p.valor, valorLiquido:p.valor_liquido, data:p.data_pagamento||p.criado_em, metodo:p.metodo, status:p.status})) : [];
   } catch(e) { console.error('Erro ao carregar pagamentos:', e.message); }
 }
 
@@ -2699,8 +2699,12 @@ function renderMensOverview(){
   // "valor/mês" do aluno — semestral/anual paga o total de uma vez só no mês da renovação,
   // não gera receita todo mês em que está ativo.
   const _mesCur = new Date().toISOString().slice(0,7);
-  const recMes = (mensHistorico||[]).filter(p=>p.status==='pago' && String(p.data||'').slice(0,7)===_mesCur)
-    .reduce((s,p)=>s+parseFloat(p.valor||0), 0);
+  const _pgtosMesAtual = (mensHistorico||[]).filter(p=>p.status==='pago' && String(p.data||'').slice(0,7)===_mesCur);
+  // Usa valor líquido (já descontada a taxa do Mercado Pago) quando disponível — só existe
+  // pra pagamentos processados a partir de 2026-10-14, quando passamos a capturar essa info.
+  const recMes = _pgtosMesAtual.reduce((s,p)=>s+parseFloat(p.valorLiquido ?? p.valor ?? 0), 0);
+  const recMesBruto = _pgtosMesAtual.reduce((s,p)=>s+parseFloat(p.valor||0), 0);
+  const taxaMesAtual = recMesBruto - recMes;
   const inadim=atrasados.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const adimplentes=pagantes.length-atrasados.length; // ativo + vencendo = em dia, só atrasado é inadimplente
   const taxaAdim=pagantes.length>0?Math.round(adimplentes/pagantes.length*100):0;
@@ -2709,7 +2713,7 @@ function renderMensOverview(){
       <div class="kpi kg"><div class="kpi-label">Adimplentes</div><div class="kpi-val">${adimplentes}</div><div class="kpi-sub">${taxaAdim}% do total</div></div>
       <div class="kpi kr"><div class="kpi-label">Inadimplentes</div><div class="kpi-val">${atrasados.length}</div><div class="kpi-sub">${fmtR(inadim)} em aberto</div></div>
       <div class="kpi ky"><div class="kpi-label">Vencendo</div><div class="kpi-val">${vencendo.length}</div></div>
-      <div class="kpi kb"><div class="kpi-label">Recebido este mês</div><div class="kpi-val">${fmtR(recMes)}</div></div>
+      <div class="kpi kb"><div class="kpi-label">Recebido este mês</div><div class="kpi-val">${fmtR(recMes)}</div>${taxaMesAtual>0?`<div class="kpi-sub">já descontada taxa MP (${fmtR(taxaMesAtual)})</div>`:''}</div>
     </div>
     ${atrasados.length>0?`<div class="alert alert-r">🔴 ${atrasados.length} aluno(s) inadimplente(s)</div>`:''}
     ${vencendo.length>0?`<div class="alert alert-y">⚠️ ${vencendo.length} aluno(s) vencendo em breve</div>`:''}

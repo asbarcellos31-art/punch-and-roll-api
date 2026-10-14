@@ -328,6 +328,7 @@ async function setupDB() {
       "ALTER TABLE pagamentos ADD COLUMN meses INT DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN plano_id VARCHAR(50) DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN plano_nome VARCHAR(200) DEFAULT NULL",
+      "ALTER TABLE pagamentos ADD COLUMN valor_liquido DECIMAL(10,2) DEFAULT NULL",
     ]) { try { await conn.query(sql); } catch(e) {} }
 
     await conn.query(`
@@ -983,8 +984,9 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
     }
 
     const hoje = hojeBRT();
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome, payment.status === 'approved' ? hoje : null]);
+    const valorLiquido = payment.status === 'approved' ? (payment.transaction_details?.net_received_amount ?? null) : null;
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento,valor_liquido) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [aluno_id, descricao, totalValor, payment.status === 'approved' ? 'pago' : 'pendente', metodo, String(payment.id), parseInt(meses), plano_id||null, plano_nome, payment.status === 'approved' ? hoje : null, valorLiquido]);
 
     if (['approved','authorized'].includes(payment.status)) {
       const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?', [aluno_id]);
@@ -1614,7 +1616,9 @@ app.get('/api/pagamentos', auth, async (req, res) => {
 app.post('/api/pagamentos', auth, adminOnly, async (req, res) => {
   try {
     const { aluno_id, descricao, valor, data_pagamento, status, metodo } = req.body;
-    const [result] = await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,data_pagamento,status,metodo) VALUES (?,?,?,?,?,?)',[aluno_id,descricao,valor,data_pagamento,status,metodo]);
+    // Lançamento manual (dinheiro, transferência etc.) não passa pelo Mercado Pago — sem taxa a descontar.
+    const valorLiquido = status === 'pago' ? valor : null;
+    const [result] = await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,data_pagamento,status,metodo,valor_liquido) VALUES (?,?,?,?,?,?,?)',[aluno_id,descricao,valor,data_pagamento,status,metodo,valorLiquido]);
     if (status === 'pago') await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1687,8 +1691,9 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
     const pagStatusOk = ['approved','authorized'].includes(payment.status);
     const { plano_id, plano_nome } = req.body;
     const hoje = hojeBRT();
-    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id),meses||null,plano_id||null,plano_nome||null,pagStatusOk?hoje:null]);
+    const valorLiquido = pagStatusOk ? (payment.transaction_details?.net_received_amount ?? null) : null;
+    await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_id,plano_nome,data_pagamento,valor_liquido) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [aluno_id,descricao,valor,pagStatusOk?'pago':'pendente','cartao',String(payment.id),meses||null,plano_id||null,plano_nome||null,pagStatusOk?hoje:null,valorLiquido]);
     if (pagStatusOk) {
       if (meses && plano_nome) {
         const [[alunoAtual]] = await db.query('SELECT vencimento FROM alunos WHERE id=?',[aluno_id]);
@@ -1725,7 +1730,8 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
         // Claim atômico — o front faz polling nesta rota enquanto espera a aprovação, então ela
         // pode ser chamada várias vezes seguidas com status='approved'. Sem isso, toda chamada
         // repetida estendia o vencimento de novo (mesmo bug do webhook, só que pior aqui).
-        const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE mp_payment_id=? AND status != 'pago'",[String(req.params.payment_id)]);
+        const valorLiquido = payment.transaction_details?.net_received_amount ?? null;
+        const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE(), valor_liquido=? WHERE mp_payment_id=? AND status != 'pago'",[valorLiquido, String(req.params.payment_id)]);
         if (claim.affectedRows === 0) { res.json({ status: payment.status, status_detail: payment.status_detail }); return; }
         const { aluno_id, meses, plano_id, plano_nome } = pag[0];
         const hoje = hojeBRT();
@@ -1847,8 +1853,9 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           // Evita que notificações duplicadas do Mercado Pago (reenvio por garantia, comum) cheguem
           // quase simultâneas, as duas leiam status='pendente' antes de qualquer uma gravar, e as
           // duas estendam o vencimento — dobrando o mês do aluno.
-          const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE() WHERE (mp_payment_id=? OR mp_payment_id=?) AND status != 'pago'",
-            [String(data.id), payment.external_reference||String(data.id)]);
+          const valorLiquido = payment.transaction_details?.net_received_amount ?? null;
+          const [claim] = await db.query("UPDATE pagamentos SET status='pago', data_pagamento=CURDATE(), valor_liquido=? WHERE (mp_payment_id=? OR mp_payment_id=?) AND status != 'pago'",
+            [valorLiquido, String(data.id), payment.external_reference||String(data.id)]);
           if (claim.affectedRows === 0) { res.sendStatus(200); return; } // outra chamada já processou este pagamento
           const { aluno_id, meses, plano_id, plano_nome } = pag[0];
           const hoje = hojeBRT();
