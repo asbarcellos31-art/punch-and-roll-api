@@ -1417,9 +1417,11 @@ function renderFinGeral(){
   const _aReceberAlunos = cache.alunos.filter(a=>!a.cortesia&&(a.status==='vencendo'||a.status==='atrasado'));
   const _gAReceberReal = _aReceberAlunos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _gAReceberLinha = _aReceberAlunos.length>0 ? '<div onclick="verAReceberDoMes()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)"><span style="font-size:12px">&#x23F3; A receber — '+_aReceberAlunos.length+' aluno(s) 👆</span><span style="font-size:13px;font-weight:700;color:var(--yellow)">'+fmtR(_gAReceberReal)+'</span></div>' : '';
-  // Taxa MP por método
+  // Taxa MP — usa o valor líquido real capturado em cada pagamento (fallback: estimativa
+  // só pra pagamentos antigos que não têm essa informação ainda)
   const _pagsDoMes = (mensHistorico||[]).filter(p=>p.status==='pago'&&String(p.data||'').slice(0,7)===mesCur);
   const _taxaMP = _pagsDoMes.reduce((s,p)=>{
+    if(p.valorLiquido!=null) return s + (parseFloat(p.valor||0) - parseFloat(p.valorLiquido));
     const taxa = p.metodo==='pix'?0.0099:p.metodo==='cartao'?0.0379:0;
     return s + parseFloat(p.valor||0)*taxa;
   },0);
@@ -2071,9 +2073,9 @@ function relatorioDRE() {
     const isFuturo = mes > mesCur;
     const isAtual = mes === mesCur;
 
-    // Receitas: pagamentos realmente recebidos neste mês
+    // Receitas: pagamentos realmente recebidos neste mês (valor líquido, já descontada taxa MP)
     const pgtosMes = pgtos.filter(r => String(r.data||'').slice(0,7) === mes);
-    const totalRecebido = pgtosMes.reduce((s,r) => s + parseFloat(r.valor||0), 0);
+    const totalRecebido = pgtosMes.reduce((s,r) => s + parseFloat(r.valorLiquido ?? r.valor ?? 0), 0);
 
     // Shop
     const shopMes = shopPeds.filter(p => String(p.criado_em||'').slice(0,7) === mes);
@@ -2222,7 +2224,7 @@ function relatorioFluxo() {
     const entradasManuaisMes = despesas.filter(d => d.tipo==='entrada' && (d.data_vencimento || '').startsWith(mes));
     const entradaManualRecebida = entradasManuaisMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const entradaManualPendente = entradasManuaisMes.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-    const entradaReal = recMes.reduce((s, r) => s + parseFloat(r.valor || 0), 0) + entradaManualRecebida;
+    const entradaReal = recMes.reduce((s, r) => s + parseFloat(r.valorLiquido ?? r.valor ?? 0), 0) + entradaManualRecebida;
     const qtdRecebidos = new Set(recMes.map(r => r.alunoId)).size;
 
     // Alunos que ainda não pagaram neste mês

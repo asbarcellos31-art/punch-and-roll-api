@@ -1764,7 +1764,7 @@ app.get('/api/dashboard', auth, adminOnly, async (req, res) => {
     const [[atrasados]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='atrasado' AND (cortesia IS NULL OR cortesia=0)");
     const [[vencendo]]  = await db.query("SELECT COUNT(*) as n FROM alunos WHERE status='vencendo' AND (cortesia IS NULL OR cortesia=0)");
     const [[cortesias]] = await db.query("SELECT COUNT(*) as n FROM alunos WHERE cortesia=1");
-    const [[receitaMes]] = await db.query("SELECT COALESCE(SUM(valor),0) as total FROM pagamentos WHERE status='pago' AND MONTH(data_pagamento)=MONTH(NOW()) AND YEAR(data_pagamento)=YEAR(NOW())");
+    const [[receitaMes]] = await db.query("SELECT COALESCE(SUM(COALESCE(valor_liquido,valor)),0) as total FROM pagamentos WHERE status='pago' AND MONTH(data_pagamento)=MONTH(NOW()) AND YEAR(data_pagamento)=YEAR(NOW())");
     const [[checkinsHoje]] = await db.query("SELECT COUNT(*) as n FROM checkins WHERE data_checkin=CURDATE()");
     res.json({
       alunos: {
@@ -3230,7 +3230,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
   try {
     const [historicoRec] = await db.query(`
-      SELECT DATE_FORMAT(COALESCE(data_pagamento, DATE(criado_em)), '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
+      SELECT DATE_FORMAT(COALESCE(data_pagamento, DATE(criado_em)), '%Y-%m') as mes, COALESCE(SUM(COALESCE(valor_liquido,valor)),0) as total
       FROM pagamentos WHERE status='pago' AND COALESCE(data_pagamento, DATE(criado_em)) >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
       GROUP BY mes ORDER BY mes
     `);
