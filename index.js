@@ -1878,6 +1878,31 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
           const [[aluno]] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
           const metodoTxt = pagto === 'cartao' ? 'Cartão' : 'PIX';
           if (aluno) await notificarWA(aluno.tel,`✅ Pagamento via ${metodoTxt} confirmado, ${aluno.nome.split(' ')[0]}! Seu plano está ativo. 🥊`);
+        } else {
+          // Cobrança de débito automático (recorrente) — o Mercado Pago dispara essa cobrança
+          // sozinho a cada ciclo, sem o nosso sistema criar um registro "pendente" antes (diferente
+          // de cartão avulso/PIX). Sem isso aqui, a cobrança passa, o dinheiro cai, e o sistema nunca
+          // fica sabendo: vencimento não avança e nada fica registrado.
+          const subId = payment.point_of_interaction?.transaction_data?.subscription_id;
+          if (subId) {
+            const [[alunoSub]] = await db.query('SELECT id,nome,tel,plano,plano_id,vencimento,subscription_meses FROM alunos WHERE mp_subscription_id=?',[subId]);
+            if (alunoSub) {
+              const [dup] = await db.query('SELECT id FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+              if (dup.length === 0) {
+                const hoje = hojeBRT();
+                const vencAtual = alunoSub.vencimento ? String(alunoSub.vencimento).slice(0,10) : null;
+                const base = baseVencimento(vencAtual, hoje);
+                const mesesSub = alunoSub.subscription_meses || 1;
+                const venc = new Date(base); venc.setMonth(venc.getMonth() + mesesSub);
+                const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
+                const valorLiquido = payment.transaction_details?.net_received_amount ?? null;
+                await db.query('INSERT INTO pagamentos (aluno_id,descricao,valor,status,metodo,mp_payment_id,meses,plano_nome,data_pagamento,valor_liquido) VALUES (?,?,?,?,?,?,?,?,CURDATE(),?)',
+                  [alunoSub.id, payment.description || `Recorrente — ${alunoSub.plano||'Plano'}`, payment.transaction_amount, 'pago', 'recorrente', String(data.id), mesesSub, alunoSub.plano||null, valorLiquido]);
+                await db.query("UPDATE alunos SET status='ativo',vencimento=?,pagto='recorrente' WHERE id=?",[vencStr, alunoSub.id]);
+                if (alunoSub.tel) await notificarWA(alunoSub.tel,`✅ Cobrança recorrente confirmada, ${alunoSub.nome.split(' ')[0]}! Plano renovado até ${vencStr.split('-').reverse().join('/')}. 🥊`);
+              }
+            }
+          }
         }
       }
     }
