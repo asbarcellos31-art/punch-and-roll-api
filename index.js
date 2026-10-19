@@ -163,6 +163,19 @@ async function setupDB() {
       )
     `);
 
+    // Registra TODA tentativa de check-in (sucesso ou erro) — sem isso, uma falha de verdade
+    // (aula lotada, bug, cadastro bloqueado) nunca deixa rastro em lugar nenhum.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS checkin_tentativas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        aluno_id INT,
+        aula_id INT,
+        sucesso TINYINT NOT NULL DEFAULT 0,
+        motivo VARCHAR(300),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS aulas (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1484,9 +1497,16 @@ app.get('/api/checkins', auth, async (req, res) => {
 });
 
 app.post('/api/checkins', auth, async (req, res) => {
+  const { aula_id } = req.body;
+  const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
+  // Registra TODA tentativa (sucesso ou erro) — antes disso uma falha real não deixava
+  // nenhum rastro em lugar nenhum, impossível saber se alguém tentou e não conseguiu.
+  const logTentativa = (sucesso, motivo) => {
+    db.query('INSERT INTO checkin_tentativas (aluno_id,aula_id,sucesso,motivo) VALUES (?,?,?,?)',
+      [aluno_id||null, aula_id||null, sucesso?1:0, motivo]).catch(e=>console.error('[CHECKIN-LOG] erro:', e.message));
+  };
+  const falhar = (status, error) => { logTentativa(0, error); return res.status(status).json({ error }); };
   try {
-    const { aula_id } = req.body;
-    const aluno_id = req.user.tipo === 'aluno' ? req.user.id : req.body.aluno_id;
     const hora = new Date().toTimeString().slice(0,5);
     // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
     const FERIADOS = {
@@ -1494,18 +1514,18 @@ app.post('/api/checkins', auth, async (req, res) => {
       '2026-10-12': '🙏 Feriado Nacional (Nossa Senhora Aparecida) — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 13/10. Bom feriado! 💪'
     };
     const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
-    if (!aluno[0]) return res.status(404).json({ error: 'Aluno não encontrado' });
+    if (!aluno[0]) return falhar(404, 'Aluno não encontrado');
     if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
-      return res.status(403).json({ error: 'Acesso bloqueado. Regularize sua mensalidade para fazer check-in.' });
+      return falhar(403, 'Acesso bloqueado. Regularize sua mensalidade para fazer check-in.');
     const [aula] = await db.query('SELECT vagas, nome, hora, dia, modalidade FROM aulas WHERE id=?',[aula_id]);
-    if (!aula[0]) return res.status(404).json({ error: 'Aula não encontrada' });
+    if (!aula[0]) return falhar(404, 'Aula não encontrada');
     // Valida modalidade: boxe só entra em boxe, jiujitsu só entra em jiujitsu, ambos pode tudo
     const modalidadeAluno = aluno[0].modalidade;
     const modalidadeAula = aula[0].modalidade;
     if (modalidadeAluno !== 'ambos' && modalidadeAula && modalidadeAluno !== modalidadeAula) {
       const nomeAula = modalidadeAula === 'boxe' ? 'Boxe' : 'Jiu-Jitsu';
       const nomePlano = modalidadeAluno === 'boxe' ? 'Boxe' : 'Jiu-Jitsu';
-      return res.status(403).json({ error: `Seu plano é de ${nomePlano}. Esta aula é de ${nomeAula}. Faça upgrade para o plano Combo para ter acesso às duas modalidades.` });
+      return falhar(403, `Seu plano é de ${nomePlano}. Esta aula é de ${nomeAula}. Faça upgrade para o plano Combo para ter acesso às duas modalidades.`);
     }
     // Calcula a data da aula usando horário de Brasília (BRT), não UTC
     const DIAS_SEMANA = {Segunda:1,Terça:2,Quarta:3,Quinta:4,Sexta:5,Sábado:6};
@@ -1517,20 +1537,21 @@ app.post('/api/checkins', auth, async (req, res) => {
     if (diffDias < 0) diffDias += 7;
     const dataAulaUTC = new Date(Date.UTC(brtNow.getFullYear(), brtNow.getMonth(), brtNow.getDate() + diffDias));
     const dataCheckin = dataAulaUTC.toISOString().slice(0,10);
-    if (FERIADOS[dataCheckin]) return res.status(403).json({ error: FERIADOS[dataCheckin] });
+    if (FERIADOS[dataCheckin]) return falhar(403, FERIADOS[dataCheckin]);
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
       const brt = new Date(agora.toLocaleString('en-US', {timeZone:'America/Sao_Paulo'}));
       const minAgora = brt.getHours() * 60 + brt.getMinutes();
       if (minAgora >= hAula * 60 + mAula - 60)
-        return res.status(400).json({ error: 'Check-in encerrado! O prazo fecha 1 hora antes do início da aula.' });
+        return falhar(400, 'Check-in encerrado! O prazo fecha 1 hora antes do início da aula.');
     }
     const [exists] = await db.query('SELECT id FROM checkins WHERE aluno_id=? AND aula_id=? AND data_checkin=?',[aluno_id,aula_id,dataCheckin]);
-    if (exists.length) return res.status(400).json({ error: 'Check-in já realizado!' });
+    if (exists.length) return falhar(400, 'Check-in já realizado!');
     const [ckCount] = await db.query('SELECT COUNT(*) as n FROM checkins WHERE aula_id=? AND data_checkin=?',[aula_id,dataCheckin]);
-    if (ckCount[0].n >= aula[0]?.vagas) return res.status(400).json({ error: 'Turma lotada!' });
+    if (ckCount[0].n >= aula[0]?.vagas) return falhar(400, 'Turma lotada!');
     await db.query('INSERT INTO checkins (aluno_id,aula_id,data_checkin,hora) VALUES (?,?,?,?)',[aluno_id,aula_id,dataCheckin,hora]);
+    logTentativa(1, 'OK');
     res.json({ message: 'Check-in confirmado! 🥊' });
     const totalHoje = ckCount[0].n + 1;
     const msgNotif = `✅ *Check-in confirmado!*\n\n👤 *${aluno[0]?.nome}*\n🥊 ${aula[0]?.nome} — ${aula[0]?.hora}\n📅 ${dataCheckin}\n⏰ ${hora}\n👥 ${totalHoje} aluno(s) nessa turma`;
@@ -1538,6 +1559,18 @@ app.post('/api/checkins', auth, async (req, res) => {
     for (const tel of admins) {
       notificarWA(tel, msgNotif).catch(e => console.error(`[CHECKIN-WA] erro ao notificar ${tel}:`, e.message));
     }
+  } catch (e) { logTentativa(0, 'ERRO: '+e.message); res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/checkins/tentativas', auth, adminOnly, async (req, res) => {
+  try {
+    const { dias } = req.query;
+    const [rows] = await db.query(
+      `SELECT t.*, a.nome as aluno_nome, au.nome as aula_nome FROM checkin_tentativas t
+       LEFT JOIN alunos a ON t.aluno_id=a.id LEFT JOIN aulas au ON t.aula_id=au.id
+       WHERE t.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) ORDER BY t.criado_em DESC LIMIT 500`,
+      [parseInt(dias)||7]);
+    res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
