@@ -1838,8 +1838,22 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
       const payment = mpRes.data;
       if (['cancelled','rejected','refunded','charged_back'].includes(payment.status)) {
         const novoStatus = payment.status === 'cancelled' ? 'cancelado' : payment.status === 'rejected' ? 'rejeitado' : payment.status;
-        await db.query('UPDATE pagamentos SET status=? WHERE mp_payment_id=? AND status=?',
-          [novoStatus, String(data.id), 'pendente']);
+        // Antes só pegava se ainda estava 'pendente' — um estorno feito DEPOIS do pagamento já
+        // confirmado como 'pago' (caso real: Nayara e Lucas, estornados dias depois) passava
+        // batido e continuava contando como receita pra sempre. Agora pega os dois casos, e se
+        // já estava 'pago' avisa o admin por WhatsApp em vez de mexer sozinho no vencimento do
+        // aluno (pode ter pago de novo depois, como aconteceu — mexer errado é pior que não mexer).
+        const [upd] = await db.query('UPDATE pagamentos SET status=? WHERE mp_payment_id=? AND status IN (?,?)',
+          [novoStatus, String(data.id), 'pendente', 'pago']);
+        if (upd.affectedRows > 0) {
+          try {
+            const [[pagRev]] = await db.query('SELECT aluno_id,valor FROM pagamentos WHERE mp_payment_id=?',[String(data.id)]);
+            if (pagRev) {
+              const [[alunoRev]] = await db.query('SELECT nome FROM alunos WHERE id=?',[pagRev.aluno_id]);
+              if (alunoRev) await notificarWA(OWNER_WA_NUM, `⚠️ Pagamento de ${alunoRev.nome} (R$${pagRev.valor}) foi ${novoStatus} no Mercado Pago depois de já estar confirmado. Confira o vencimento dela(e) manualmente.`);
+            }
+          } catch(eNotif) { console.error('[Webhook estorno pago->cancelado] notificação falhou:', eNotif.message); }
+        }
       }
       if (payment.status === 'approved') {
         // Tenta achar pelo mp_payment_id numérico primeiro
@@ -1921,7 +1935,7 @@ async function notificarWA(tel, msg) {
   try {
     const num    = '55' + tel.replace(/\D/g,'');
     const apiUrl = instance ? `${url}/message/sendText/${instance}` : url;
-    const r = await axios.post(apiUrl, { number: num, text: msg }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
+    const r = await axios.post(apiUrl, { number: num, textMessage: { text: msg } }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
     console.log(`[WA] OK → ${num} status=${r.status}`);
   } catch (e) {
     console.error(`[WA] ERRO → ${tel}:`, e.response?.data || e.message);
@@ -1992,7 +2006,7 @@ async function enviarWA(tel, msg, instancia) {
   if (numero.length < 12) return { sucesso: false, erro: `Número inválido: ${tel}` };
   try {
     await axios.post(`${evoUrl}/message/sendText/${inst}`,
-      { number: numero, text: msg, delay: 1500 },
+      { number: numero, textMessage: { text: msg }, delay: 1500 },
       { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 30000 }
     );
     return { sucesso: true };
@@ -2418,6 +2432,7 @@ app.post('/api/wa/config', auth, adminOnly, async (req, res) => {
 let ultimoDiaAniversario = -1;
 let ultimoDiaAtrasados = -1;
 let ultimoDiaAusentes = -1;
+let ultimoDiaReconciliacaoMP = -1;
 let ultimoDiaVencimento = -1;
 let _waConnStatus = null; // 'open' | 'close' | null
 let _waLastAlertTs = 0;
@@ -2729,9 +2744,9 @@ async function monitorarWA() {
   const evoInstance = process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
   if (!evoUrl || !evoKey) return;
   try {
-    const r = await axios.get(`${evoUrl}/instance/fetchInstances`, { headers: { apikey: evoKey } });
-    const inst = (r.data || []).find(i => i.name === evoInstance);
-    const status = inst?.connectionStatus || 'close';
+    const r = await axios.get(`${evoUrl}/instance/fetchInstances?instanceName=${evoInstance}`, { headers: { apikey: evoKey } });
+    const inst = r.data?.instance;
+    const status = inst?.status === 'open' ? 'open' : (inst?.status || 'close');
     _waConnStatus = status;
     if (status !== 'open') {
       console.warn(`[WA-MONITOR] Desconectado: ${status}`);
@@ -2765,10 +2780,10 @@ app.get('/api/whatsapp/status', auth, adminOnly, async (req, res) => {
   const evoInstance = process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
   if (!evoUrl || !evoKey) return res.json({ ok: false, status: 'not_configured' });
   try {
-    const r = await axios.get(`${evoUrl}/instance/fetchInstances`, { headers: { apikey: evoKey } });
-    const inst = (r.data || []).find(i => i.name === evoInstance);
+    const r = await axios.get(`${evoUrl}/instance/fetchInstances?instanceName=${evoInstance}`, { headers: { apikey: evoKey } });
+    const inst = r.data?.instance;
     if (!inst) return res.json({ ok: false, status: 'not_found' });
-    res.json({ ok: true, status: inst.connectionStatus, numero: inst.ownerJid?.replace('@s.whatsapp.net',''), nome: inst.profileName });
+    res.json({ ok: true, status: inst.status, numero: inst.owner?.replace('@s.whatsapp.net',''), nome: inst.profileName });
   } catch(e) { res.json({ ok: false, status: 'error', erro: e.message }); }
 });
 
