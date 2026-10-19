@@ -1917,10 +1917,13 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto=? WHERE id=?",
               [vencStr, plano_nome, plano_id||null, pagto, aluno_id]);
           } else {
-            // meses não informado — estende 1 mês a partir da base (mesma regra dos 7 dias)
-            const vencExt = new Date(base); vencExt.setMonth(vencExt.getMonth() + 1);
-            const vencExtStr = `${vencExt.getFullYear()}-${String(vencExt.getMonth()+1).padStart(2,'0')}-${String(vencExt.getDate()).padStart(2,'0')}`;
-            await db.query("UPDATE alunos SET status='ativo',vencimento=?,pagto=? WHERE id=?",[vencExtStr, pagto, aluno_id]);
+            // meses não informado: isso só acontece em matrícula nova via PIX (a renovação pelo
+            // portal sempre manda meses). Nesse caso o vencimento JÁ foi calculado certinho na
+            // hora do cadastro (matricula.html manda venc=hoje+meses do plano) — não precisa
+            // (e não deve) estender de novo aqui, senão dobra. Isso já causou vencimento errado
+            // pra vários alunos (Jean, entre outros) quando esse webhook ganhava a corrida do
+            // polling do site. Só confirma o status, igual o endpoint de status/polling já fazia.
+            await db.query("UPDATE alunos SET status='ativo',pagto=? WHERE id=?",[pagto, aluno_id]);
           }
           const [[aluno]] = await db.query('SELECT nome,tel FROM alunos WHERE id=?',[aluno_id]);
           const metodoTxt = pagto === 'cartao' ? 'Cartão' : 'PIX';
