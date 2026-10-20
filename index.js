@@ -342,6 +342,7 @@ async function setupDB() {
       "ALTER TABLE pagamentos ADD COLUMN plano_id VARCHAR(50) DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN plano_nome VARCHAR(200) DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN valor_liquido DECIMAL(10,2) DEFAULT NULL",
+      "ALTER TABLE despesas ADD COLUMN mp_source_id VARCHAR(50) DEFAULT NULL",
     ]) { try { await conn.query(sql); } catch(e) {} }
 
     await conn.query(`
@@ -2627,6 +2628,16 @@ setInterval(async () => {
     }
   } catch(e) { console.error('[Cron Ausentes]',e.message); }
 
+  // Conferência diária com o Mercado Pago (disparo às 6h) — lança em Contas a Pagar toda
+  // despesa paga direto pela conta MP que ainda não está no nosso sistema, e corrige qualquer
+  // pagamento marcado 'pago' que foi estornado e o webhook em tempo real não pegou.
+  try {
+    if (hora === 6 && dia !== ultimoDiaReconciliacaoMP) {
+      ultimoDiaReconciliacaoMP = dia;
+      await reconciliarMercadoPago();
+    }
+  } catch(e) { console.error('[Cron Reconciliação MP]',e.message); }
+
   // Vencimento de plano (disparo a partir das 9h — resistente a restart)
   try {
     if (hora >= 9 && dia !== ultimoDiaVencimento) {
@@ -2773,6 +2784,75 @@ setInterval(async () => {
   } catch(e) { console.error('[Cron Email Campanhas]',e.message); }
 
 }, 60000);
+
+async function reconciliarMercadoPago() {
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token) return;
+  try {
+    // Pede o relatório de liberação dos últimos 4 dias (margem de segurança contra atraso
+    // de processamento do Mercado Pago) — dedupe por mp_source_id evita duplicar o que já
+    // foi lançado em execuções anteriores.
+    const fim = new Date();
+    const inicio = new Date(fim.getTime() - 4*24*60*60*1000);
+    await axios.post('https://api.mercadopago.com/v1/account/release_report',
+      { begin_date: inicio.toISOString(), end_date: fim.toISOString() },
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+
+    let fileName = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 6000));
+      const listRes = await axios.get('https://api.mercadopago.com/v1/account/release_report/list',
+        { headers: { Authorization: `Bearer ${token}` } });
+      const recente = (listRes.data || [])
+        .filter(r => r.status === 'enabled' && (Date.now() - new Date(r.date_created).getTime()) < 10*60*1000)
+        .sort((a,b) => new Date(b.date_created) - new Date(a.date_created))[0];
+      if (recente) { fileName = recente.file_name; break; }
+    }
+    if (!fileName) { console.error('[Reconciliação MP] relatório não ficou pronto a tempo'); return; }
+
+    const csvRes = await axios.get(`https://api.mercadopago.com/v1/account/release_report/${fileName}`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    const linhas = String(csvRes.data).split('\n').map(l => l.trim()).filter(Boolean);
+    if (!linhas.length) return;
+    const header = linhas[0].split(';');
+    const col = name => header.indexOf(name);
+    const iDesc = col('DESCRIPTION'), iSrc = col('SOURCE_ID'), iGross = col('GROSS_AMOUNT'),
+          iMethod = col('PAYMENT_METHOD'), iDate = col('DATE');
+
+    let despesasNovas = 0, estornosCorrigidos = [];
+    for (let i = 1; i < linhas.length; i++) {
+      const c = linhas[i].split(';');
+      const desc = c[iDesc], sourceId = c[iSrc], gross = parseFloat(c[iGross] || '0'), method = c[iMethod];
+      const dataMov = (c[iDate] || '').slice(0, 10);
+      if (!sourceId || !dataMov) continue;
+
+      if (desc === 'payment' && gross < 0 && method === 'available_money') {
+        const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
+        if (jaExiste.length) continue;
+        await db.query(
+          'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
+          ['Pagamento Mercado Pago (a classificar)', Math.abs(gross), dataMov, dataMov, 'pago', 'pix',
+           'Lançado automaticamente pela conferência diária — classifique nome e categoria.', sourceId, 'saida']
+        );
+        despesasNovas++;
+      } else if (desc === 'refund') {
+        const [[local]] = await db.query("SELECT id,status,aluno_id,valor FROM pagamentos WHERE mp_payment_id=?", [sourceId]);
+        if (local && local.status === 'pago') {
+          await db.query("UPDATE pagamentos SET status='refunded' WHERE id=?", [local.id]);
+          const [[al]] = await db.query('SELECT nome FROM alunos WHERE id=?', [local.aluno_id]);
+          estornosCorrigidos.push(`${al?.nome || 'aluno ' + local.aluno_id} (R$${local.valor}) — estava marcado pago mas foi estornado no Mercado Pago, corrigido.`);
+        }
+      }
+    }
+
+    if (despesasNovas > 0 || estornosCorrigidos.length > 0) {
+      let msg = `🔍 *Conferência diária — Mercado Pago*\n\n`;
+      if (despesasNovas > 0) msg += `💰 ${despesasNovas} despesa(s) nova(s) lançada(s) em Contas a Pagar — falta classificar nome/categoria.\n`;
+      if (estornosCorrigidos.length) msg += estornosCorrigidos.map(e => '⚠️ ' + e).join('\n');
+      await notificarWA(OWNER_WA_NUM, msg);
+    }
+  } catch (e) { console.error('[Reconciliação MP] erro:', e.response?.data || e.message); }
+}
 
 async function monitorarWA() {
   const evoUrl = process.env.WA_EVOLUTION_URL;
