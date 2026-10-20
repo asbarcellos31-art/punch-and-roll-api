@@ -2813,17 +2813,19 @@ async function _reconciliarPeriodoMP(token, inicio, fim) {
   const iDesc = col('DESCRIPTION'), iSrc = col('SOURCE_ID'), iGross = col('GROSS_AMOUNT'),
         iMethod = col('PAYMENT_METHOD'), iDate = col('DATE');
 
-  let despesasNovas = 0, estornosCorrigidos = [];
+  let despesasNovas = 0, estornosCorrigidos = [], payoutsParaRevisar = [];
   for (let i = 1; i < linhas.length; i++) {
     const c = linhas[i].split(';');
     const desc = c[iDesc], sourceId = c[iSrc], gross = parseFloat(c[iGross] || '0'), method = c[iMethod];
     const dataMov = (c[iDate] || '').slice(0, 10);
     if (!sourceId || !dataMov) continue;
 
-    // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential).
-    // 'payout' = transferência/Pix enviado pra fora (ex: repasse pro Anderson, pagamento de
-    // boleto/Pix de fornecedor) — categoria SEPARADA no extrato do MP, sem isso ficava de fora.
-    if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
+    // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential) — confiável,
+    // sempre é pagamento pra um fornecedor/conta real. Lança sozinho.
+    // 'payout' = transferência/Pix enviado — pode ser fornecedor OU repasse pro próprio sócio
+    // (ex: Pix pro Anderson que é retirada, não despesa). Sem o nome de quem recebeu (a API do
+    // MP não fornece isso), não dá pra saber qual é qual com segurança — só avisa, não lança.
+    if (desc === 'payment' && gross < 0 && method === 'available_money') {
       const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
       if (jaExiste.length) continue;
       // Mesmo sem bater o mp_source_id, pode já existir uma despesa lançada manualmente pra essa
@@ -2841,6 +2843,8 @@ async function _reconciliarPeriodoMP(token, inicio, fim) {
          'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria.', sourceId, 'saida']
       );
       despesasNovas++;
+    } else if (desc === 'payout' && gross < 0 && method === 'available_money') {
+      payoutsParaRevisar.push(`R$${Math.abs(gross).toFixed(2)} em ${dataMov} (ID ${sourceId})`);
     } else if (desc === 'refund') {
       const [[local]] = await db.query("SELECT id,status,aluno_id,valor FROM pagamentos WHERE mp_payment_id=?", [sourceId]);
       if (local && local.status === 'pago') {
@@ -2850,7 +2854,7 @@ async function _reconciliarPeriodoMP(token, inicio, fim) {
       }
     }
   }
-  return { despesasNovas, estornosCorrigidos };
+  return { despesasNovas, estornosCorrigidos, payoutsParaRevisar };
 }
 
 async function reconciliarMercadoPago(diasAtras) {
@@ -2863,20 +2867,22 @@ async function reconciliarMercadoPago(diasAtras) {
     // O Mercado Pago rejeita período maior que 90 dias — quebra em pedaços de até 85 dias
     // (margem de segurança) quando o período pedido for maior que isso.
     const JANELA_MS = 85*24*60*60*1000;
-    let despesasNovas = 0, estornosCorrigidos = [];
+    let despesasNovas = 0, estornosCorrigidos = [], payoutsParaRevisar = [];
     let cursor = inicioTotal.getTime();
     while (cursor < fimTotal.getTime()) {
       const fimJanela = new Date(Math.min(cursor + JANELA_MS, fimTotal.getTime()));
       const r = await _reconciliarPeriodoMP(token, new Date(cursor), fimJanela);
       despesasNovas += r.despesasNovas;
       estornosCorrigidos = estornosCorrigidos.concat(r.estornosCorrigidos);
+      payoutsParaRevisar = payoutsParaRevisar.concat(r.payoutsParaRevisar);
       cursor += JANELA_MS;
     }
 
-    if (despesasNovas > 0 || estornosCorrigidos.length > 0) {
+    if (despesasNovas > 0 || estornosCorrigidos.length > 0 || payoutsParaRevisar.length > 0) {
       let msg = `🔍 *Conferência com o Mercado Pago*\n\n`;
       if (despesasNovas > 0) msg += `💰 ${despesasNovas} despesa(s) nova(s) lançada(s) em Contas a Pagar — falta classificar nome/categoria.\n`;
-      if (estornosCorrigidos.length) msg += estornosCorrigidos.map(e => '⚠️ ' + e).join('\n');
+      if (estornosCorrigidos.length) msg += estornosCorrigidos.map(e => '⚠️ ' + e).join('\n') + '\n';
+      if (payoutsParaRevisar.length) msg += `\n👀 ${payoutsParaRevisar.length} transferência(s)/Pix enviado(s) pra revisar manualmente (pode ser fornecedor ou repasse de sócio — não lancei sozinho):\n` + payoutsParaRevisar.map(p => '• ' + p).join('\n');
       await notificarWA(OWNER_WA_NUM, msg);
     }
   } catch (e) { console.error('[Reconciliação MP] erro:', e.response?.data || e.message); }
