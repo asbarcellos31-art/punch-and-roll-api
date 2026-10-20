@@ -4942,6 +4942,15 @@ app.get('/api/welcome/aprovar/:token', async (req, res) => {
   } catch(e) { res.send(`<html><body style="font-family:Arial;text-align:center;padding:60px"><h2>❌ Erro: ${e.message}</h2></body></html>`); }
 });
 
+// Dispara a conferência diária com o Mercado Pago na hora (uso interno/teste)
+app.get('/api/_reconciliar-mp-agora', async (req, res) => {
+  if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
+  try {
+    await reconciliarMercadoPago();
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Envia preview das boas-vindas para o Anderson (uso interno)
 app.get('/api/_welcome-preview', async (req, res) => {
   if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
