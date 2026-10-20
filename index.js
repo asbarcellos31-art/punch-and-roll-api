@@ -2826,6 +2826,15 @@ async function _reconciliarPeriodoMP(token, inicio, fim) {
     if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
       const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
       if (jaExiste.length) continue;
+      // Mesmo sem bater o mp_source_id, pode já existir uma despesa lançada manualmente pra essa
+      // mesma conta (ex: "CONDOMINIO" digitado à mão) — compara valor igual + data próxima (10
+      // dias) pra não duplicar. Isso já aconteceu na primeira versão: Condomínio, Energia e
+      // Internet foram lançados de novo por cima do que já existia.
+      const valorAbs = Math.abs(gross);
+      const [possivelDup] = await db.query(
+        `SELECT id FROM despesas WHERE mp_source_id IS NULL AND (tipo IS NULL OR tipo!='entrada')
+         AND ABS(valor-?)<0.01 AND ABS(DATEDIFF(data_vencimento,?))<=10`, [valorAbs, dataMov]);
+      if (possivelDup.length) continue;
       await db.query(
         'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
         ['Pagamento Mercado Pago (a classificar)', Math.abs(gross), dataMov, dataMov, 'pago', 'pix',
