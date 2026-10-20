@@ -2785,15 +2785,15 @@ setInterval(async () => {
 
 }, 60000);
 
-async function reconciliarMercadoPago() {
+async function reconciliarMercadoPago(diasAtras) {
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) return;
   try {
-    // Pede o relatório de liberação dos últimos 4 dias (margem de segurança contra atraso
-    // de processamento do Mercado Pago) — dedupe por mp_source_id evita duplicar o que já
-    // foi lançado em execuções anteriores.
+    // Pede o relatório de liberação do período (padrão: últimos 4 dias, margem de segurança
+    // contra atraso de processamento do Mercado Pago) — dedupe por mp_source_id evita duplicar
+    // o que já foi lançado em execuções anteriores.
     const fim = new Date();
-    const inicio = new Date(fim.getTime() - 4*24*60*60*1000);
+    const inicio = new Date(fim.getTime() - (diasAtras || 4)*24*60*60*1000);
     await axios.post('https://api.mercadopago.com/v1/account/release_report',
       { begin_date: inicio.toISOString().replace(/\.\d{3}Z$/, 'Z'), end_date: fim.toISOString().replace(/\.\d{3}Z$/, 'Z') },
       { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
@@ -2826,7 +2826,10 @@ async function reconciliarMercadoPago() {
       const dataMov = (c[iDate] || '').slice(0, 10);
       if (!sourceId || !dataMov) continue;
 
-      if (desc === 'payment' && gross < 0 && method === 'available_money') {
+      // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential).
+      // 'payout' = transferência/Pix enviado pra fora (ex: repasse pro Anderson, pagamento de
+      // boleto/Pix de fornecedor) — categoria SEPARADA no extrato do MP, sem isso ficava de fora.
+      if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
         const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
         if (jaExiste.length) continue;
         await db.query(
@@ -4946,7 +4949,7 @@ app.get('/api/welcome/aprovar/:token', async (req, res) => {
 app.get('/api/_reconciliar-mp-agora', async (req, res) => {
   if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
   try {
-    await reconciliarMercadoPago();
+    await reconciliarMercadoPago(parseInt(req.query.dias) || 4);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
