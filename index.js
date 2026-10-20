@@ -2795,7 +2795,7 @@ async function reconciliarMercadoPago() {
     const fim = new Date();
     const inicio = new Date(fim.getTime() - 4*24*60*60*1000);
     await axios.post('https://api.mercadopago.com/v1/account/release_report',
-      { begin_date: inicio.toISOString(), end_date: fim.toISOString() },
+      { begin_date: inicio.toISOString().replace(/\.\d{3}Z$/, 'Z'), end_date: fim.toISOString().replace(/\.\d{3}Z$/, 'Z') },
       { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
 
     let fileName = null;
