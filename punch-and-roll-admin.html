@@ -1864,6 +1864,15 @@ function imprimirContas() {
       if(d.status==='pago') por[p].pago+=parseFloat(d.valor||0);
       else por[p].pendente+=parseFloat(d.valor||0);
     });
+    // Repasse já feito pra um sócio (empresa devolvendo o que ele pagou do próprio bolso) abate
+    // do que ele ainda tem a receber — sem isso, o Acerto mostraria ele tendo direito ao valor
+    // CHEIO de novo, mesmo depois de já ter recebido parte de volta.
+    const _repassesDoMes=(finResumo?.repasses||[]).filter(r=>!contasMes||String(r.data).startsWith(contasMes));
+    _repassesDoMes.forEach(r=>{
+      const p=(r.socio||'').trim().toUpperCase();
+      if(!p||!por[p]) return;
+      por[p].pago-=parseFloat(r.valor||0);
+    });
     const totalPR=(por['PR']?.pago||0)+(por['PR']?.pendente||0);
     const socios=Object.keys(por).filter(p=>p!=='PR');
     if(!socios.length) return '';
@@ -1929,6 +1938,7 @@ function imprimirContas() {
       <div style="margin-top:16px">
         <h3 style="font-size:13px;margin-bottom:8px;color:#111">Acerto entre Sócios</h3>
         ${acertos.length?acertos.join(''):'<div style="padding:8px 12px;color:#16a34a;font-size:12px">✅ Nenhum acerto necessário — despesas já equilibradas</div>'}
+        ${_repassesDoMes.length?`<div style="margin-top:10px;padding:8px 12px;background:#eff6ff;border-left:3px solid #3b82f6;font-size:11px;color:#1e40af">ℹ️ Já descontado ${_repassesDoMes.length} repasse(s) já feito(s) este mês: ${_repassesDoMes.map(r=>r.socio+' R$'+parseFloat(r.valor).toFixed(2).replace('.',',')).join(', ')}</div>`:''}
       </div>
     </div>`;
   })()}

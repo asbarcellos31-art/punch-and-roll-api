@@ -330,6 +330,24 @@ async function setupDB() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Repasse da empresa pro sócio — quando ele paga uma conta do próprio bolso (pago_por=
+    // ANDERSON/LEONARDO/MELQUE numa despesa) e a empresa devolve depois, isso NÃO é uma despesa
+    // nova (já foi contada quando ele pagou), é a quitação de uma dívida que já existia. Precisa
+    // existir separado da tabela despesas pra não ser contado duas vezes, e o cálculo do Acerto
+    // entre Sócios precisa descontar isso do que aquele sócio ainda tem a receber.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS repasses_socios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        socio VARCHAR(20) NOT NULL,
+        valor DECIMAL(10,2) NOT NULL,
+        data DATE NOT NULL,
+        descricao VARCHAR(300),
+        mp_source_id VARCHAR(50),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Migração segura: adiciona colunas se ainda não existirem
     for (const sql of [
       "ALTER TABLE despesas ADD COLUMN parcelas INT DEFAULT 1",
@@ -3420,8 +3438,38 @@ app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
     const [cats] = await db.query(
       `SELECT DISTINCT categoria FROM despesas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria`
     );
-    res.json({ historicoRec, historicoShop, historicoDes, historicoEntradasManual, despesas, categorias: cats.map(c => c.categoria) });
-  } catch (e) { res.json({ historicoRec: [], historicoShop: [], historicoDes: [], historicoEntradasManual: [], despesas: [], categorias: [] }); }
+    const [repasses] = await db.query(
+      `SELECT * FROM repasses_socios WHERE data >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH) ORDER BY data DESC`
+    ).catch(() => [[]]);
+    res.json({ historicoRec, historicoShop, historicoDes, historicoEntradasManual, despesas, categorias: cats.map(c => c.categoria), repasses });
+  } catch (e) { res.json({ historicoRec: [], historicoShop: [], historicoDes: [], historicoEntradasManual: [], despesas: [], categorias: [], repasses: [] }); }
+});
+
+// ── REPASSES ENTRE SÓCIOS (quitação de despesa que o sócio pagou do próprio bolso) ──
+app.get('/api/repasses-socios', auth, adminOnly, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM repasses_socios ORDER BY data DESC LIMIT 200');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/repasses-socios', auth, adminOnly, async (req, res) => {
+  try {
+    const { socio, valor, data, descricao, mp_source_id } = req.body;
+    if (!socio || !valor || !data) return res.status(400).json({ error: 'socio, valor e data são obrigatórios' });
+    const [result] = await db.query(
+      'INSERT INTO repasses_socios (socio,valor,data,descricao,mp_source_id) VALUES (?,?,?,?,?)',
+      [String(socio).toUpperCase(), valor, data, descricao || null, mp_source_id || null]
+    );
+    res.json({ id: result.insertId });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/repasses-socios/:id', auth, adminOnly, async (req, res) => {
+  try {
+    await db.query('DELETE FROM repasses_socios WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── DESPESAS CRUD ──
