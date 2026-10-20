@@ -2785,71 +2785,87 @@ setInterval(async () => {
 
 }, 60000);
 
+async function _reconciliarPeriodoMP(token, inicio, fim) {
+  // Gera o relatório pro período exato e guarda o ID retornado — identifica o relatório
+  // certo na listagem por ID, não por "mais recente", porque rodar dois períodos em
+  // sequência rápida fazia pegar o relatório errado (o de uma chamada anterior).
+  const genRes = await axios.post('https://api.mercadopago.com/v1/account/release_report',
+    { begin_date: inicio.toISOString().replace(/\.\d{3}Z$/, 'Z'), end_date: fim.toISOString().replace(/\.\d{3}Z$/, 'Z') },
+    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+
+  let fileName = null;
+  for (let i = 0; i < 25; i++) {
+    await new Promise(r => setTimeout(r, 6000));
+    const listRes = await axios.get('https://api.mercadopago.com/v1/account/release_report/list',
+      { headers: { Authorization: `Bearer ${token}` } });
+    const match = (listRes.data || []).find(r => r.status === 'enabled' &&
+      (r.begin_date === genRes.data.begin_date || Math.abs(new Date(r.date_created) - new Date(genRes.data.generation_date)) < 15000));
+    if (match) { fileName = match.file_name; break; }
+  }
+  if (!fileName) { console.error('[Reconciliação MP] relatório não ficou pronto a tempo para', inicio.toISOString(), '-', fim.toISOString()); return { despesasNovas: 0, estornosCorrigidos: [] }; }
+
+  const csvRes = await axios.get(`https://api.mercadopago.com/v1/account/release_report/${fileName}`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  const linhas = String(csvRes.data).split('\n').map(l => l.trim()).filter(Boolean);
+  if (!linhas.length) return { despesasNovas: 0, estornosCorrigidos: [] };
+  const header = linhas[0].split(';');
+  const col = name => header.indexOf(name);
+  const iDesc = col('DESCRIPTION'), iSrc = col('SOURCE_ID'), iGross = col('GROSS_AMOUNT'),
+        iMethod = col('PAYMENT_METHOD'), iDate = col('DATE');
+
+  let despesasNovas = 0, estornosCorrigidos = [];
+  for (let i = 1; i < linhas.length; i++) {
+    const c = linhas[i].split(';');
+    const desc = c[iDesc], sourceId = c[iSrc], gross = parseFloat(c[iGross] || '0'), method = c[iMethod];
+    const dataMov = (c[iDate] || '').slice(0, 10);
+    if (!sourceId || !dataMov) continue;
+
+    // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential).
+    // 'payout' = transferência/Pix enviado pra fora (ex: repasse pro Anderson, pagamento de
+    // boleto/Pix de fornecedor) — categoria SEPARADA no extrato do MP, sem isso ficava de fora.
+    if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
+      const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
+      if (jaExiste.length) continue;
+      await db.query(
+        'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
+        ['Pagamento Mercado Pago (a classificar)', Math.abs(gross), dataMov, dataMov, 'pago', 'pix',
+         'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria.', sourceId, 'saida']
+      );
+      despesasNovas++;
+    } else if (desc === 'refund') {
+      const [[local]] = await db.query("SELECT id,status,aluno_id,valor FROM pagamentos WHERE mp_payment_id=?", [sourceId]);
+      if (local && local.status === 'pago') {
+        await db.query("UPDATE pagamentos SET status='refunded' WHERE id=?", [local.id]);
+        const [[al]] = await db.query('SELECT nome FROM alunos WHERE id=?', [local.aluno_id]);
+        estornosCorrigidos.push(`${al?.nome || 'aluno ' + local.aluno_id} (R$${local.valor}) — estava marcado pago mas foi estornado no Mercado Pago, corrigido.`);
+      }
+    }
+  }
+  return { despesasNovas, estornosCorrigidos };
+}
+
 async function reconciliarMercadoPago(diasAtras) {
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) return;
   try {
-    // Pede o relatório de liberação do período (padrão: últimos 4 dias, margem de segurança
-    // contra atraso de processamento do Mercado Pago) — dedupe por mp_source_id evita duplicar
-    // o que já foi lançado em execuções anteriores.
-    const fim = new Date();
-    const inicio = new Date(fim.getTime() - (diasAtras || 4)*24*60*60*1000);
-    await axios.post('https://api.mercadopago.com/v1/account/release_report',
-      { begin_date: inicio.toISOString().replace(/\.\d{3}Z$/, 'Z'), end_date: fim.toISOString().replace(/\.\d{3}Z$/, 'Z') },
-      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
-
-    let fileName = null;
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 6000));
-      const listRes = await axios.get('https://api.mercadopago.com/v1/account/release_report/list',
-        { headers: { Authorization: `Bearer ${token}` } });
-      const recente = (listRes.data || [])
-        .filter(r => r.status === 'enabled' && (Date.now() - new Date(r.date_created).getTime()) < 10*60*1000)
-        .sort((a,b) => new Date(b.date_created) - new Date(a.date_created))[0];
-      if (recente) { fileName = recente.file_name; break; }
-    }
-    if (!fileName) { console.error('[Reconciliação MP] relatório não ficou pronto a tempo'); return; }
-
-    const csvRes = await axios.get(`https://api.mercadopago.com/v1/account/release_report/${fileName}`,
-      { headers: { Authorization: `Bearer ${token}` } });
-    const linhas = String(csvRes.data).split('\n').map(l => l.trim()).filter(Boolean);
-    if (!linhas.length) return;
-    const header = linhas[0].split(';');
-    const col = name => header.indexOf(name);
-    const iDesc = col('DESCRIPTION'), iSrc = col('SOURCE_ID'), iGross = col('GROSS_AMOUNT'),
-          iMethod = col('PAYMENT_METHOD'), iDate = col('DATE');
-
+    const fimTotal = new Date();
+    const dias = diasAtras || 4;
+    const inicioTotal = new Date(fimTotal.getTime() - dias*24*60*60*1000);
+    // O Mercado Pago rejeita período maior que 90 dias — quebra em pedaços de até 85 dias
+    // (margem de segurança) quando o período pedido for maior que isso.
+    const JANELA_MS = 85*24*60*60*1000;
     let despesasNovas = 0, estornosCorrigidos = [];
-    for (let i = 1; i < linhas.length; i++) {
-      const c = linhas[i].split(';');
-      const desc = c[iDesc], sourceId = c[iSrc], gross = parseFloat(c[iGross] || '0'), method = c[iMethod];
-      const dataMov = (c[iDate] || '').slice(0, 10);
-      if (!sourceId || !dataMov) continue;
-
-      // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential).
-      // 'payout' = transferência/Pix enviado pra fora (ex: repasse pro Anderson, pagamento de
-      // boleto/Pix de fornecedor) — categoria SEPARADA no extrato do MP, sem isso ficava de fora.
-      if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
-        const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
-        if (jaExiste.length) continue;
-        await db.query(
-          'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
-          ['Pagamento Mercado Pago (a classificar)', Math.abs(gross), dataMov, dataMov, 'pago', 'pix',
-           'Lançado automaticamente pela conferência diária — classifique nome e categoria.', sourceId, 'saida']
-        );
-        despesasNovas++;
-      } else if (desc === 'refund') {
-        const [[local]] = await db.query("SELECT id,status,aluno_id,valor FROM pagamentos WHERE mp_payment_id=?", [sourceId]);
-        if (local && local.status === 'pago') {
-          await db.query("UPDATE pagamentos SET status='refunded' WHERE id=?", [local.id]);
-          const [[al]] = await db.query('SELECT nome FROM alunos WHERE id=?', [local.aluno_id]);
-          estornosCorrigidos.push(`${al?.nome || 'aluno ' + local.aluno_id} (R$${local.valor}) — estava marcado pago mas foi estornado no Mercado Pago, corrigido.`);
-        }
-      }
+    let cursor = inicioTotal.getTime();
+    while (cursor < fimTotal.getTime()) {
+      const fimJanela = new Date(Math.min(cursor + JANELA_MS, fimTotal.getTime()));
+      const r = await _reconciliarPeriodoMP(token, new Date(cursor), fimJanela);
+      despesasNovas += r.despesasNovas;
+      estornosCorrigidos = estornosCorrigidos.concat(r.estornosCorrigidos);
+      cursor += JANELA_MS;
     }
 
     if (despesasNovas > 0 || estornosCorrigidos.length > 0) {
-      let msg = `🔍 *Conferência diária — Mercado Pago*\n\n`;
+      let msg = `🔍 *Conferência com o Mercado Pago*\n\n`;
       if (despesasNovas > 0) msg += `💰 ${despesasNovas} despesa(s) nova(s) lançada(s) em Contas a Pagar — falta classificar nome/categoria.\n`;
       if (estornosCorrigidos.length) msg += estornosCorrigidos.map(e => '⚠️ ' + e).join('\n');
       await notificarWA(OWNER_WA_NUM, msg);
@@ -4948,10 +4964,10 @@ app.get('/api/welcome/aprovar/:token', async (req, res) => {
 // Dispara a conferência diária com o Mercado Pago na hora (uso interno/teste)
 app.get('/api/_reconciliar-mp-agora', async (req, res) => {
   if (req.query.k !== PRIV_KEY) return res.sendStatus(403);
-  try {
-    await reconciliarMercadoPago(parseInt(req.query.dias) || 4);
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  // Períodos longos (muitos pedaços de até 85 dias) demoram mais que o timeout de uma
+  // requisição HTTP normal — dispara em background e responde na hora.
+  res.json({ ok: true, status: 'iniciado em background, confira o WhatsApp/banco quando terminar' });
+  reconciliarMercadoPago(parseInt(req.query.dias) || 4).catch(e => console.error('[_reconciliar-mp-agora]', e.message));
 });
 
 // Envia preview das boas-vindas para o Anderson (uso interno)
