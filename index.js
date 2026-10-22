@@ -2257,6 +2257,7 @@ app.post('/api/wa/campanhas/:id/disparar', auth, adminOnly, async (req, res) => 
       if (camp.segmento==='atrasados') q+=" AND status='atrasado'";
       else if (camp.segmento==='vencendo') q+=" AND status='vencendo'";
       else if (camp.segmento==='ativos') q+=" AND status='ativo'";
+      else if (camp.segmento==='todos') q+=" AND status IN ('ativo','vencendo','atrasado')";
       const [rows] = await db.query(q);
       destinatarios = rows;
     }
