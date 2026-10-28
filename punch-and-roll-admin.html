@@ -1592,7 +1592,7 @@ function renderFinContas(){
     </div>
 
     <!-- Resumo: Entradas × Saídas × Saldo Real × Saldo Real-A Pagar × Saldo Previsto -->
-    ${(()=>{const _totalDespPR=totalPagoPR+totalPendPR+_repassesCaixa;const _saldoPrev=_recTotal+totalEntradasPend-_totalDespPR;const _saldoMenosAPagar=_saldo-totalPendPR;return`
+    ${(()=>{const _totalDespPR=totalPagoPR+totalPend+_repassesCaixa;const _saldoPrev=_recTotal+totalEntradasPend-_totalDespPR;const _saldoMenosAPagar=_saldo-totalPendPR;return`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
       <div onclick="verPagantesDoMes('${_mesAnterior}')" style="cursor:pointer;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Entradas</div>
@@ -1612,10 +1612,10 @@ function renderFinContas(){
       <div style="background:${_saldoPrev>=0?'rgba(59,130,246,.08)':'rgba(245,158,11,.08)'};border:1px solid ${_saldoPrev>=0?'rgba(59,130,246,.25)':'rgba(245,158,11,.25)'};border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Sobra depois de pagar tudo</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${_saldoPrev>=0?'#60a5fa':'#f59e0b'}">${_saldoPrev>=0?'+':''}${fmtR(_saldoPrev)}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">saldo real − ${fmtR(totalPendPR)} que o caixa ainda paga${totalEntradasPend>0?` + ${fmtR(totalEntradasPend)} a receber`:''}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">saldo real − ${fmtR(totalPend)} ainda a pagar${totalEntradasPend>0?` + ${fmtR(totalEntradasPend)} a receber`:''}</div>
       </div>
     </div>`})()}
-    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês${totalPend-totalPendPR>0.009?` <span style="font-size:10px;color:var(--muted)">— ${fmtR(totalPendPR)} do caixa + ${fmtR(totalPend-totalPendPR)} dos sócios (do bolso, não sai do caixa)</span>`:''}</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>
     ${totalEntradasPend>0?`<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--green)">⏳ Ainda a receber no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--green)">${fmtR(totalEntradasPend)}</span></div>`:''}
 
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
@@ -1740,7 +1740,7 @@ function imprimirContas() {
   const _socioNomesPdf=['ANDERSON','LEONARDO','MELQUE'];
   const _ehSocioPdf=d=>_socioNomesPdf.includes((d.pago_por||'').toUpperCase());
   const _totalPagoMes=_todasDoMes.filter(d=>d.status==='pago'&&d.tipo!=='entrada'&&!_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
-  const _totalPendMes=_todasDoMes.filter(d=>d.status==='pendente'&&d.tipo!=='entrada'&&!_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _totalPendMes=_todasDoMes.filter(d=>d.status==='pendente'&&d.tipo!=='entrada').reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const _totalPagoSociosPdf=_todasDoMes.filter(d=>d.status==='pago'&&d.tipo!=='entrada'&&_ehSocioPdf(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
   const _repassesCaixaPdf=(finResumo?.repasses||[]).filter(r=>!contasMes||String(r.data).startsWith(contasMes)).reduce((s,r)=>s+parseFloat(r.valor||0),0);
   const _saldoReal=_recTotal-_totalPagoMes-_repassesCaixaPdf;
