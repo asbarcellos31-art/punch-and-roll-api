@@ -2864,6 +2864,9 @@ async function _conferirRecebimentosMP(dias) {
     const valorTxt = `R$${Number(p.transaction_amount).toFixed(2)}`;
     if (p.status === 'approved') {
       if (loc.some(l => l.status === 'pago')) continue;
+      // Recebimento que não é mensalidade (ex: Pix de camiseta) lançado como entrada manual
+      const [entrada] = await db.query("SELECT id FROM despesas WHERE tipo='entrada' AND mp_source_id=?", [String(p.id)]);
+      if (entrada.length) continue;
       const assinatura = await registrarCobrancaAssinatura(p);
       if (assinatura) { out.assinaturasRegistradas.push(assinatura); continue; }
       if (loc.length) {
