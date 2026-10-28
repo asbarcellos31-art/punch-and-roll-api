@@ -2921,36 +2921,33 @@ async function _processarRelatoriosMP() {
         const dataMov = (c[iDate] || '').slice(0, 10);
         if (!sourceId || !dataMov) continue;
 
-        // 'payment' = despesa/compra avulsa paga pela conta (ex: Celesc, Prudential) — confiável,
-        // sempre é pagamento pra um fornecedor/conta real. Lança sozinho.
-        // 'payout' = transferência/Pix enviado — pode ser fornecedor OU repasse pro próprio sócio
-        // (ex: Pix pro Anderson que é retirada, não despesa). Sem o nome de quem recebeu (a API do
-        // MP não fornece isso), não dá pra saber qual é qual com segurança — só avisa, não lança.
-        if (desc === 'payment' && gross < 0 && method === 'available_money') {
+        // Todo débito da conta (conta/compra paga com o saldo = 'payment', Pix/transferência
+        // enviado = 'payout') entra como despesa PAGA — o saldo da tela tem que bater com a conta.
+        // Antes o Pix enviado só era avisado e nunca lançado, e a água (Pix toda semana) ficava de
+        // fora ou duplicada. Repasse a sócio é marcado depois na tela e sai daqui (ver repasses).
+        if ((desc === 'payment' || desc === 'payout') && gross < 0 && method === 'available_money') {
           const [jaExiste] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
           if (jaExiste.length) continue;
           const [jaRepasse] = await db.query('SELECT id FROM repasses_socios WHERE mp_source_id=?', [sourceId]);
           if (jaRepasse.length) continue;
-          // Mesmo sem bater o mp_source_id, pode já existir uma despesa lançada manualmente pra essa
-          // mesma conta (ex: "CONDOMINIO" digitado à mão) — compara valor igual + data próxima (10
-          // dias) pra não duplicar. Isso já aconteceu na primeira versão: Condomínio, Energia e
-          // Internet foram lançados de novo por cima do que já existia.
+          // Já lançada à mão (ex: "AGUA PIX 20/10", "CONDOMINIO")? Mesmo valor, data próxima (15 dias
+          // do vencimento ou do pagamento), sem vínculo com o MP: VINCULA em vez de lançar de novo —
+          // e por ficar vinculada não casa com o próximo débito igual (água R$18 toda semana).
           const valorAbs = Math.abs(gross);
-          const [possivelDup] = await db.query(
+          const [[manual]] = await db.query(
             `SELECT id FROM despesas WHERE mp_source_id IS NULL AND (tipo IS NULL OR tipo!='entrada')
-             AND ABS(valor-?)<0.01 AND ABS(DATEDIFF(data_vencimento,?))<=10`, [valorAbs, dataMov]);
-          if (possivelDup.length) continue;
+             AND ABS(valor-?)<0.01 AND (ABS(DATEDIFF(data_vencimento,?))<=15 OR ABS(DATEDIFF(data_pagamento,?))<=15)
+             ORDER BY ABS(DATEDIFF(COALESCE(data_pagamento,data_vencimento),?)) LIMIT 1`, [valorAbs, dataMov, dataMov, dataMov]);
+          if (manual) {
+            await db.query("UPDATE despesas SET mp_source_id=?, status='pago', data_pagamento=COALESCE(data_pagamento,?) WHERE id=?", [sourceId, dataMov, manual.id]);
+            continue;
+          }
           await db.query(
             'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
-            ['Pagamento Mercado Pago (a classificar)', valorAbs, dataMov, dataMov, 'pago', 'pix',
-             'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria.', sourceId, 'saida']
+            [desc === 'payout' ? 'Pix enviado pelo Mercado Pago (a classificar)' : 'Pagamento Mercado Pago (a classificar)', valorAbs, dataMov, dataMov, 'pago', 'pix',
+             'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria. Se foi repasse a sócio, registre como repasse.', sourceId, 'saida']
           );
           out.despesasNovas++;
-        } else if (desc === 'payout' && gross < 0 && method === 'available_money') {
-          const [jaDesp] = await db.query('SELECT id FROM despesas WHERE mp_source_id=?', [sourceId]);
-          const [jaRepasse] = await db.query('SELECT id FROM repasses_socios WHERE mp_source_id=?', [sourceId]);
-          if (!jaDesp.length && !jaRepasse.length && await _mpMarcarNovo('aviso:payout:' + sourceId))
-            out.payoutsParaRevisar.push(`R$${Math.abs(gross).toFixed(2)} em ${dataMov} (ID ${sourceId})`);
         } else if (desc === 'refund') {
           // Compra paga com o saldo e depois estornada (ex: álcool R$44,93 em 15/10) — o dinheiro
           // voltou, então a despesa lançada sozinha pela conferência deixa de existir.
@@ -2978,7 +2975,7 @@ async function _avisarConciliacaoMP(rec, sai) {
   if (rec?.assinaturasRegistradas?.length) msg += `🔁 Cobrança(s) de assinatura que não tinham sido registradas — lancei e renovei o plano:\n` + rec.assinaturasRegistradas.map(x => '• ' + x).join('\n') + '\n\n';
   const estornos = [...(rec?.estornosCorrigidos || []), ...(sai?.estornosCorrigidos || [])];
   if (estornos.length) msg += estornos.map(e => '⚠️ ' + e).join('\n') + '\n\n';
-  if (sai?.despesasNovas > 0) msg += `💰 ${sai.despesasNovas} despesa(s) nova(s) lançada(s) em Contas a Pagar — falta classificar nome/categoria.\n\n`;
+  if (sai?.despesasNovas > 0) msg += `💰 ${sai.despesasNovas} débito(s) da conta lançado(s) como pago(s) em Contas a Pagar — falta classificar nome/categoria (se for repasse a sócio, registre como repasse).\n\n`;
   if (sai?.payoutsParaRevisar?.length) msg += `👀 ${sai.payoutsParaRevisar.length} transferência(s)/Pix enviado(s) pra revisar manualmente (pode ser fornecedor ou repasse de sócio — não lancei sozinho):\n` + sai.payoutsParaRevisar.map(p => '• ' + p).join('\n');
   if (msg.trim()) await notificarWA(OWNER_WA_NUM, `🔍 *Conferência com o Mercado Pago*\n\n` + msg.trim());
 }
@@ -3566,6 +3563,8 @@ app.post('/api/repasses-socios', auth, adminOnly, async (req, res) => {
       'INSERT INTO repasses_socios (socio,valor,data,descricao,mp_source_id) VALUES (?,?,?,?,?)',
       [String(socio).toUpperCase(), valor, data, descricao || null, mp_source_id || null]
     );
+    // Repasse não é despesa — se a conferência já tinha lançado esse Pix como despesa, tira de lá.
+    if (mp_source_id) await db.query("DELETE FROM despesas WHERE mp_source_id=? AND descricao LIKE '%(a classificar)%'", [String(mp_source_id)]);
     res.json({ id: result.insertId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
