@@ -2952,6 +2952,9 @@ async function _processarRelatoriosMP() {
           if (!jaDesp.length && !jaRepasse.length && await _mpMarcarNovo('aviso:payout:' + sourceId))
             out.payoutsParaRevisar.push(`R$${Math.abs(gross).toFixed(2)} em ${dataMov} (ID ${sourceId})`);
         } else if (desc === 'refund') {
+          // Compra paga com o saldo e depois estornada (ex: álcool R$44,93 em 15/10) — o dinheiro
+          // voltou, então a despesa lançada sozinha pela conferência deixa de existir.
+          await db.query("DELETE FROM despesas WHERE mp_source_id=? AND descricao='Pagamento Mercado Pago (a classificar)'", [sourceId]);
           const [[local]] = await db.query("SELECT id,status,aluno_id,valor FROM pagamentos WHERE mp_payment_id=?", [sourceId]);
           if (local && local.status === 'pago') {
             await db.query("UPDATE pagamentos SET status='refunded' WHERE id=?", [local.id]);
