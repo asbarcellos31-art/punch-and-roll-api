@@ -1617,7 +1617,7 @@ function renderFinContas(){
         <div style="font-size:9px;color:var(--muted);margin-top:2px">entradas − despesas do caixa (não conta sócio)</div>
       </div>
     </div>`})()}
-    ${totalPend>0?`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>`:''}
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--yellow)">⏳ Ainda a pagar no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--yellow)">${fmtR(totalPend)}</span></div>
     ${totalEntradasPend>0?`<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--green)">⏳ Ainda a receber no mês</span><span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--green)">${fmtR(totalEntradasPend)}</span></div>`:''}
 
     ${qtdVenc>0?`<div class="alert alert-r">⚠️ ${qtdVenc} conta(s) vencida(s)!</div>`:''}
