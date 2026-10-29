@@ -1397,19 +1397,25 @@ function renderFinGeral(){
   const ticketMedio=nAtivos>0?ativos.reduce((s,a)=>s+parseFloat(a.valor||0),0)/nAtivos:0;
   const agora=new Date();
   const mesCur=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
-  const recMesMens=parseFloat(finResumo?.historicoRec?.find(h=>h.mes===mesCur)?.total||0);
+  // historicoRec.total já é LÍQUIDO (depois da taxa do MP); bruto vem separado — antes a tela
+  // mostrava o líquido como "recebidas" e descontava a taxa de novo.
+  const _gRecMesRow=finResumo?.historicoRec?.find(h=>h.mes===mesCur);
+  const recMesMens=parseFloat(_gRecMesRow?.total||0);
+  const recMesMensBruto=parseFloat(_gRecMesRow?.bruto||recMesMens);
   const recMesShop=parseFloat(finResumo?.historicoShop?.find(h=>h.mes===mesCur)?.total||0);
   const recMesEntradas=parseFloat(finResumo?.historicoEntradasManual?.find(h=>h.mes===mesCur)?.total||0);
   const recMes=recMesMens+recMesShop+recMesEntradas;
   const desMes=parseFloat(finResumo?.historicoDes?.find(h=>h.mes===mesCur)?.total||0);
   const resultado=recMes-desMes;
   const nomeMes=agora.toLocaleDateString('pt-BR',{month:'long'});
-  const despPendentes=(finResumo?.despesas||[]).filter(d=>d.status==='pendente');
+  const despPendentes=(finResumo?.despesas||[]).filter(d=>d.status==='pendente'&&d.tipo!=='entrada'&&String(d.data_vencimento||'').slice(0,7)===mesCur);
   const despVencidas=despPendentes.filter(d=>d.data_vencimento<todayStr);
   if(_finChart){try{_finChart.destroy();}catch(e){}_finChart=null;}
   if(_finChartDoughnut){try{_finChartDoughnut.destroy();}catch(e){}_finChartDoughnut=null;}
   // receitas por fonte — calculado antes do template
-  const _gQtdPgtos = (Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===mesCur).length;
+  // Só pagamento aprovado — antes contava recusado/cancelado/pendente junto ("44 pagantes")
+  const _gQtdPgtos = parseInt(_gRecMesRow?.pagamentos||0);
+  const _gQtdAlunosPg = parseInt(_gRecMesRow?.alunos||0);
   const _gRecPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _gAReceber = Math.max(0, _gRecPot - recMes);
   const _gShopLinha = recMesShop>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8"><span style="font-size:12px">&#x1F6D2; Loja / Shop</span><span style="font-size:13px;font-weight:700;color:#818cf8">'+fmtR(recMesShop)+'</span></div>' : '';
@@ -1417,21 +1423,14 @@ function renderFinGeral(){
   const _aReceberAlunos = cache.alunos.filter(a=>!a.cortesia&&(a.status==='vencendo'||a.status==='atrasado'));
   const _gAReceberReal = _aReceberAlunos.reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _gAReceberLinha = _aReceberAlunos.length>0 ? '<div onclick="verAReceberDoMes()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,.07);border-radius:6px;border-left:3px dashed var(--yellow)"><span style="font-size:12px">&#x23F3; A receber — '+_aReceberAlunos.length+' aluno(s) 👆</span><span style="font-size:13px;font-weight:700;color:var(--yellow)">'+fmtR(_gAReceberReal)+'</span></div>' : '';
-  // Taxa MP — usa o valor líquido real capturado em cada pagamento (fallback: estimativa
-  // só pra pagamentos antigos que não têm essa informação ainda)
-  const _pagsDoMes = (mensHistorico||[]).filter(p=>p.status==='pago'&&String(p.data||'').slice(0,7)===mesCur);
-  const _taxaMP = _pagsDoMes.reduce((s,p)=>{
-    if(p.valorLiquido!=null) return s + (parseFloat(p.valor||0) - parseFloat(p.valorLiquido));
-    const taxa = p.metodo==='pix'?0.0099:p.metodo==='cartao'?0.0379:0;
-    return s + parseFloat(p.valor||0)*taxa;
-  },0);
-  const _liquido = recMesMens - _taxaMP;
-  const _taxaLinha = _taxaMP>0?'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:3px 10px"><span>Taxas MP (PIX 0,99% / Cartão 3,79%)</span><span style="color:#f87171">− '+fmtR(_taxaMP)+'</span></div><div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;padding:3px 10px 6px"><span>Líquido</span><span style="color:var(--green)">'+fmtR(_liquido)+'</span></div>':'';
-  const _geralReceitasHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">&#x1F4B0; Receitas '+nomeMes+' — Por Fonte</div><div style="display:flex;flex-direction:column;gap:7px;margin-top:6px"><div onclick="verPagantesDoMes(\''+mesCur+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)"><span style="font-size:12px">&#x1F49A; Mensalidades recebidas 👆</span><span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtR(recMesMens)+' <span style="font-size:10px;font-weight:400;color:var(--muted)">('+_gQtdPgtos+' pgtos)</span></span></div>'+_taxaLinha+_gShopLinha+_gEntradasLinha+_gAReceberLinha+'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px"><span style="font-size:12px;font-weight:600">Total recebido</span><span style="font-size:15px;font-weight:700;color:var(--green)">'+fmtR(recMes)+'</span></div></div></div>';
+  const _taxaMP = Math.max(0, recMesMensBruto - recMesMens); // taxa real cobrada pelo MP
+  const _liquido = recMesMens;
+  const _taxaLinha = _taxaMP>0?'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:3px 10px"><span>Taxas Mercado Pago</span><span style="color:#f87171">− '+fmtR(_taxaMP)+'</span></div><div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;padding:3px 10px 6px"><span>Líquido</span><span style="color:var(--green)">'+fmtR(_liquido)+'</span></div>':'';
+  const _geralReceitasHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">&#x1F4B0; Receitas '+nomeMes+' — Por Fonte</div><div style="display:flex;flex-direction:column;gap:7px;margin-top:6px"><div onclick="verPagantesDoMes(\''+mesCur+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(34,197,94,.08);border-radius:6px;border-left:3px solid var(--green)"><span style="font-size:12px">&#x1F49A; Mensalidades recebidas (bruto) 👆</span><span style="font-size:13px;font-weight:700;color:var(--green)">'+fmtR(recMesMensBruto)+' <span style="font-size:10px;font-weight:400;color:var(--muted)">('+_gQtdAlunosPg+' alunos · '+_gQtdPgtos+' pgtos)</span></span></div>'+_taxaLinha+_gShopLinha+_gEntradasLinha+_gAReceberLinha+'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--panel);border-radius:6px;border-top:2px solid var(--border);margin-top:2px"><span style="font-size:12px;font-weight:600">Total recebido (líquido)</span><span style="font-size:15px;font-weight:700;color:var(--green)">'+fmtR(recMes)+'</span></div></div></div>';
   document.getElementById('fin-content').innerHTML=`
     <div class="grid4">
-      <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">${nAtivos} alunos ativos</div></div>
-      <div class="kpi kr"><div class="kpi-label">Despesas ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(desMes)}</div><div class="kpi-sub">${despPendentes.length} pendente(s)</div></div>
+      <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">líquido · ${_gQtdAlunosPg} alunos pagaram</div></div>
+      <div class="kpi kr"><div class="kpi-label">Despesas ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(desMes)}</div><div class="kpi-sub">${despPendentes.length} pendente(s) no mês</div></div>
       <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="font-size:18px;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</div><div class="kpi-sub">${nomeMes}</div></div>
       <div class="kpi ky"><div class="kpi-label">Ticket Médio</div><div class="kpi-val" style="font-size:18px">${fmtR(ticketMedio)}</div><div class="kpi-sub">por aluno ativo</div></div>
     </div>
@@ -1564,7 +1563,9 @@ function renderFinContas(){
   const _recShop=parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mesAnterior)?.total||0);
   const _recTotal=_recMens+_recShop+totalEntradasPago;
   const _recPot=(cache.alunos||[]).filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
-  const _qtdPgtos=(Array.isArray(mensHistorico)?mensHistorico:[]).filter(p=>String(p.data||'').slice(0,7)===_mesAnterior).length;
+  const _qtdPgtos=parseInt((finResumo?.historicoRec||[]).find(h=>h.mes===_mesAnterior)?.alunos||0);
+  const _saldoAnteriorMes=doMesEntradas.filter(d=>d.status==='pago'&&d.categoria==='Saldo anterior').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  const _avulsasMes=totalEntradasPago-_saldoAnteriorMes;
   // Repasse ao sócio (empresa devolvendo conta que ele pagou do bolso) não é despesa — a conta
   // já está lançada no nome dele — mas o dinheiro sai do caixa, então abate o saldo aqui.
   const _repassesCaixa=(finResumo?.repasses||[]).filter(r=>!contasMes||String(r.data).startsWith(contasMes)).reduce((s,r)=>s+parseFloat(r.valor||0),0);
@@ -1597,7 +1598,7 @@ function renderFinContas(){
       <div onclick="verPagantesDoMes('${_mesAnterior}')" style="cursor:pointer;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Entradas</div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--green)">${fmtR(_recTotal)}</div>
-        <div style="font-size:9px;color:var(--green);margin-top:2px">${_qtdPgtos} pagantes (${_mesAnteriorLbl})${totalEntradasPago>0?` + ${fmtR(totalEntradasPago)} avulsas 👆`:' 👆'}</div>
+        <div style="font-size:9px;color:var(--green);margin-top:2px">${_qtdPgtos} alunos pagaram em ${_mesAnteriorLbl}${_saldoAnteriorMes>0?` + ${fmtR(_saldoAnteriorMes)} que sobrou de ${_mesAnteriorLbl}`:''}${_avulsasMes>0.009?` + ${fmtR(_avulsasMes)} avulsas`:''} 👆</div>
       </div>
       <div style="background:rgba(212,17,28,.08);border:1px solid rgba(212,17,28,.2);border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Saídas pagas (caixa)</div>

@@ -3515,7 +3515,8 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
   try {
     const [historicoRec] = await db.query(`
-      SELECT DATE_FORMAT(COALESCE(data_pagamento, DATE(criado_em)), '%Y-%m') as mes, COALESCE(SUM(COALESCE(valor_liquido,valor)),0) as total
+      SELECT DATE_FORMAT(COALESCE(data_pagamento, DATE(criado_em)), '%Y-%m') as mes, COALESCE(SUM(COALESCE(valor_liquido,valor)),0) as total,
+        COALESCE(SUM(valor),0) as bruto, COUNT(*) as pagamentos, COUNT(DISTINCT aluno_id) as alunos
       FROM pagamentos WHERE status='pago' AND COALESCE(data_pagamento, DATE(criado_em)) >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
       GROUP BY mes ORDER BY mes
     `);
@@ -3532,6 +3533,7 @@ app.get('/api/financeiro/resumo', auth, adminOnly, async (req, res) => {
     const [historicoEntradasManual] = await db.query(`
       SELECT DATE_FORMAT(COALESCE(data_pagamento, data_vencimento), '%Y-%m') as mes, COALESCE(SUM(valor),0) as total
       FROM despesas WHERE tipo = 'entrada' AND status = 'pago' AND COALESCE(data_pagamento, data_vencimento) >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
+        AND COALESCE(categoria,'') != 'Saldo anterior' -- sobra/acerto de saldo do mês anterior é caixa, não receita nova
       GROUP BY mes ORDER BY mes
     `).catch(() => [[]]);
     const [despesas] = await db.query(
