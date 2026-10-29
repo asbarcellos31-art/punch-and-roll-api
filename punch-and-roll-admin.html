@@ -1399,9 +1399,9 @@ function renderFinGeral(){
   const mesCur=`${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
   // historicoRec.total já é LÍQUIDO (depois da taxa do MP); bruto vem separado — antes a tela
   // mostrava o líquido como "recebidas" e descontava a taxa de novo.
-  const _gRecMesRow=finResumo?.historicoRec?.find(h=>h.mes===mesCur);
-  const recMesMens=parseFloat(_gRecMesRow?.total||0);
-  const recMesMensBruto=parseFloat(_gRecMesRow?.bruto||recMesMens);
+  const _gRec=receitaDoMes(mesCur);
+  const recMesMens=_gRec.liq;
+  const recMesMensBruto=_gRec.bruto;
   const recMesShop=parseFloat(finResumo?.historicoShop?.find(h=>h.mes===mesCur)?.total||0);
   const recMesEntradas=parseFloat(finResumo?.historicoEntradasManual?.find(h=>h.mes===mesCur)?.total||0);
   const recMes=recMesMens+recMesShop+recMesEntradas;
@@ -1414,8 +1414,8 @@ function renderFinGeral(){
   if(_finChartDoughnut){try{_finChartDoughnut.destroy();}catch(e){}_finChartDoughnut=null;}
   // receitas por fonte — calculado antes do template
   // Só pagamento aprovado — antes contava recusado/cancelado/pendente junto ("44 pagantes")
-  const _gQtdPgtos = parseInt(_gRecMesRow?.pagamentos||0);
-  const _gQtdAlunosPg = parseInt(_gRecMesRow?.alunos||0);
+  const _gQtdPgtos = _gRec.pagamentos;
+  const _gQtdAlunosPg = _gRec.alunos;
   const _gRecPot = cache.alunos.filter(a=>!a.cortesia&&a.status!=='inativo').reduce((s,a)=>s+parseFloat(a.valor||0),0);
   const _gAReceber = Math.max(0, _gRecPot - recMes);
   const _gShopLinha = recMesShop>0 ? '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(99,102,241,.08);border-radius:6px;border-left:3px solid #818cf8"><span style="font-size:12px">&#x1F6D2; Loja / Shop</span><span style="font-size:13px;font-weight:700;color:#818cf8">'+fmtR(recMesShop)+'</span></div>' : '';
@@ -1950,6 +1950,18 @@ function imprimirContas() {
   w.document.close();
 }
 
+// Critério ÚNICO de receita do mês, usado em todas as telas e relatórios:
+// mensalidades APROVADAS (líquido, depois da taxa do MP) + loja + entradas avulsas pagas.
+// "Saldo anterior" (sobra do mês passado / acerto de saldo) é caixa, NÃO é receita.
+function _ehSaldoAnterior(d){ return d.tipo==='entrada' && d.categoria==='Saldo anterior'; }
+function receitaDoMes(mes){
+  const r=(finResumo?.historicoRec||[]).find(h=>h.mes===mes)||{};
+  const liq=parseFloat(r.total||0), bruto=parseFloat(r.bruto||r.total||0);
+  const shop=parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===mes)?.total||0);
+  const avulsas=(finResumo?.despesas||[]).filter(d=>d.tipo==='entrada'&&d.status==='pago'&&!_ehSaldoAnterior(d)&&String(d.data_vencimento||'').slice(0,7)===mes).reduce((s,d)=>s+parseFloat(d.valor||0),0);
+  return {liq,bruto,taxa:Math.max(0,bruto-liq),shop,avulsas,total:liq+shop+avulsas,pagamentos:parseInt(r.pagamentos||0),alunos:parseInt(r.alunos||0)};
+}
+
 function relatorioAnual() {
   const ano = new Date().getFullYear();
   const todas = finResumo?.despesas || [];
@@ -1981,7 +1993,7 @@ function relatorioAnual() {
     const entradas = dados.filter(d=>d.tipo==='entrada');
     const pend = saidas.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const pago = saidas.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-    const recebido = entradas.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
+    const recebido = entradas.filter(d=>d.status==='pago'&&!_ehSaldoAnterior(d)).reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const aReceber = entradas.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
     totalGeralPend += pend; totalGeralPago += pago; totalGeralRecebido += recebido; totalGeralAReceber += aReceber;
     const resultado = recebido - pago;
@@ -2093,8 +2105,9 @@ function relatorioDRE() {
     const isAtual = mes === mesCur;
 
     // Receitas: pagamentos realmente recebidos neste mês (valor líquido, já descontada taxa MP)
-    const pgtosMes = pgtos.filter(r => String(r.data||'').slice(0,7) === mes);
-    const totalRecebido = pgtosMes.reduce((s,r) => s + parseFloat(r.valorLiquido ?? r.valor ?? 0), 0);
+    const pgtosMes = pgtos.filter(r => r.status==='pago' && String(r.data||'').slice(0,7) === mes);
+    const _rec = receitaDoMes(mes);
+    const totalRecebido = _rec.liq;
 
     // Shop
     const shopMes = shopPeds.filter(p => String(p.criado_em||'').slice(0,7) === mes);
@@ -2109,12 +2122,12 @@ function relatorioDRE() {
     const potencialMes = alunosMes.reduce((s,a) => s + parseFloat(a.valor||0), 0);
 
     // Entradas manuais (avulsas) lançadas em Contas
-    const entradasMes = despesas.filter(d=>d.tipo==='entrada'&&(d.data_vencimento||'').slice(0,7)===mes);
+    const entradasMes = despesas.filter(d=>d.tipo==='entrada'&&!_ehSaldoAnterior(d)&&(d.data_vencimento||'').slice(0,7)===mes);
     const entradasRecebidas = entradasMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const entradasAReceber = entradasMes.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
 
-    // Total receita = potencial do mês + shop + entradas avulsas recebidas
-    const totalRec = potencialMes + recShopTotal + entradasRecebidas;
+    // Total receita = mensalidades recebidas (líquido) + shop + entradas avulsas recebidas
+    const totalRec = totalRecebido + recShopTotal + entradasRecebidas;
 
     const desp = despesas.filter(d=>d.tipo!=='entrada'&&(d.data_vencimento||'').slice(0,7)===mes);
     const totalDesp = desp.reduce((s,d)=>s+parseFloat(d.valor||0),0);
@@ -2218,7 +2231,7 @@ function relatorioFluxo() {
   // Coletar meses: histórico + próximos 3 meses
   const mesesSet = new Set();
   despesas.forEach(d => { const m = (d.data_vencimento || '').slice(0, 7); if (m) mesesSet.add(m); });
-  receitas.forEach(r => { const m = (r.data || '').slice(0, 7); if (m) mesesSet.add(m); });
+  receitas.filter(r => r.status==='pago').forEach(r => { const m = (r.data || '').slice(0, 7); if (m) mesesSet.add(m); });
   const hoje = new Date();
   for (let i = 0; i <= 3; i++) {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
@@ -2239,11 +2252,11 @@ function relatorioFluxo() {
     const isFuturo = mes > mesCur;
     const isAtual = mes === mesCur;
 
-    const recMes = receitas.filter(r => (r.data || '').startsWith(mes));
-    const entradasManuaisMes = despesas.filter(d => d.tipo==='entrada' && (d.data_vencimento || '').startsWith(mes));
+    const recMes = receitas.filter(r => r.status==='pago' && (r.data || '').startsWith(mes));
+    const entradasManuaisMes = despesas.filter(d => d.tipo==='entrada' && !_ehSaldoAnterior(d) && (d.data_vencimento || '').startsWith(mes));
     const entradaManualRecebida = entradasManuaisMes.filter(d=>d.status==='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
     const entradaManualPendente = entradasManuaisMes.filter(d=>d.status!=='pago').reduce((s,d)=>s+parseFloat(d.valor||0),0);
-    const entradaReal = recMes.reduce((s, r) => s + parseFloat(r.valorLiquido ?? r.valor ?? 0), 0) + entradaManualRecebida;
+    const entradaReal = receitaDoMes(mes).liq + entradaManualRecebida;
     const qtdRecebidos = new Set(recMes.map(r => r.alunoId)).size;
 
     // Alunos que ainda não pagaram neste mês

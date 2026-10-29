@@ -236,9 +236,10 @@ async function api(path) {
 
 async function carregarDados() {
   try {
-    const [alunos, aulas, pags] = await Promise.all([
-      api('/api/alunos'), api('/api/aulas'), api('/api/pagamentos')
+    const [alunos, aulas, pags, fin] = await Promise.all([
+      api('/api/alunos'), api('/api/aulas'), api('/api/pagamentos'), api('/api/financeiro/resumo')
     ]);
+    dadosCache.fin = fin && !fin.error ? fin : {};
     dadosCache.alunos = Array.isArray(alunos)?alunos:[];
     dadosCache.aulas = Array.isArray(aulas)?aulas:[];
     dadosCache.pagamentos = Array.isArray(pags)?pags:[];
@@ -254,7 +255,7 @@ function calcMetricas() {
   const alunos = dadosCache.alunos;
   const pags = dadosCache.pagamentos;
 
-  const pagantes = alunos.filter(a=>!a.cortesia);
+  const pagantes = alunos.filter(a=>!a.cortesia&&a.status!=='inativo');
   const ativos = pagantes.filter(a=>a.status==='ativo');
   const atrasados = pagantes.filter(a=>a.status==='atrasado');
   const vencendo = pagantes.filter(a=>a.status==='vencendo');
@@ -264,7 +265,16 @@ function calcMetricas() {
     const d = p.data_pagamento||p.criado_em||'';
     return parseInt(d.slice(5,7))===mes && parseInt(d.slice(0,4))===ano && p.status==='pago';
   });
-  const recMes = pagsMes.reduce((s,p)=>s+parseFloat(p.valor||0),0);
+  // Mesmo critério do Financeiro: mensalidades aprovadas (líquido) + loja + entradas avulsas
+  // (sem "saldo anterior", que é sobra do mês passado, não receita)
+  const recDoMes = (mm,aa) => {
+    const k = `${aa}-${String(mm).padStart(2,'0')}`, f = dadosCache.fin||{};
+    const liq = parseFloat((f.historicoRec||[]).find(h=>h.mes===k)?.total||0);
+    const shop = parseFloat((f.historicoShop||[]).find(h=>h.mes===k)?.total||0);
+    const av = parseFloat((f.historicoEntradasManual||[]).find(h=>h.mes===k)?.total||0);
+    return liq+shop+av;
+  };
+  const recMes = recDoMes(mes,ano);
 
   // Metas (baseadas nos dados reais — academia pequena)
   const metaAlunos = 30; // meta final: 30 alunos em 6 meses
@@ -299,10 +309,7 @@ function calcMetricas() {
     const m2 = mes-5+i;
     const m3 = m2<=0?m2+12:m2;
     const ano2 = m2<=0?ano-1:ano;
-    const r = pags.filter(p=>{
-      const d=p.data_pagamento||p.criado_em||'';
-      return parseInt(d.slice(5,7))===m3&&parseInt(d.slice(0,4))===ano2&&p.status==='pago';
-    }).reduce((s,p)=>s+parseFloat(p.valor||0),0);
+    const r = recDoMes(m3,ano2);
     return {mes:m3,ano:ano2,receita:r,label:MESES_A[m3]};
   });
 
@@ -368,7 +375,7 @@ function renderRelatorio(m) {
     <!-- KPIs principais -->
     <div class="grid4" style="margin-bottom:20px">
       <div class="kpi-card" style="border-left-color:${pillStatus(m.pctReceita).border||'#e2e8f0'}">
-        <div class="kpi-label">Receita do Mês</div>
+        <div class="kpi-label">Receita do Mês (líquida)</div>
         <div class="kpi-val">${fmtR(m.recMes)}</div>
         <div class="kpi-sub">Ritmo (mês ${m.mesesDecorridosMeta}/6): ${fmtR(m.metaReceitaRitmo)} · Meta final: ${fmtR(m.metaReceita)}</div>
         <div class="kpi-pct">${pill(m.pctReceita)}</div>
