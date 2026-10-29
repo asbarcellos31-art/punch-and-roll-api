@@ -2939,13 +2939,13 @@ async function _processarRelatoriosMP() {
              AND ABS(valor-?)<0.01 AND (ABS(DATEDIFF(data_vencimento,?))<=15 OR ABS(DATEDIFF(data_pagamento,?))<=15)
              ORDER BY ABS(DATEDIFF(COALESCE(data_pagamento,data_vencimento),?)) LIMIT 1`, [valorAbs, dataMov, dataMov, dataMov]);
           if (manual) {
-            await db.query("UPDATE despesas SET mp_source_id=?, status='pago', data_pagamento=COALESCE(data_pagamento,?) WHERE id=?", [sourceId, dataMov, manual.id]);
+            await db.query("UPDATE despesas SET mp_source_id=?, status='pago', data_pagamento=COALESCE(data_pagamento,?), pago_por=IF(pago_por IS NULL OR pago_por='','PR',pago_por) WHERE id=?", [sourceId, dataMov, manual.id]);
             continue;
           }
           await db.query(
-            'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo) VALUES (?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO despesas (descricao,valor,data_vencimento,data_pagamento,status,metodo,obs,mp_source_id,tipo,pago_por) VALUES (?,?,?,?,?,?,?,?,?,?)',
             [desc === 'payout' ? 'Pix enviado pelo Mercado Pago (a classificar)' : 'Pagamento Mercado Pago (a classificar)', valorAbs, dataMov, dataMov, 'pago', 'pix',
-             'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria. Se foi repasse a sócio, registre como repasse.', sourceId, 'saida']
+             'Lançado automaticamente pela conferência com o Mercado Pago — classifique nome e categoria. Se foi repasse a sócio, registre como repasse.', sourceId, 'saida', 'PR']
           );
           out.despesasNovas++;
         } else if (desc === 'refund') {
