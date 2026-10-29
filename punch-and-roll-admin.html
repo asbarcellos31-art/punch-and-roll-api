@@ -1431,8 +1431,8 @@ function renderFinGeral(){
     <div class="grid4">
       <div class="kpi kg"><div class="kpi-label">Receita ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(recMes)}</div><div class="kpi-sub">líquido · ${_gQtdAlunosPg} alunos pagaram</div></div>
       <div class="kpi kr"><div class="kpi-label">Despesas ${nomeMes}</div><div class="kpi-val" style="font-size:18px">${fmtR(desMes)}</div><div class="kpi-sub">${despPendentes.length} pendente(s) no mês</div></div>
-      <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="font-size:18px;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</div><div class="kpi-sub">${nomeMes}</div></div>
-      <div class="kpi ky"><div class="kpi-label">Ticket Médio</div><div class="kpi-val" style="font-size:18px">${fmtR(ticketMedio)}</div><div class="kpi-sub">por aluno ativo</div></div>
+      <div class="kpi ${resultado>=0?'kg':'kr'}"><div class="kpi-label">Resultado</div><div class="kpi-val" style="font-size:18px;color:${resultado>=0?'var(--green)':'#f87171'}">${resultado>=0?'+':''}${fmtR(resultado)}</div><div class="kpi-sub">recebido no mês − despesas do mês (inclui sócios)</div></div>
+      <div class="kpi ky"><div class="kpi-label">Mensalidade Média</div><div class="kpi-val" style="font-size:18px">${fmtR(ticketMedio)}</div><div class="kpi-sub">valor do plano por mês · ${nAtivos} ativos</div></div>
     </div>
     ${despVencidas.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="contasFilter='vencida';finNavTo('contas')">⚠️ ${despVencidas.length} conta(s) vencida(s) — clique para ver</div>`:''}
     ${atrasados.length>0?`<div class="alert alert-r" style="cursor:pointer" onclick="finNavTo('inadimplencia')">🔴 ${atrasados.length} inadimplente(s) — clique para ver</div>`:''}
