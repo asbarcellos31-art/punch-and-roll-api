@@ -1536,11 +1536,6 @@ app.post('/api/checkins', auth, async (req, res) => {
   const falhar = (status, error) => { logTentativa(0, error); return res.status(status).json({ error }); };
   try {
     const hora = new Date().toTimeString().slice(0,5);
-    // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
-    const FERIADOS = {
-      '2026-09-07': '🇧🇷 Feriado da Independência — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪',
-      '2026-10-12': '🙏 Feriado Nacional (Nossa Senhora Aparecida) — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 13/10. Bom feriado! 💪'
-    };
     const [aluno] = await db.query('SELECT nome, status, modalidade FROM alunos WHERE id=?',[aluno_id]);
     if (!aluno[0]) return falhar(404, 'Aluno não encontrado');
     if (['atrasado','aguardando_pagamento','inativo'].includes(aluno[0]?.status))
@@ -1565,7 +1560,8 @@ app.post('/api/checkins', auth, async (req, res) => {
     if (diffDias < 0) diffDias += 7;
     const dataAulaUTC = new Date(Date.UTC(brtNow.getFullYear(), brtNow.getMonth(), brtNow.getDate() + diffDias));
     const dataCheckin = dataAulaUTC.toISOString().slice(0,10);
-    if (FERIADOS[dataCheckin]) return falhar(403, FERIADOS[dataCheckin]);
+    // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
+    if (FERIADOS[dataCheckin]) return falhar(403, FERIADOS[dataCheckin].checkin);
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
@@ -1625,6 +1621,24 @@ app.delete('/api/checkins/:id', auth, async (req, res) => {
 // ══════════════════════════════════════
 // RECADOS
 // ══════════════════════════════════════
+// Feriados sem aula — lista ÚNICA usada pelo bloqueio de check-in e pelo banner do portal.
+// Próximo feriado: só acrescentar a data aqui.
+const FERIADOS = {
+  '2026-09-07': { checkin: '🇧🇷 Feriado da Independência — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 08/09. Bom feriado! 💪',
+                  titulo: '🇧🇷 Segunda (07/09) é feriado da Independência', texto: 'Não teremos aula. Retornamos na terça, 08/09. 🥊' },
+  '2026-10-12': { checkin: '🙏 Feriado Nacional (Nossa Senhora Aparecida) — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 13/10. Bom feriado! 💪',
+                  titulo: '🙏 Segunda (12/10) é feriado de Nossa Senhora Aparecida', texto: 'Não teremos aula. Retornamos na terça, 13/10. 🥊' },
+  '2026-11-02': { checkin: '🕯️ Feriado de Finados — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 03/11. Bom feriado! 💪',
+                  titulo: '🕯️ Segunda (02/11) é feriado de Finados', texto: 'Não teremos aula. Retornamos na terça, 03/11. 🥊' },
+};
+// Banner do portal: feriados de hoje até 6 dias à frente (some sozinho no dia seguinte)
+app.get('/api/feriados/proximos', (req, res) => {
+  const hoje = hojeBRT();
+  const lim = new Date(hoje + 'T12:00:00Z'); lim.setUTCDate(lim.getUTCDate() + 6);
+  const limStr = lim.toISOString().slice(0,10);
+  res.json(Object.entries(FERIADOS).filter(([d]) => d >= hoje && d <= limStr).map(([data, f]) => ({ data, titulo: f.titulo, texto: f.texto })));
+});
+
 app.get('/api/recados', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM recados WHERE ativo=1 ORDER BY pin DESC, criado_em DESC');

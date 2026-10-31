@@ -240,6 +240,7 @@ async function carregarTudo() {
     cache.recados = Array.isArray(recados) ? recados : [];
     cache.pagamentos = Array.isArray(pags) ? pags : [];
     cache.ocupacao = (ocup && typeof ocup === 'object') ? ocup : {};
+    try { const fer = await api('GET','/api/feriados/proximos'); cache.feriados = Array.isArray(fer) ? fer : []; } catch(e) { cache.feriados = []; }
     // Checkins do aluno
     try {
       const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
@@ -287,7 +288,11 @@ function renderInicio() {
   const grupoWaDismissKey = 'pr_grupo_wa_dismiss_' + a.id;
   const grupoWaDismissed = localStorage.getItem(grupoWaDismissKey) === '1';
 
-  let html = `
+  let html = (cache.feriados||[]).map(f=>`
+    <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-left:4px solid var(--yellow);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">${f.titulo}</div>
+      <div style="font-size:13px;color:var(--white);line-height:1.5">${f.texto}</div>
+    </div>`).join('') + `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:48px;height:48px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${a.nome[0]}</div>
       <div><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px">Olá, ${a.nome.split(' ')[0]}!</div>
