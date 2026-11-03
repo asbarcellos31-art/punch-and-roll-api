@@ -2101,6 +2101,22 @@ async function enviarWA(tel, msg, instancia) {
   }
 }
 
+// Envia o conteúdo de uma campanha. media_url pode ser uma mídia (com a mensagem como legenda)
+// ou um array JSON de mídias: envia todas sem legenda e depois a mensagem como texto.
+async function enviarConteudoCampanha(tel, camp, msg) {
+  const inst = camp.instancia || 'punchandroll';
+  if (!camp.media_url || !camp.media_type) return enviarWA(tel, msg, inst);
+  let lista = null;
+  if (camp.media_url.trim().startsWith('[')) { try { lista = JSON.parse(camp.media_url); } catch(e) {} }
+  if (!Array.isArray(lista)) return enviarMidiaWA(tel, camp.media_url, camp.media_type, msg, inst);
+  for (const m of lista) {
+    const r = await enviarMidiaWA(tel, m, camp.media_type, '', inst);
+    if (!r.sucesso) return r;
+    await new Promise(x => setTimeout(x, 1500));
+  }
+  return msg ? enviarWA(tel, msg, inst) : { sucesso: true };
+}
+
 async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
   const evoUrl = process.env.WA_EVOLUTION_URL;
   const evoKey = process.env.WA_EVOLUTION_KEY;
@@ -2114,8 +2130,10 @@ async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
     const media = isBase64 ? mediaUrl.replace(/^data:[^;]+;base64,/, '') : mediaUrl;
     const mimeMap = { image: 'image/jpeg', video: 'video/mp4', document: 'application/pdf' };
     const mimetype = isBase64 ? (mediaUrl.match(/^data:([^;]+);/)||[])[1] || mimeMap[mediaType] : mimeMap[mediaType];
+    // Evolution v1: payload dentro de mediaMessage
+    const ext = (mimetype||'').split('/')[1] || 'jpg';
     await axios.post(`${evoUrl}/message/sendMedia/${inst}`,
-      { number: numero, mediatype: mediaType, mimetype, media, caption: caption||'' },
+      { number: numero, mediaMessage: { mediatype: mediaType, fileName: `arquivo.${ext}`, caption: caption||'', media } },
       { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 60000 }
     );
     return { sucesso: true };
@@ -2321,11 +2339,7 @@ app.post('/api/wa/campanhas/:id/disparar', auth, adminOnly, async (req, res) => 
         }
         const msg = camp.mensagem.replace(/\{\{nome\}\}/gi, d.nome?.split(' ')[0]||d.nome||'');
         let resultado;
-        if (camp.media_url && camp.media_type) {
-          resultado = await enviarMidiaWA(d.telefone, camp.media_url, camp.media_type, msg, camp.instancia||'punchandroll');
-        } else {
-          resultado = await enviarWA(d.telefone, msg, camp.instancia||'punchandroll');
-        }
+        resultado = await enviarConteudoCampanha(d.telefone, camp, msg);
         await db.query('INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
           [id,d.nome,d.telefone,msg,'CAMPANHA',resultado.sucesso?'ENVIADO':'ERRO',resultado.erro||null]);
         if (resultado.sucesso) { enviados++; enviados_hoje++; }
@@ -2361,6 +2375,7 @@ async function retomarCampanha(id) {
     if (camp.segmento==='atrasados') q+=" AND status='atrasado'";
     else if (camp.segmento==='vencendo') q+=" AND status='vencendo'";
     else if (camp.segmento==='ativos') q+=" AND status='ativo'";
+    else if (camp.segmento==='todos') q+=" AND status IN ('ativo','vencendo','atrasado')";
     const [rows] = await db.query(q);
     todos = rows;
   }
@@ -2385,11 +2400,7 @@ async function retomarCampanha(id) {
       if (c.pausada) { await db.query("UPDATE wa_campanhas SET status='AGENDADA' WHERE id=?", [id]); break; }
       const msg = camp.mensagem.replace(/\{\{nome\}\}/gi, d.nome?.split(' ')[0]||d.nome||'');
       let resultado;
-      if (camp.media_url && camp.media_type) {
-        resultado = await enviarMidiaWA(d.telefone, camp.media_url, camp.media_type, msg, camp.instancia||'punchandroll');
-      } else {
-        resultado = await enviarWA(d.telefone, msg, camp.instancia||'punchandroll');
-      }
+      resultado = await enviarConteudoCampanha(d.telefone, camp, msg);
       await db.query('INSERT INTO wa_envios (campanha_id,nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?,?)',
         [id, d.nome, d.telefone, msg, 'CAMPANHA', resultado.sucesso?'ENVIADO':'ERRO', resultado.erro||null]);
       if (resultado.sucesso) enviados++; else erros++;
