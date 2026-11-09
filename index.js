@@ -582,6 +582,23 @@ async function setupDB() {
     if(!_etchk.length) await conn.query(`ALTER TABLE email_templates ADD COLUMN cor_cabecalho VARCHAR(20) DEFAULT '#d4111c'`);
     const [_etfk] = await conn.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='email_templates' AND COLUMN_NAME='cor_fundo_cab'`);
     if(!_etfk.length) await conn.query(`ALTER TABLE email_templates ADD COLUMN cor_fundo_cab VARCHAR(20) DEFAULT '#ffffff'`);
+    // recados com data de validade: some do app sozinho depois de expira_em (UTC)
+    const [_rcexp] = await conn.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='recados' AND COLUMN_NAME='expira_em'`);
+    if(!_rcexp.length) await conn.query(`ALTER TABLE recados ADD COLUMN expira_em DATETIME NULL`);
+    // equipe (professores/staff): aniversário com dia/mês, sem ano
+    await conn.query(`CREATE TABLE IF NOT EXISTS equipe_aniversarios (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(200) NOT NULL,
+      cargo VARCHAR(100),
+      tel VARCHAR(30),
+      dia TINYINT NOT NULL,
+      mes TINYINT NOT NULL,
+      ativo BOOLEAN DEFAULT TRUE,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await conn.query(`INSERT INTO equipe_aniversarios (nome,cargo,tel,dia,mes) SELECT 'Leo','Mestre e instrutor','(48) 98463-9257',8,11 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM equipe_aniversarios)`);
+    await conn.query(`INSERT IGNORE INTO wa_config (chave,valor) VALUES ('aniversario_equipe_template', ?)`,
+      ['🥋 *Parabéns, {{nome}}!* 🎉\n\nHoje é o seu dia, e a gente não podia deixar passar em branco.\n\nObrigado por tudo que você constrói no tatame: a técnica, a paciência, a disciplina e o exemplo que você passa pra cada aluno que entra na Punch and Roll. A equipe é o que é por sua causa.\n\nQue esse novo ano venha com muita saúde, conquistas e muitos treinos pela frente. 👊\n\nUm abraço de toda a família Punch and Roll! 🥊❤️']);
     await conn.query(`CREATE TABLE IF NOT EXISTS email_listas (
       id INT AUTO_INCREMENT PRIMARY KEY,
       nome VARCHAR(200) NOT NULL,
@@ -1641,7 +1658,7 @@ app.get('/api/feriados/proximos', (req, res) => {
 
 app.get('/api/recados', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM recados WHERE ativo=1 ORDER BY pin DESC, criado_em DESC');
+    const [rows] = await db.query('SELECT * FROM recados WHERE ativo=1 AND (expira_em IS NULL OR expira_em > NOW()) ORDER BY pin DESC, criado_em DESC');
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1658,6 +1675,7 @@ app.put('/api/recados/:id', auth, adminOnly, async (req, res) => {
   try {
     const { titulo, body, tipo, pin, ativo } = req.body;
     await db.query('UPDATE recados SET titulo=?,body=?,tipo=?,pin=?,ativo=? WHERE id=?',[titulo,body,tipo,pin?1:0,ativo?1:0,req.params.id]);
+    if ('expira_em' in req.body) await db.query('UPDATE recados SET expira_em=? WHERE id=?',[req.body.expira_em||null,req.params.id]);
     res.json({ message: 'Recado atualizado!' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2143,6 +2161,47 @@ async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
 }
 
 // ── Aniversariantes ──────────────────────────────────────────────────────────
+// Mural de aniversariantes no app: só nome curto e dia (sem ano/idade)
+app.get('/api/aniversariantes/mural', auth, async (req, res) => {
+  try {
+    const brt = new Date(new Date().toLocaleString('en-US', {timeZone:'America/Sao_Paulo'}));
+    const mes = brt.getMonth()+1, hoje = brt.getDate();
+    const curto = n => (n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+    const [alunos] = await db.query("SELECT nome, DAY(nasc) dia FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=? AND status IN ('ativo','vencendo','atrasado')",[mes]);
+    const [eq] = await db.query('SELECT nome, cargo, dia FROM equipe_aniversarios WHERE ativo=1 AND mes=?',[mes]);
+    const lista = [
+      ...alunos.map(a=>({ nome: curto(a.nome), dia: a.dia, equipe: false })),
+      ...eq.map(e=>({ nome: curto(e.nome), dia: e.dia, equipe: true, cargo: e.cargo||'' })),
+    ].sort((a,b)=>a.dia-b.dia || a.nome.localeCompare(b.nome));
+    res.json({ mes, hoje, lista, aniversariantesHoje: lista.filter(x=>x.dia===hoje) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Equipe (professores/staff) — aniversários
+app.get('/api/equipe-aniversarios', auth, adminOnly, async (req, res) => {
+  try { const [r] = await db.query('SELECT * FROM equipe_aniversarios ORDER BY mes, dia, nome'); res.json(r); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/equipe-aniversarios', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, cargo, tel, dia, mes } = req.body;
+    if (!nome || !(dia>=1 && dia<=31) || !(mes>=1 && mes<=12)) return res.status(400).json({ error: 'Informe nome, dia e mês válidos' });
+    const [r] = await db.query('INSERT INTO equipe_aniversarios (nome,cargo,tel,dia,mes) VALUES (?,?,?,?,?)',[nome,cargo||null,tel||null,dia,mes]);
+    res.json({ id: r.insertId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/equipe-aniversarios/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const { nome, cargo, tel, dia, mes, ativo } = req.body;
+    await db.query('UPDATE equipe_aniversarios SET nome=?,cargo=?,tel=?,dia=?,mes=?,ativo=? WHERE id=?',[nome,cargo||null,tel||null,dia,mes,ativo===false?0:1,req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/equipe-aniversarios/:id', auth, adminOnly, async (req, res) => {
+  try { await db.query('DELETE FROM equipe_aniversarios WHERE id=?',[req.params.id]); res.json({ ok: true }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/wa/aniversariantes', auth, adminOnly, async (req, res) => {
   try {
     const { mes, dia } = req.query;
@@ -2589,16 +2648,26 @@ setInterval(async () => {
         ultimoDiaAniversario = dia;
         const [[tmpl]] = await db.query("SELECT valor FROM wa_config WHERE chave='aniversario_template'");
         const template = tmpl?.valor || '🥊 Feliz Aniversário, {{nome}}! Punch and Roll Fight Team te deseja um dia incrível! 💪';
-        const [alunos] = await db.query('SELECT nome,tel FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=? AND DAY(nasc)=? AND status IN (?,?)',[mes,dia,'ativo','vencendo']);
-        for (const a of alunos) {
+        // aniversário não depende de mensalidade em dia: inclui atrasados
+        const [alunos] = await db.query("SELECT nome,tel FROM alunos WHERE nasc IS NOT NULL AND MONTH(nasc)=? AND DAY(nasc)=? AND status IN ('ativo','vencendo','atrasado')",[mes,dia]);
+        const [equipeAniv] = await db.query('SELECT nome,tel FROM equipe_aniversarios WHERE ativo=1 AND mes=? AND dia=?',[mes,dia]);
+        const [[tmplEq]] = await db.query("SELECT valor FROM wa_config WHERE chave='aniversario_equipe_template'");
+        const lista = [...alunos.map(a=>({...a, tmpl: template})), ...equipeAniv.map(e=>({...e, tmpl: tmplEq?.valor || template}))];
+        let enviadosAniv = 0;
+        for (const a of lista) {
           if (!a.tel) continue;
-          const msg = template.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
+          const tel = formatarTelWA(a.tel);
+          // evita mandar de novo se o servidor reiniciar durante o horário
+          const [ja] = await db.query("SELECT 1 FROM wa_envios WHERE tipo='ANIVERSARIO' AND status='ENVIADO' AND telefone=? AND criado_em > NOW() - INTERVAL 20 HOUR LIMIT 1",[tel]);
+          if (ja.length) continue;
+          const msg = a.tmpl.replace(/\{\{nome\}\}/gi, a.nome.split(' ')[0]);
           const r = await enviarWA(a.tel, msg);
           await db.query('INSERT INTO wa_envios (nome,telefone,mensagem,tipo,status,erro) VALUES (?,?,?,?,?,?)',
-            [a.nome,formatarTelWA(a.tel),msg,'ANIVERSARIO',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+            [a.nome,tel,msg,'ANIVERSARIO',r.sucesso?'ENVIADO':'ERRO',r.erro||null]);
+          if (r.sucesso) enviadosAniv++;
           await new Promise(x=>setTimeout(x,3000));
         }
-        if (alunos.length) console.log(`[Aniversários] ${alunos.length} mensagens enviadas`);
+        if (lista.length) console.log(`[Aniversários] ${enviadosAniv} de ${lista.length} mensagens enviadas`);
       }
     }
   } catch(e) { console.error('[Cron Aniversário]',e.message); }

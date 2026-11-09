@@ -1888,7 +1888,10 @@ function imprimirContas() {
     // reduz a parte justa de cada sócio automaticamente, por estar no mesmo cálculo.
     const receitaDoMes=_recTotal||0;
     const deficitLiquido=Math.max(0,totalGeral-receitaDoMes);
-    const partePrevista=deficitLiquido/nSocios; // responsabilidade líquida de cada sócio
+    // Mês negativo NÃO é dividido entre os sócios: fica como saldo negativo e passa pro mês
+    // seguinte (entra como "saldo que sobrou" negativo). Cada sócio recebe de volta o que pagou.
+    const partePrevista=0;
+    const _mesSegLbl=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][_numM%12];
 
     const td=(txt,opt='')=>`<td style="padding:7px 12px;border-bottom:1px solid #eee;${opt}">${txt}</td>`;
     const linhas=socios.sort().map((nome,i)=>{
@@ -1901,7 +1904,6 @@ function imprimirContas() {
         ${td('R$ '+v.pago.toFixed(2).replace('.',','),'color:#16a34a;font-weight:600;text-align:right')}
         ${td('R$ '+v.pendente.toFixed(2).replace('.',','),'color:#ca8a04;font-weight:600;text-align:right')}
         ${td('R$ '+total.toFixed(2).replace('.',','),'font-weight:700;text-align:right')}
-        ${td('R$ '+partePrevista.toFixed(2).replace('.',','),'text-align:right;color:#555')}
         ${td('R$ '+faltaPagar.toFixed(2).replace('.',','),`text-align:right;font-weight:700;color:${faltaPagar>0?'#dc2626':'#16a34a'}`)}
       </tr>`;
     }).join('');
@@ -1911,7 +1913,9 @@ function imprimirContas() {
     // O PR entra também: o que sobrou de receita depois de cobrir a parte dele (totalPR)
     // é dinheiro que ele está segurando e precisa repassar pro sócio que ficou no prejuízo
     // — sem isso, o repasse ficava "escondido" e só aparecia a diferença entre os sócios.
-    const saldoPR=totalPR-receitaDoMes; // negativo = PR está segurando mais receita do que precisa pra si
+    // PR devolve aos sócios TUDO que eles pagaram, mesmo que o caixa fique negativo (o negativo vai pro mês seguinte)
+    const _totalSocios=socios.reduce((s,p)=>s+por[p].pago+por[p].pendente,0);
+    const saldoPR=Math.min(totalPR-receitaDoMes,-_totalSocios); // negativo = PR repassa
     const saldos=socios.map(p=>({nome:p,saldo:(por[p].pago+por[p].pendente)-partePrevista}));
     if(Math.abs(saldoPR)>0.01) saldos.push({nome:'PR',saldo:saldoPR});
     const acertos=[];
@@ -1926,15 +1930,15 @@ function imprimirContas() {
     }
 
     return `<div style="margin-top:24px;border-top:2px solid #e5e7eb;padding-top:16px">
-      <h3 style="font-size:13px;margin-bottom:4px;color:#111">Previsão por Sócio — ${contasMesLabel()}</h3>
-      <div style="font-size:11px;color:#555;margin-bottom:10px">Despesas totais: <b>R$ ${totalGeral.toFixed(2).replace('.',',')}</b>${receitaDoMes>0?` − Receita: <b style="color:#16a34a">R$ ${receitaDoMes.toFixed(2).replace('.',',')}</b>`:''} = Déficit: <b>R$ ${deficitLiquido.toFixed(2).replace('.',',')}</b> ÷ ${nSocios} sócio${nSocios>1?'s':''} = <b>R$ ${partePrevista.toFixed(2).replace('.',',')} cada</b>${totalPR>0?`<br><span style="color:#0369a1">ℹ️ Dessa receita, R$ ${totalPR.toFixed(2).replace('.',',')} já está sendo usada pelo PR pra cobrir as contas atribuídas a ele.</span>`:''}</div>
+      <h3 style="font-size:13px;margin-bottom:4px;color:#111">Contas pagas por sócio — ${contasMesLabel()}</h3>
+      <div style="font-size:11px;color:#555;margin-bottom:10px">Entradas: <b style="color:#16a34a">R$ ${receitaDoMes.toFixed(2).replace('.',',')}</b> − Despesas totais: <b>R$ ${totalGeral.toFixed(2).replace('.',',')}</b> = Resultado: <b style="color:${receitaDoMes-totalGeral>=0?'#16a34a':'#dc2626'}">${receitaDoMes-totalGeral>=0?'+':'−'}R$ ${Math.abs(receitaDoMes-totalGeral).toFixed(2).replace('.',',')}</b></div>
+      ${deficitLiquido>0.009?`<div style="margin:0 0 12px;padding:10px 14px;background:#fef2f2;border-left:4px solid #dc2626;font-size:12px;color:#7f1d1d;line-height:1.5"><b>Nota:</b> o mês fechou <b>negativo em R$ ${deficitLiquido.toFixed(2).replace('.',',')}</b>. Esse valor <b>não é dividido entre os sócios</b>: fica como saldo negativo e passa para ${_mesSegLbl}, descontado das entradas do mês seguinte ("saldo que sobrou" negativo). Cada sócio recebe de volta o valor integral das contas que pagou.</div>`:''}
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr>
           <th style="text-align:left;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Sócio</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Já pagou</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pendente</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Total atrib.</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Parte justa</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Falta pagar</th>
         </tr></thead>
         <tbody>${linhas}</tbody>
@@ -4252,6 +4256,23 @@ async function waRenderAutomacoes(c){
         <button onclick="waSalvarAutomacao('aniversario')" class="btn btn-r btn-sm">Salvar configuração de aniversário</button>
       </div>
 
+      <!-- Aniversário da equipe -->
+      <div class="card" style="margin-bottom:12px">
+        <div style="font-weight:700;font-size:15px">🥋 Aniversário da Equipe</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Professores e staff. Recebem a mensagem abaixo no mesmo horário e aparecem no mural de aniversariantes do app.</div>
+        <div id="equipe-lista" style="margin-bottom:12px"><div class="spinner"></div></div>
+        <div style="display:grid;grid-template-columns:2fr 1.5fr 1.5fr .7fr .7fr auto;gap:8px;align-items:end;margin-bottom:14px">
+          <div class="fg" style="margin:0"><label class="fl">Nome</label><input class="fi" id="eq-nome" placeholder="Ex: Leo"></div>
+          <div class="fg" style="margin:0"><label class="fl">Cargo</label><input class="fi" id="eq-cargo" placeholder="Ex: Instrutor"></div>
+          <div class="fg" style="margin:0"><label class="fl">WhatsApp</label><input class="fi" id="eq-tel" placeholder="(48) 9...."></div>
+          <div class="fg" style="margin:0"><label class="fl">Dia</label><input class="fi" id="eq-dia" type="number" min="1" max="31"></div>
+          <div class="fg" style="margin:0"><label class="fl">Mês</label><input class="fi" id="eq-mes" type="number" min="1" max="12"></div>
+          <button onclick="equipeAdicionar()" class="btn btn-r btn-sm">+ Adicionar</button>
+        </div>
+        <div class="fg"><label class="fl">Mensagem para a equipe (use {{nome}})</label><textarea class="fi" id="cfg-aniv-eq-tmpl" rows="6" style="resize:vertical;font-family:monospace">${cfg.aniversario_equipe_template||''}</textarea></div>
+        <button onclick="waSalvarAutomacao('aniversario_equipe')" class="btn btn-r btn-sm">Salvar mensagem da equipe</button>
+      </div>
+
       <!-- Atrasados -->
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -4352,12 +4373,39 @@ async function waRenderAutomacoes(c){
         <div class="fg"><label class="fl">Template WhatsApp</label><textarea class="fi" id="cfg-vc1-tmpl" rows="6" style="resize:vertical;font-family:monospace">${cfg.vencimento1_wa||''}</textarea></div>
         <button onclick="waSalvarAutomacao('vencimento1')" class="btn btn-r btn-sm" style="background:#f59e0b">Salvar aviso 1 dia</button>
       </div>`;
+    equipeCarregar();
   }catch(e){c.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`;}
+}
+
+async function equipeCarregar(){
+  const el=document.getElementById('equipe-lista'); if(!el) return;
+  try{
+    const lista=await GET('/api/equipe-aniversarios');
+    const esc=t=>String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    el.innerHTML = lista.length ? lista.map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel2);border-radius:8px;margin-bottom:6px">
+        <div style="font-weight:700;min-width:48px">${String(e.dia).padStart(2,'0')}/${String(e.mes).padStart(2,'0')}</div>
+        <div style="flex:1">${esc(e.nome)} <span style="color:var(--muted);font-size:12px">${e.cargo?'· '+esc(e.cargo):''} ${e.tel?'· '+esc(e.tel):'· sem WhatsApp'}</span></div>
+        <button onclick="equipeExcluir(${e.id})" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--muted)">🗑</button>
+      </div>`).join('') : '<div style="font-size:13px;color:var(--muted)">Ninguém cadastrado.</div>';
+  }catch(e){ el.innerHTML=`<div class="alert alert-r">Erro: ${e.message}</div>`; }
+}
+async function equipeAdicionar(){
+  const v=id=>document.getElementById(id)?.value.trim();
+  const body={nome:v('eq-nome'),cargo:v('eq-cargo'),tel:v('eq-tel'),dia:parseInt(v('eq-dia')),mes:parseInt(v('eq-mes'))};
+  if(!body.nome||!body.dia||!body.mes) return alert('Preencha nome, dia e mês.');
+  try{ await POST('/api/equipe-aniversarios',body); ['eq-nome','eq-cargo','eq-tel','eq-dia','eq-mes'].forEach(id=>document.getElementById(id).value=''); equipeCarregar(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+async function equipeExcluir(id){
+  try{ await DEL('/api/equipe-aniversarios/'+id); equipeCarregar(); }catch(e){ alert('Erro: '+e.message); }
 }
 
 async function waSalvarAutomacao(tipo){
   try{
-    if(tipo==='aniversario'){
+    if(tipo==='aniversario_equipe'){
+      await POST('/api/wa/config',{aniversario_equipe_template:document.getElementById('cfg-aniv-eq-tmpl')?.value||''});
+    } else if(tipo==='aniversario'){
       const ativo = document.getElementById('cfg-aniv-ativo')?.checked?'1':'0';
       const tmpl = document.getElementById('cfg-aniv-tmpl')?.value;
       const hora = document.getElementById('cfg-aniv-hora')?.value;
@@ -5535,7 +5583,7 @@ let _equipe=[];
 async function renderEquipe(){
   const pg=document.getElementById('page-equipe');
   pg.innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';
-  try{_equipe=await GET('/api/equipe');}catch(e){_equipe=[];}
+  try{_equipe=await GET('/api/equipe-aniversarios');}catch(e){_equipe=[];}
   const isMaster=_meuNivel==='master';
   pg.innerHTML=`
     ${!isMaster?'<div class="alert alert-y">⚠️ Apenas o admin master pode gerenciar a equipe.</div>':''}
@@ -5642,7 +5690,7 @@ async function toggleAtivoEquipe(id,ativo){
 
 async function excluirEquipe(id,nome){
   if(!confirm('Excluir membro "'+nome+'"?'))return;
-  try{await DEL('/api/equipe/'+id);await renderEquipe();alert('✅ Membro removido!');}
+  try{await DEL('/api/equipe-aniversarios/'+id);await renderEquipe();alert('✅ Membro removido!');}
   catch(e){alert('Erro: '+e.message);}
 }
 

@@ -241,6 +241,7 @@ async function carregarTudo() {
     cache.pagamentos = Array.isArray(pags) ? pags : [];
     cache.ocupacao = (ocup && typeof ocup === 'object') ? ocup : {};
     try { const fer = await api('GET','/api/feriados/proximos'); cache.feriados = Array.isArray(fer) ? fer : []; } catch(e) { cache.feriados = []; }
+    try { const mur = await api('GET','/api/aniversariantes/mural'); cache.mural = (mur && Array.isArray(mur.lista)) ? mur : null; } catch(e) { cache.mural = null; }
     // Checkins do aluno
     try {
       const cks = await api('GET','/api/checkins?aluno_id='+aluno.id);
@@ -288,7 +289,15 @@ function renderInicio() {
   const grupoWaDismissKey = 'pr_grupo_wa_dismiss_' + a.id;
   const grupoWaDismissed = localStorage.getItem(grupoWaDismissKey) === '1';
 
-  let html = (cache.feriados||[]).map(f=>`
+  const escH = t => String(t||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const mural = cache.mural;
+  const anivHoje = mural ? mural.aniversariantesHoje : [];
+  const bannerAniv = anivHoje.length ? `
+    <div style="background:linear-gradient(135deg,rgba(212,17,28,.22),rgba(212,17,28,.06));border:1px solid rgba(212,17,28,.5);border-left:4px solid var(--red);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">🎂 Aniversariante${anivHoje.length>1?'s':''} de hoje</div>
+      <div style="font-size:13px;color:var(--white);line-height:1.5">${anivHoje.map(x=>x.equipe?`<b>${escH(x.nome)}</b> (${escH(x.cargo||'equipe')})`:`<b>${escH(x.nome)}</b>`).join(', ')}. Deixa o seu parabéns no próximo treino! 🥊</div>
+    </div>` : '';
+  let html = bannerAniv + (cache.feriados||[]).map(f=>`
     <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-left:4px solid var(--yellow);border-radius:10px;padding:14px;margin-bottom:16px">
       <div style="font-size:14px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">${f.titulo}</div>
       <div style="font-size:13px;color:var(--white);line-height:1.5">${f.texto}</div>
@@ -318,6 +327,20 @@ function renderInicio() {
     ${!aguardando&&bloqueado?'<div class="alert-r">🔴 Mensalidade em atraso. Check-in bloqueado.</div>':''}
     ${!aguardando&&a.status==='vencendo'?'<div class="alert-y">⚠️ Mensalidade vencendo em breve!</div>':''}
   `;
+
+  if(mural && mural.lista.length) {
+    const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    html+=`<div class="card"><div class="card-title">🎂 Aniversariantes de ${meses[mural.mes-1]}</div>`;
+    mural.lista.forEach(x=>{
+      const eHoje = x.dia===mural.hoje, passou = x.dia<mural.hoje;
+      html+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:${eHoje?'rgba(212,17,28,.15)':'var(--panel2)'};opacity:${passou?'.55':'1'}">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;min-width:30px;color:${eHoje?'var(--red)':'var(--muted)'}">${String(x.dia).padStart(2,'0')}</div>
+        <div style="font-size:13px;flex:1">${escH(x.nome)}${x.equipe?` <span style="font-size:11px;color:var(--muted)">· ${escH(x.cargo||'equipe')}</span>`:''}</div>
+        ${eHoje?'<div style="font-size:11px;font-weight:700;color:var(--red)">HOJE 🎉</div>':''}
+      </div>`;
+    });
+    html+='</div>';
+  }
 
   if(pinned.length) {
     html+='<div class="card"><div class="card-title">📌 Avisos</div>';
