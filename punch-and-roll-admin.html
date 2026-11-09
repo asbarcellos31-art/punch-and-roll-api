@@ -1815,47 +1815,43 @@ function imprimirContas() {
     </tr></thead>
     <tbody>${linhas}</tbody>
   </table>
-  <div class="totais">
-    ${totalPend>0?`<div class="t-pend">A pagar: R$ ${totalPend.toFixed(2).replace('.',',')}</div>`:''}
-    ${totalPago>0?`<div class="t-pago">Pago: R$ ${totalPago.toFixed(2).replace('.',',')}</div>`:''}
-    ${totalEntradasRecebido>0?`<div class="t-pago">Recebido: R$ ${totalEntradasRecebido.toFixed(2).replace('.',',')}</div>`:''}
-    ${totalEntradasAReceber>0?`<div class="t-pend" style="background:#f0fdf4;color:#16a34a;border-color:#86efac">A receber: R$ ${totalEntradasAReceber.toFixed(2).replace('.',',')}</div>`:''}
-    <div class="t-tot">Total: R$ ${(totalPend+totalPago+totalEntradasRecebido+totalEntradasAReceber).toFixed(2).replace('.',',')}</div>
-  </div>
-  <!-- Resumo financeiro -->
-  <div style="margin-top:12px">
-    <div class="section-title">Resumo Financeiro — ${contasMesLabel()}</div>
-    <table class="resumo-table">
-      <tr style="background:#f0fdf4">
-        <td style="padding:8px 12px;border-bottom:1px solid #d1fae5;color:#555">Entradas (mensalidades ${_mesAnteriorLbl}${_totalEntradasManualMes>0?' + avulsas':''})</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #d1fae5;text-align:right;font-weight:700;color:#16a34a">${fR(_recTotal)}</td>
-      </tr>
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">− Despesas pagas</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#dc2626">−${fR(_totalPagoMes)}</td>
-      </tr>
-      ${_repassesCaixaPdf>0?`<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">− Repasse a sócio (devolução de conta paga do bolso)</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#dc2626">−${fR(_repassesCaixaPdf)}</td>
-      </tr>`:''}
-      <tr style="background:#f9f9f9">
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">= Saldo atual</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:${_saldoReal>=0?'#16a34a':'#dc2626'}">${_saldoReal>=0?'+':'−'}${fR(_saldoReal)}</td>
-      </tr>
-      ${_totalEntradasManualPendMes>0?`<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">+ Entradas avulsas a receber</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#16a34a">+${fR(_totalEntradasManualPendMes)}</td>
-      </tr>`:''}
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555">− Despesas pendentes</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#ca8a04">−${fR(_totalPendMes)}</td>
-      </tr>
-      <tr style="background:${_saldoPrev>=0?'#f0fdf4':'#fef2f2'}">
-        <td style="padding:8px 12px;font-weight:700;color:#111">= Saldo previsto</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:14px;color:${_saldoPrev>=0?'#16a34a':'#dc2626'}">${_saldoPrev>=0?'+':'−'}${fR(_saldoPrev)}</td>
-      </tr>
-    </table>
-  </div>
+  ${(()=>{
+    // Resumo único e legível: cada entrada com nome, contas pagas = mesmo total do contas a pagar.
+    const R=v=>'R$ '+Math.abs(v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    const _mensAnt=parseFloat((finResumo?.historicoRec||[]).find(h=>h.mes===_mesAnterior)?.total||0);
+    const _shopAnt=parseFloat((finResumo?.historicoShop||[]).find(h=>h.mes===_mesAnterior)?.total||0);
+    const _entradasLanc=_todasDoMes.filter(d=>d.tipo==='entrada'&&d.status==='pago');
+    const _pagoSocios=_totalPagoSociosPdf;
+    const _socioDevolvido=Math.min(_repassesCaixaPdf,_pagoSocios);
+    const _socioNaoDevolvido=Math.max(0,_pagoSocios-_repassesCaixaPdf);
+    const _repasseExtra=Math.max(0,_repassesCaixaPdf-_pagoSocios); // devolução de mês anterior
+    const _saidasCaixa=_totalPagoMes+_repassesCaixaPdf;
+    const L=(txt,val,cor,neg,bold)=>`<tr><td style="padding:6px 12px;border-bottom:1px solid #eee;color:#444${bold?';font-weight:700;color:#111':''}">${txt}</td><td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:${cor}">${neg?'−':''}${R(val)}</td></tr>`;
+    const H=t=>`<tr><td colspan="2" style="padding:8px 12px 4px;font-size:9px;font-weight:700;letter-spacing:.5px;color:#6b7280;text-transform:uppercase">${t}</td></tr>`;
+    return `<div class="totais">
+      <div class="t-pago">Contas pagas no mês: ${R(_totalPagoMes+_pagoSocios)}</div>
+      ${_totalPendMes>0?`<div class="t-pend">Contas a pagar: ${R(_totalPendMes)}</div>`:''}
+    </div>
+    <div style="margin-top:12px">
+      <div class="section-title">Resumo Financeiro — ${contasMesLabel()}</div>
+      <table class="resumo-table" style="width:520px">
+        ${H('Entradas')}
+        ${_mensAnt?L(`Mensalidades recebidas em ${_mesAnteriorLbl} (líquido)`,_mensAnt,'#16a34a'):''}
+        ${_shopAnt?L(`Loja (${_mesAnteriorLbl})`,_shopAnt,'#16a34a'):''}
+        ${_entradasLanc.map(d=>L(d.descricao,parseFloat(d.valor||0),parseFloat(d.valor||0)>=0?'#16a34a':'#dc2626',parseFloat(d.valor||0)<0)).join('')}
+        ${L('= Total de entradas',_recTotal,'#16a34a',_recTotal<0,true)}
+        ${H('Contas pagas (mesmo total da lista acima)')}
+        ${L('Pagas pelo caixa da academia',_totalPagoMes,'#dc2626',true)}
+        ${_socioDevolvido>0?L('Pagas pelos sócios e devolvidas pelo caixa',_socioDevolvido,'#dc2626',true):''}
+        ${_repasseExtra>0?L('Devolução a sócio de conta de mês anterior',_repasseExtra,'#dc2626',true):''}
+        ${L('= Total que saiu do caixa',_saidasCaixa,'#dc2626',true,true)}
+        ${_socioNaoDevolvido>0?`<tr><td colspan="2" style="padding:6px 12px;font-size:9px;color:#1e40af;background:#eff6ff">ℹ️ ${R(_socioNaoDevolvido)} em contas pagas pelos sócios ainda não foram devolvidos pelo caixa — não saem do saldo (ver acerto abaixo).</td></tr>`:''}
+        <tr style="background:${_saldoReal>=0?'#f0fdf4':'#fef2f2'}"><td style="padding:8px 12px;font-weight:700;color:#111">= Resultado do mês</td><td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;color:${_saldoReal>=0?'#16a34a':'#dc2626'}">${_saldoReal>=0?'+':'−'}${R(_saldoReal)}</td></tr>
+        ${_totalPendMes>0||_totalEntradasManualPendMes>0?`${_totalEntradasManualPendMes>0?L('+ Entradas a receber',_totalEntradasManualPendMes,'#16a34a'):''}${L('− Contas ainda a pagar',_totalPendMes,'#ca8a04',true)}<tr style="background:${_saldoPrev>=0?'#f0fdf4':'#fef2f2'}"><td style="padding:8px 12px;font-weight:700;color:#111">= Saldo previsto</td><td style="padding:8px 12px;text-align:right;font-weight:700;color:${_saldoPrev>=0?'#16a34a':'#dc2626'}">${_saldoPrev>=0?'+':'−'}${R(_saldoPrev)}</td></tr>`:''}
+      </table>
+      ${_saldoReal<-0.009?`<div style="margin-top:8px;max-width:520px;padding:10px 14px;background:#fef2f2;border-left:4px solid #dc2626;font-size:10px;color:#7f1d1d;line-height:1.5"><b>Nota:</b> o mês fechou <b>negativo em ${R(_saldoReal)}</b>. Esse valor não é dividido entre os sócios: passa para o mês seguinte como saldo negativo e é coberto pelas entradas de lá.</div>`:''}
+    </div>`;
+  })()}
   ${(()=>{
     // Agrupa todas as despesas do mês por responsável (entradas não entram na divisão)
     // PR (caixa da empresa) NÃO é um sócio — o que ele já cobriu abate o total ANTES de
@@ -1875,6 +1871,7 @@ function imprimirContas() {
     _repassesDoMes.forEach(r=>{
       const p=(r.socio||'').trim().toUpperCase();
       if(!p||!por[p]) return;
+      por[p].devolvido=(por[p].devolvido||0)+parseFloat(r.valor||0);
       por[p].pago-=parseFloat(r.valor||0);
     });
     const totalPR=(por['PR']?.pago||0)+(por['PR']?.pendente||0);
@@ -1882,6 +1879,7 @@ function imprimirContas() {
     if(!socios.length) return '';
     const nSocios=socios.length;
     const totalGeral=Object.keys(por).reduce((s,p)=>s+por[p].pago+por[p].pendente,0);
+    // Linhas do quadro: só sócios (PR fica no resumo acima)
     // Abate a receita do mês do total GERAL (não só do que sobra sem o PR) — o PR paga
     // a parte dele COM essa mesma receita, então não pode subtrair os dois separadamente
     // (senão conta a mesma grana duas vezes). O que sobrar da receita depois do PR já
@@ -1896,12 +1894,14 @@ function imprimirContas() {
     const td=(txt,opt='')=>`<td style="padding:7px 12px;border-bottom:1px solid #eee;${opt}">${txt}</td>`;
     const linhas=socios.sort().map((nome,i)=>{
       const v=por[nome];
-      const total=v.pago+v.pendente;
+      const dev=v.devolvido||0;
+      const total=v.pago+dev+v.pendente;
       const faltaPagar=v.pendente; // contas atribuídas ainda não pagas
       const excesso=v.pago-partePrevista; // positivo = pagou mais que a parte
       return `<tr style="background:${i%2===0?'#fff':'#f9f9f9'}">
         ${td(`<b>${nome}</b>`)}
-        ${td('R$ '+v.pago.toFixed(2).replace('.',','),'color:#16a34a;font-weight:600;text-align:right')}
+        ${td('R$ '+(v.pago+dev).toFixed(2).replace('.',','),'color:#16a34a;font-weight:600;text-align:right')}
+        ${td('R$ '+dev.toFixed(2).replace('.',','),'color:#2563eb;font-weight:600;text-align:right')}
         ${td('R$ '+v.pendente.toFixed(2).replace('.',','),'color:#ca8a04;font-weight:600;text-align:right')}
         ${td('R$ '+total.toFixed(2).replace('.',','),'font-weight:700;text-align:right')}
         ${td('R$ '+faltaPagar.toFixed(2).replace('.',','),`text-align:right;font-weight:700;color:${faltaPagar>0?'#dc2626':'#16a34a'}`)}
@@ -1931,12 +1931,11 @@ function imprimirContas() {
 
     return `<div style="margin-top:24px;border-top:2px solid #e5e7eb;padding-top:16px">
       <h3 style="font-size:13px;margin-bottom:4px;color:#111">Contas pagas por sócio — ${contasMesLabel()}</h3>
-      <div style="font-size:11px;color:#555;margin-bottom:10px">Entradas: <b style="color:#16a34a">R$ ${receitaDoMes.toFixed(2).replace('.',',')}</b> − Despesas totais: <b>R$ ${totalGeral.toFixed(2).replace('.',',')}</b> = Resultado: <b style="color:${receitaDoMes-totalGeral>=0?'#16a34a':'#dc2626'}">${receitaDoMes-totalGeral>=0?'+':'−'}R$ ${Math.abs(receitaDoMes-totalGeral).toFixed(2).replace('.',',')}</b></div>
-      ${deficitLiquido>0.009?`<div style="margin:0 0 12px;padding:10px 14px;background:#fef2f2;border-left:4px solid #dc2626;font-size:12px;color:#7f1d1d;line-height:1.5"><b>Nota:</b> o mês fechou <b>negativo em R$ ${deficitLiquido.toFixed(2).replace('.',',')}</b>. Esse valor <b>não é dividido entre os sócios</b>: fica como saldo negativo e passa para ${_mesSegLbl}, descontado das entradas do mês seguinte ("saldo que sobrou" negativo). Cada sócio recebe de volta o valor integral das contas que pagou.</div>`:''}
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr>
           <th style="text-align:left;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Sócio</th>
-          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Já pagou</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pagou do bolso</th>
+          <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Já devolvido</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Pendente</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Total atrib.</th>
           <th style="text-align:right;padding:6px 12px;background:#f3f3f3;border-bottom:2px solid #ddd;font-size:11px">Falta pagar</th>
