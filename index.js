@@ -370,6 +370,9 @@ async function setupDB() {
       "ALTER TABLE pagamentos ADD COLUMN plano_nome VARCHAR(200) DEFAULT NULL",
       "ALTER TABLE pagamentos ADD COLUMN valor_liquido DECIMAL(10,2) DEFAULT NULL",
       "ALTER TABLE despesas ADD COLUMN mp_source_id VARCHAR(50) DEFAULT NULL",
+      // Recado com imagem vira banner em destaque no topo do portal (link opcional no clique)
+      "ALTER TABLE recados ADD COLUMN imagem_url VARCHAR(500) DEFAULT NULL",
+      "ALTER TABLE recados ADD COLUMN link_url VARCHAR(500) DEFAULT NULL",
     ]) { try { await conn.query(sql); } catch(e) {} }
 
     await conn.query(`
@@ -1578,7 +1581,9 @@ app.post('/api/checkins', auth, async (req, res) => {
     const dataAulaUTC = new Date(Date.UTC(brtNow.getFullYear(), brtNow.getMonth(), brtNow.getDate() + diffDias));
     const dataCheckin = dataAulaUTC.toISOString().slice(0,10);
     // Feriados: bloqueia check-in para a data da aula (inclusive antecipado)
-    if (FERIADOS[dataCheckin]) return falhar(403, FERIADOS[dataCheckin].checkin);
+    // aPartirDe: bloqueia só as aulas desse horário em diante (ex.: sem aula a partir das 19:30)
+    const fer = FERIADOS[dataCheckin];
+    if (fer && (!fer.aPartirDe || (aula[0].hora || '00:00') >= fer.aPartirDe)) return falhar(403, fer.checkin);
     // Bloqueia check-in 1h antes da aula (somente para aulas de hoje)
     if (diffDias === 0) {
       const [hAula, mAula] = (aula[0].hora || '00:00').split(':').map(Number);
@@ -1647,13 +1652,16 @@ const FERIADOS = {
                   titulo: '🙏 Segunda (12/10) é feriado de Nossa Senhora Aparecida', texto: 'Não teremos aula. Retornamos na terça, 13/10. 🥊' },
   '2026-11-02': { checkin: '🕯️ Feriado de Finados — Não haverá aula nesse dia. Retornamos normalmente na terça-feira, dia 03/11. Bom feriado! 💪',
                   titulo: '🕯️ Segunda (02/11) é feriado de Finados', texto: 'Não teremos aula. Retornamos na terça, 03/11. 🥊' },
+  // Sem titulo = não gera banner aqui (o banner está nos recados)
+  '2026-11-18': { aPartirDe: '19:30',
+                  checkin: '⚠️ Excepcionalmente na quarta-feira, 18/11, não haverá aulas a partir das 19h30, em virtude de um compromisso da equipe. Na quinta, 19/11, as aulas voltam ao normal. 💪' },
 };
 // Banner do portal: feriados de hoje até 6 dias à frente (some sozinho no dia seguinte)
 app.get('/api/feriados/proximos', (req, res) => {
   const hoje = hojeBRT();
   const lim = new Date(hoje + 'T12:00:00Z'); lim.setUTCDate(lim.getUTCDate() + 6);
   const limStr = lim.toISOString().slice(0,10);
-  res.json(Object.entries(FERIADOS).filter(([d]) => d >= hoje && d <= limStr).map(([data, f]) => ({ data, titulo: f.titulo, texto: f.texto })));
+  res.json(Object.entries(FERIADOS).filter(([d, f]) => f.titulo && d >= hoje && d <= limStr).map(([data, f]) => ({ data, titulo: f.titulo, texto: f.texto })));
 });
 
 app.get('/api/recados', async (req, res) => {
