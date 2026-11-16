@@ -1058,6 +1058,7 @@ app.post('/api/alunos/me/renovar', auth, async (req, res) => {
       const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
       await db.query("UPDATE alunos SET plano=?,plano_id=?,valor=?,vencimento=?,status='ativo',pagto=? WHERE id=?",
         [plano_nome, plano_id||null, parseFloat(valor), vencStr, metodo, aluno_id]);
+      await ajustarModalidadePeloPlano(aluno_id, plano_id);
     }
 
     res.json({ payment_id: payment.id, status: payment.status, status_detail: payment.status_detail });
@@ -1804,6 +1805,7 @@ app.post('/api/pagamentos/cartao', async (req, res) => {
         const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
         const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
         await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='cartao' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
+        await ajustarModalidadePeloPlano(aluno_id, plano_id);
       } else {
         await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
       }
@@ -1844,6 +1846,7 @@ app.get('/api/pagamentos/status/:payment_id', async (req, res) => {
           const venc = new Date(base); venc.setMonth(venc.getMonth() + parseInt(meses));
           const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
           await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto='pix' WHERE id=?",[vencStr,plano_nome,plano_id||null,aluno_id]);
+          await ajustarModalidadePeloPlano(aluno_id, plano_id);
         } else {
           await db.query("UPDATE alunos SET status='ativo' WHERE id=?",[aluno_id]);
         }
@@ -2015,6 +2018,7 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
             const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
             await db.query("UPDATE alunos SET status='ativo',vencimento=?,plano=?,plano_id=?,pagto=? WHERE id=?",
               [vencStr, plano_nome, plano_id||null, pagto, aluno_id]);
+            await ajustarModalidadePeloPlano(aluno_id, plano_id);
           } else {
             // meses não informado: isso só acontece em matrícula nova via PIX (a renovação pelo
             // portal sempre manda meses). Nesse caso o vencimento JÁ foi calculado certinho na
@@ -2129,6 +2133,14 @@ async function enviarWA(tel, msg, instancia) {
 
 // Envia o conteúdo de uma campanha. media_url pode ser uma mídia (com a mensagem como legenda)
 // ou um array JSON de mídias: envia todas sem legenda e depois a mensagem como texto.
+// Plano define a modalidade (combo = 'ambos'). Sem isso, quem pagava o combo continuava
+// cadastrado só em Boxe e tinha o check-in do Jiu-Jitsu bloqueado.
+async function ajustarModalidadePeloPlano(alunoId, planoId) {
+  const p = String(planoId || '');
+  const mod = p.includes('_amb_') ? 'ambos' : p.includes('_jj_') ? 'jiujitsu' : p.includes('_boxe_') ? 'boxe' : null;
+  if (mod && alunoId) await db.query('UPDATE alunos SET modalidade=? WHERE id=?', [mod, alunoId]);
+}
+
 async function enviarConteudoCampanha(tel, camp, msg) {
   const inst = camp.instancia || 'punchandroll';
   if (!camp.media_url || !camp.media_type) return enviarWA(tel, msg, inst);

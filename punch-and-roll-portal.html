@@ -723,6 +723,7 @@ function renderAlterarPlano(a) {
         }
       </div>`;
     }).join('')}
+    ${a.modalidade!=='ambos'?`<button onclick="abrirRenovacao('mensal_amb_3x','Mensal — Ambos 3x/sem',269,1)" style="width:100%;padding:10px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px">⚡ Mudar para o Combo (Boxe + Jiu-Jitsu) →</button>`:''}
     <button onclick="abrirRenovacao('${(PLANOS_PORTAL[a.modalidade]||[])[0]?.id}','${(PLANOS_PORTAL[a.modalidade]||[])[0]?.nome}',${(PLANOS_PORTAL[a.modalidade]||[])[0]?.valor||0},${(PLANOS_PORTAL[a.modalidade]||[])[0]?.meses||1},'same')" style="width:100%;padding:10px;background:rgba(212,17,28,.1);color:var(--red);border:1px solid rgba(212,17,28,.3);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">🔄 Renovar plano atual</button>
   </div>`;
 }
@@ -785,7 +786,9 @@ function renovSelecionarPlano(id,nome,valor,meses) {
 
 function abrirRenovacao(id, nome, valor, meses, tipo) {
   // Determina a modalidade inicial
-  _renovMod = aluno.modalidade || 'boxe';
+  // Se veio um plano de outra modalidade (ex.: botão do Combo), abre direto nela
+  const modDoPlano = id ? Object.keys(PLANOS_PORTAL).find(m=>PLANOS_PORTAL[m].some(x=>x.id===id)) : null;
+  _renovMod = modDoPlano || aluno.modalidade || 'boxe';
   if(!PLANOS_PORTAL[_renovMod]) _renovMod = 'boxe';
 
   document.getElementById('renov-pix-qr').innerHTML = '';
@@ -1245,7 +1248,7 @@ async function alterarSenhaPerfil() {
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <button id="renov-mod-boxe" onclick="renovSelecionarMod('boxe')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--red);color:#fff">🥊 Boxe</button>
       <button id="renov-mod-jiujitsu" onclick="renovSelecionarMod('jiujitsu')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--panel2);color:var(--muted)">🟦 Jiu-Jitsu</button>
-      <button id="renov-mod-ambos" onclick="renovSelecionarMod('ambos')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--panel2);color:var(--muted)">⚡ Ambos</button>
+      <button id="renov-mod-ambos" onclick="renovSelecionarMod('ambos')" style="flex:1;padding:8px 4px;border-radius:6px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--panel2);color:var(--muted)">⚡ Combo</button>
     </div>
 
     <!-- Lista de Planos -->
