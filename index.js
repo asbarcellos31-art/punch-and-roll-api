@@ -1656,6 +1656,8 @@ const FERIADOS = {
   // Sem titulo = não gera banner aqui (o banner está nos recados)
   '2026-11-18': { aPartirDe: '19:30',
                   checkin: '⚠️ Excepcionalmente na quarta-feira, 18/11, não haverá aulas a partir das 19h30, em virtude de um compromisso da equipe. Na quinta, 19/11, as aulas voltam ao normal. 💪' },
+  '2026-11-20': { checkin: '📢 Feriado — Não haverá aula nesse dia. Retornamos normalmente na segunda-feira, dia 23/11. Bom feriado! 💪',
+                  titulo: '📢 Sexta (20/11) é feriado', texto: 'Não teremos aula. Retornamos na segunda, 23/11. 🥊' },
 };
 // Banner do portal: feriados de hoje até 6 dias à frente (some sozinho no dia seguinte)
 app.get('/api/feriados/proximos', (req, res) => {
