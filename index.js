@@ -2046,6 +2046,8 @@ app.post('/api/webhook/mercadopago', async (req, res) => {
 // NOTIFICAÇÕES
 // ══════════════════════════════════════
 async function notificarWA(tel, msg) {
+  // Trava: com WA_SOMENTE_PARA definido, só envia para esse número (testes)
+  if (process.env.WA_SOMENTE_PARA && String(tel).replace(/\D/g,'').slice(-8) !== process.env.WA_SOMENTE_PARA.slice(-8)) { console.log('[WA] travado, não enviado →', tel); return ; }
   const url      = process.env.WA_EVOLUTION_URL || process.env.WA_API_URL;
   const instance = process.env.WA_EVOLUTION_INSTANCE || '';
   const key      = process.env.WA_EVOLUTION_KEY || process.env.WA_API_KEY;
@@ -2053,7 +2055,7 @@ async function notificarWA(tel, msg) {
   try {
     const num    = '55' + tel.replace(/\D/g,'');
     const apiUrl = instance ? `${url}/message/sendText/${instance}` : url;
-    const r = await axios.post(apiUrl, { number: num, textMessage: { text: msg } }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
+    const r = await axios.post(apiUrl, { number: num, text: msg }, { headers: { 'apikey': key, 'Content-Type': 'application/json' } });
     console.log(`[WA] OK → ${num} status=${r.status}`);
   } catch (e) {
     console.error(`[WA] ERRO → ${tel}:`, e.response?.data || e.message);
@@ -2116,6 +2118,8 @@ function formatarTelWA(tel) {
 }
 
 async function enviarWA(tel, msg, instancia) {
+  // Trava: com WA_SOMENTE_PARA definido, só envia para esse número (testes)
+  if (process.env.WA_SOMENTE_PARA && String(tel).replace(/\D/g,'').slice(-8) !== process.env.WA_SOMENTE_PARA.slice(-8)) { console.log('[WA] travado, não enviado →', tel); return { sucesso: false, erro: 'WA travado (modo teste)' }; }
   const evoUrl = process.env.WA_EVOLUTION_URL;
   const evoKey = process.env.WA_EVOLUTION_KEY;
   const inst = instancia || process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
@@ -2124,7 +2128,7 @@ async function enviarWA(tel, msg, instancia) {
   if (numero.length < 12) return { sucesso: false, erro: `Número inválido: ${tel}` };
   try {
     await axios.post(`${evoUrl}/message/sendText/${inst}`,
-      { number: numero, textMessage: { text: msg }, delay: 1500 },
+      { number: numero, text: msg, delay: 1500 },
       { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 30000 }
     );
     return { sucesso: true };
@@ -2163,6 +2167,7 @@ async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
   const inst = instancia || process.env.WA_EVOLUTION_INSTANCE || 'punchandroll';
   if (!evoUrl || !evoKey) return { sucesso: false, erro: 'Evolution não configurado' };
   const numero = formatarTelWA(tel);
+  if (process.env.WA_SOMENTE_PARA && numero.slice(-8) !== process.env.WA_SOMENTE_PARA.slice(-8)) return { sucesso: false, erro: 'WA travado (modo teste)' };
   if (numero.length < 12) return { sucesso: false, erro: `Número inválido: ${tel}` };
   try {
     // suporta base64 data URI ou URL externa
@@ -2170,10 +2175,10 @@ async function enviarMidiaWA(tel, mediaUrl, mediaType, caption, instancia) {
     const media = isBase64 ? mediaUrl.replace(/^data:[^;]+;base64,/, '') : mediaUrl;
     const mimeMap = { image: 'image/jpeg', video: 'video/mp4', document: 'application/pdf' };
     const mimetype = isBase64 ? (mediaUrl.match(/^data:([^;]+);/)||[])[1] || mimeMap[mediaType] : mimeMap[mediaType];
-    // Evolution v1: payload dentro de mediaMessage
+    // Evolution v2: payload no nível raiz
     const ext = (mimetype||'').split('/')[1] || 'jpg';
     await axios.post(`${evoUrl}/message/sendMedia/${inst}`,
-      { number: numero, mediaMessage: { mediatype: mediaType, fileName: `arquivo.${ext}`, caption: caption||'', media } },
+      { number: numero, mediatype: mediaType, mimetype, fileName: `arquivo.${ext}`, caption: caption||'', media },
       { headers: { apikey: evoKey, 'Content-Type': 'application/json' }, timeout: 60000 }
     );
     return { sucesso: true };
@@ -3124,6 +3129,16 @@ async function processarRelatoriosProntosMP() {
   } catch (e) { console.error('[Reconciliação MP] relatórios:', e.response?.data || e.message); }
 }
 
+// fetchInstances: v1 devolve {instance:{status,owner,profileName}}, v2 devolve [{name,connectionStatus,ownerJid,profileName}]
+function _evoInst(data, nome) {
+  if (data?.instance) return data.instance;
+  const arr = Array.isArray(data) ? data : [];
+  const i = arr.find(x => (x.name || x.instance?.instanceName) === nome) || arr[0];
+  if (!i) return null;
+  if (i.instance) return i.instance;
+  return { status: i.connectionStatus, owner: i.ownerJid, profileName: i.profileName };
+}
+
 async function monitorarWA() {
   const evoUrl = process.env.WA_EVOLUTION_URL;
   const evoKey = process.env.WA_EVOLUTION_KEY;
@@ -3131,7 +3146,7 @@ async function monitorarWA() {
   if (!evoUrl || !evoKey) return;
   try {
     const r = await axios.get(`${evoUrl}/instance/fetchInstances?instanceName=${evoInstance}`, { headers: { apikey: evoKey } });
-    const inst = r.data?.instance;
+    const inst = _evoInst(r.data, evoInstance);
     const status = inst?.status === 'open' ? 'open' : (inst?.status || 'close');
     _waConnStatus = status;
     if (status !== 'open') {
@@ -3167,7 +3182,7 @@ app.get('/api/whatsapp/status', auth, adminOnly, async (req, res) => {
   if (!evoUrl || !evoKey) return res.json({ ok: false, status: 'not_configured' });
   try {
     const r = await axios.get(`${evoUrl}/instance/fetchInstances?instanceName=${evoInstance}`, { headers: { apikey: evoKey } });
-    const inst = r.data?.instance;
+    const inst = _evoInst(r.data, evoInstance);
     if (!inst) return res.json({ ok: false, status: 'not_found' });
     res.json({ ok: true, status: inst.status, numero: inst.owner?.replace('@s.whatsapp.net',''), nome: inst.profileName });
   } catch(e) { res.json({ ok: false, status: 'error', erro: e.message }); }
