@@ -1926,7 +1926,10 @@ async function registrarCobrancaAssinatura(payment) {
   const hoje = hojeBRT();
   const vencAtual = alunoSub.vencimento ? (alunoSub.vencimento instanceof Date ? alunoSub.vencimento.toISOString().slice(0,10) : String(alunoSub.vencimento).slice(0,10)) : null;
   const base = baseVencimento(vencAtual, hoje);
-  const mesesSub = alunoSub.subscription_meses || 1;
+  // A assinatura cobra TODO MÊS (frequency 1 month), inclusive a semestral/anual — o "6" ou "12"
+  // é só o compromisso (multa se cancelar antes). Cada cobrança renova 1 mês, nunca 6.
+  // (Erro real: Diogo pagou R$149 do semestral em 03/11 e ficou com vencimento 04/05/2027.)
+  const mesesSub = 1;
   const venc = new Date(base); venc.setMonth(venc.getMonth() + mesesSub);
   const vencStr = `${venc.getFullYear()}-${String(venc.getMonth()+1).padStart(2,"0")}-${String(venc.getDate()).padStart(2,"0")}`;
   const valorLiquido = payment.transaction_details?.net_received_amount ?? null;
